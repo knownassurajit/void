@@ -45,8 +45,8 @@ import com.voidlauncher.app.helper.setPlainWallpaperByTheme
 import com.voidlauncher.app.helper.showToast
 import com.voidlauncher.app.listener.OnSwipeTouchListener
 import com.voidlauncher.app.listener.ViewSwipeTouchListener
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener {
@@ -249,8 +249,8 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         binding.date.isVisible = Constants.DateTime.isDateVisible(prefs.dateTimeVisibility)
 
 //        var dateText = SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date())
-        val dateFormat = SimpleDateFormat("EEE, d MMM", Locale.getDefault())
-        var dateText = dateFormat.format(Date())
+        val dateFormat = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault())
+        var dateText = dateFormat.format(LocalDate.now())
 
         if (!prefs.showStatusBar) {
             val battery = (requireContext().getSystemService(Context.BATTERY_SERVICE) as BatteryManager)
