@@ -68,4 +68,5 @@ dependencies {
     // App Optimization (Baseline Profiles)
     implementation "androidx.profileinstaller:profileinstaller:1.4.1"
 
+    testImplementation 'junit:junit:4.13.2'
 }
