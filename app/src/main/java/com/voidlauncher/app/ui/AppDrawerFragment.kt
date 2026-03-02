@@ -16,6 +16,7 @@ import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.AnimationUtils
 import android.widget.TextView
+import java.net.URLEncoder
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -274,10 +275,12 @@ class AppDrawerFragment : Fragment() {
     private fun initSearch() {
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
-                if (query?.startsWith("!") == true)
-                    requireContext().openUrl(Constants.URL_DUCK_SEARCH + query.replace(" ", "%20"))
-                else if (adapter.itemCount == 0 || adapter.appFilteredList.isEmpty())
+                if (query?.startsWith("!") == true) {
+                    val encodedQuery = URLEncoder.encode(query, "UTF-8")
+                    requireContext().openUrl(Constants.URL_DUCK_SEARCH + encodedQuery)
+                } else if (adapter.itemCount == 0 || adapter.appFilteredList.isEmpty()) {
                     requireContext().openSearch(query?.trim())
+                }
                 else
                     adapter.launchFirstInList()
                 return true
