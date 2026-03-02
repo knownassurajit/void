@@ -49,6 +49,8 @@ dependencies {
     implementation fileTree(dir: "libs", include: ["*.jar"])
     implementation libs.kotlin.stdlib
     implementation libs.core.ktx
+
+    testImplementation 'junit:junit:4.13.2'
     implementation libs.appcompat
     implementation libs.recyclerview
 
