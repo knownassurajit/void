@@ -105,7 +105,7 @@ class AppDrawerFragment : Fragment() {
             searchAutoComplete?.apply {
                 // paddingStart = 28dp (20dp icon + 8dp margin) to not overlap with the icon initially
                 setPadding((28 * resources.displayMetrics.density).toInt(), paddingTop, paddingRight, paddingBottom)
-                textSize = (prefs.textSizeScale * 18).toFloat()
+                textSize = (prefs.textSizeScale * 16).toFloat()
                 gravity = prefs.appLabelAlignment or android.view.Gravity.CENTER_VERTICAL
             }
         } catch (e: Exception) {
@@ -269,7 +269,9 @@ class AppDrawerFragment : Fragment() {
             val launcherApps = requireContext()
                 .getSystemService(LauncherApps::class.java) ?: return
             val infoList = launcherApps.getActivityList(null, handle)
-            val privateModels = infoList.map { info ->
+            val privateModels = infoList.filter { info ->
+                !info.label.toString().equals("Add", ignoreCase = true)
+            }.map { info ->
                 AppModel.App(
                     appLabel = info.label.toString(),
                     key = null,
