@@ -25,7 +25,7 @@
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:background="@drawable/bg_search_bar"
+            android:background="@drawable/search_bar_card"
             android:paddingStart="12dp"
             android:paddingEnd="12dp">
 
