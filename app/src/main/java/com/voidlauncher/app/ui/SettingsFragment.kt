@@ -26,12 +26,13 @@ import com.voidlauncher.app.R
 import com.voidlauncher.app.data.Constants
 import com.voidlauncher.app.data.Prefs
 import com.voidlauncher.app.databinding.FragmentSettingsBinding
+import com.voidlauncher.app.helper.animateAlpha
 import com.voidlauncher.app.helper.appUsagePermissionGranted
 import com.voidlauncher.app.helper.getColorFromAttr
 import com.voidlauncher.app.helper.isAccessServiceEnabled
 import com.voidlauncher.app.helper.isDarkThemeOn
 import com.voidlauncher.app.helper.isEinkDisplay
-import com.voidlauncher.app.helper.isVoidDefault
+import com.voidlauncher.app.helper.isOlauncherDefault
 import com.voidlauncher.app.helper.isTablet
 import com.voidlauncher.app.helper.openAppInfo
 import com.voidlauncher.app.helper.openUrl
@@ -62,13 +63,14 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         viewModel = activity?.run {
             ViewModelProvider(this)[MainViewModel::class.java]
         } ?: throw Exception("Invalid Activity")
-        viewModel.isVoidDefault()
+        viewModel.isOlauncherDefault()
 
         deviceManager = requireContext().getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         componentName = ComponentName(requireContext(), DeviceAdmin::class.java)
         checkAdminPermission()
 
         binding.homeAppsNum.text = prefs.homeAppsNum.toString()
+        populateProMessage()
         populateKeyboardText()
         populateScreenTimeOnOff()
         populateLockSettings()
@@ -86,64 +88,53 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
     }
 
     override fun onClick(view: View) {
+        var hideOverlay = true
 
-        // Apply pending text-size unless the tap is within the text-size controls
+        binding.appsNumSelectLayout.visibility = View.GONE
+        binding.dateTimeSelectLayout.visibility = View.GONE
+        binding.appThemeSelectLayout.visibility = View.GONE
+        binding.swipeDownSelectLayout.visibility = View.GONE
+        
         val isTextSizeClick = view.id == R.id.textSizeMinus || view.id == R.id.textSizePlus || view.id == R.id.textSizeCurrent || view.id == R.id.textSizesLayout
-        if (!isTextSizeClick) {
+        if (isTextSizeClick) {
+            hideOverlay = false
+        } else {
             if (binding.textSizesLayout.visibility == View.VISIBLE) {
                 applyTextSizeScale()
             }
         }
-
-        // Close all inline sub-layouts unless the tap is on their trigger
-        if (view.id != R.id.textSizeValue && view.id != R.id.textSizeMinus && view.id != R.id.textSizePlus) {
+        
+        if (hideOverlay && view.id != R.id.textSizeValue) {
             binding.textSizesLayout.visibility = View.GONE
         }
 
-        if (view.id != R.id.alignment && view.id != R.id.alignmentBottom && view.id != R.id.alignmentLeft && view.id != R.id.alignmentCenter && view.id != R.id.alignmentRight) {
+        if (view.id == R.id.alignmentBottom) {
+            hideOverlay = false
+        } else {
             binding.alignmentSelectLayout.visibility = View.GONE
         }
 
-        if (view.id != R.id.homeAppsNum && view.id != R.id.appsMinus && view.id != R.id.appsPlus) {
-            binding.appsNumSelectLayout.visibility = View.GONE
-        }
-
-        if (view.id != R.id.dateTime && view.id != R.id.dateTimeOn && view.id != R.id.dateTimeOff && view.id != R.id.dateOnly) {
-            binding.dateTimeSelectLayout.visibility = View.GONE
-        }
-
-        if (view.id != R.id.swipeDownAction && view.id != R.id.notifications && view.id != R.id.search) {
-            binding.swipeDownSelectLayout.visibility = View.GONE
+        if (hideOverlay && view.id != R.id.textSizeValue && view.id != R.id.homeAppsNum && view.id != R.id.alignment && view.id != R.id.dateTime && view.id != R.id.appThemeText && view.id != R.id.swipeDownAction) {
+            binding.popupOverlay.isVisible = false
         }
 
         when (view.id) {
-            R.id.voidHiddenApps -> showHiddenApps()
+            R.id.olauncherHiddenApps -> showHiddenApps()
+            R.id.moreFeatures -> viewModel.showDialog.postValue(Constants.Dialog.PRO_MESSAGE)
             R.id.screenTimeOnOff -> viewModel.showDialog.postValue(Constants.Dialog.DIGITAL_WELLBEING)
             R.id.appInfo -> openAppInfo(requireContext(), Process.myUserHandle(), BuildConfig.APPLICATION_ID)
             R.id.setLauncher -> viewModel.resetLauncherLiveData.call()
             R.id.toggleLock -> toggleLockMode()
             R.id.autoShowKeyboard -> toggleKeyboardText()
             R.id.homeAppsNum -> {
-                // Toggle inline +/- counter visibility
-                val isVisible = binding.appsNumSelectLayout.visibility == View.VISIBLE
-                binding.appsNumSelectLayout.visibility = if (isVisible) View.GONE else View.VISIBLE
-                if (!isVisible) binding.appsNumCurrent.text = prefs.homeAppsNum.toString()
-            }
-            R.id.appsMinus -> {
-                val newNum = (prefs.homeAppsNum - 1).coerceIn(0, 10)
-                updateHomeAppsNum(newNum)
-                binding.appsNumCurrent.text = newNum.toString()
-            }
-            R.id.appsPlus -> {
-                val newNum = (prefs.homeAppsNum + 1).coerceIn(0, 10)
-                updateHomeAppsNum(newNum)
-                binding.appsNumCurrent.text = newNum.toString()
+                binding.popupOverlay.isVisible = true
+                binding.appsNumSelectLayout.visibility = View.VISIBLE
             }
             R.id.dailyWallpaperUrl -> { /* URL redirect removed */ }
             R.id.dailyWallpaper -> toggleDailyWallpaperUpdate()
             R.id.alignment -> {
-                val isVisible = binding.alignmentSelectLayout.visibility == View.VISIBLE
-                binding.alignmentSelectLayout.visibility = if (isVisible) View.GONE else View.VISIBLE
+                binding.popupOverlay.isVisible = true
+                binding.alignmentSelectLayout.visibility = View.VISIBLE
             }
             R.id.alignmentLeft -> viewModel.updateHomeAlignment(Gravity.START)
             R.id.alignmentCenter -> viewModel.updateHomeAlignment(Gravity.CENTER)
@@ -151,28 +142,40 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             R.id.alignmentBottom -> updateHomeBottomAlignment()
             R.id.statusBar -> toggleStatusBar()
             R.id.dateTime -> {
-                val isVisible = binding.dateTimeSelectLayout.visibility == View.VISIBLE
-                binding.dateTimeSelectLayout.visibility = if (isVisible) View.GONE else View.VISIBLE
+                binding.popupOverlay.isVisible = true
+                binding.dateTimeSelectLayout.visibility = View.VISIBLE
             }
             R.id.dateTimeOn -> toggleDateTime(Constants.DateTime.ON)
             R.id.dateTimeOff -> toggleDateTime(Constants.DateTime.OFF)
             R.id.dateOnly -> toggleDateTime(Constants.DateTime.DATE_ONLY)
             R.id.appThemeText -> {
+                binding.popupOverlay.isVisible = true
                 binding.appThemeSelectLayout.visibility = View.VISIBLE
             }
             R.id.themeLight -> updateTheme(AppCompatDelegate.MODE_NIGHT_NO)
             R.id.themeDark -> updateTheme(AppCompatDelegate.MODE_NIGHT_YES)
             R.id.themeSystem -> updateTheme(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
             R.id.textSizeValue -> {
-                val isVisible = binding.textSizesLayout.visibility == View.VISIBLE
-                binding.textSizesLayout.visibility = if (isVisible) View.GONE else View.VISIBLE
+                binding.popupOverlay.isVisible = true
+                binding.textSizesLayout.visibility = View.VISIBLE
             }
             R.id.actionAccessibility -> openAccessibilityService()
-            R.id.closeAccessibility,
-            R.id.accessibilityLayout -> toggleAccessibilityVisibility(false)
+            R.id.closeAccessibility -> toggleAccessibilityVisibility(false)
             R.id.notWorking -> { /* URL redirect removed */ }
 
             R.id.tvGestures -> binding.flSwipeDown.visibility = View.VISIBLE
+
+            R.id.maxApps0 -> updateHomeAppsNum(0)
+            R.id.maxApps1 -> updateHomeAppsNum(1)
+            R.id.maxApps2 -> updateHomeAppsNum(2)
+            R.id.maxApps3 -> updateHomeAppsNum(3)
+            R.id.maxApps4 -> updateHomeAppsNum(4)
+            R.id.maxApps5 -> updateHomeAppsNum(5)
+            R.id.maxApps6 -> updateHomeAppsNum(6)
+            R.id.maxApps7 -> updateHomeAppsNum(7)
+            R.id.maxApps8 -> updateHomeAppsNum(8)
+            R.id.maxApps9 -> updateHomeAppsNum(9)
+            R.id.maxApps10 -> updateHomeAppsNum(10)
 
             R.id.textSizeMinus -> adjustTextSizePreview(-0.1f)
             R.id.textSizePlus -> adjustTextSizePreview(0.1f)
@@ -180,15 +183,15 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             R.id.swipeLeftApp -> showAppListIfEnabled(Constants.FLAG_SET_SWIPE_LEFT_APP)
             R.id.swipeRightApp -> showAppListIfEnabled(Constants.FLAG_SET_SWIPE_RIGHT_APP)
             R.id.swipeDownAction -> {
-                val isVisible = binding.swipeDownSelectLayout.visibility == View.VISIBLE
-                binding.swipeDownSelectLayout.visibility = if (isVisible) View.GONE else View.VISIBLE
+                binding.popupOverlay.isVisible = true
+                binding.swipeDownSelectLayout.visibility = View.VISIBLE
             }
             R.id.notifications -> updateSwipeDownAction(Constants.SwipeDownAction.NOTIFICATIONS)
             R.id.search -> updateSwipeDownAction(Constants.SwipeDownAction.SEARCH)
 
-            R.id.systemSettings -> startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
-
             // Footer and social links removed — no-op
+            R.id.aboutOlauncher,
+            R.id.moreFeatures,
             R.id.share,
             R.id.rate,
             R.id.twitter,
@@ -221,16 +224,16 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
 
     private fun initClickListeners() {
         binding.popupOverlay.setOnClickListener(this)
-        binding.voidHiddenApps.setOnClickListener(this)
+        binding.olauncherHiddenApps.setOnClickListener(this)
         binding.scrollLayout.setOnClickListener(this)
         binding.appInfo.setOnClickListener(this)
         binding.setLauncher.setOnClickListener(this)
-        binding.systemSettings.setOnClickListener(this)
+        // aboutOlauncher + moreFeatures are hidden stubs — still registered for no-op
+        binding.aboutOlauncher.setOnClickListener(this)
+        binding.moreFeatures.setOnClickListener(this)
         binding.autoShowKeyboard.setOnClickListener(this)
         binding.toggleLock.setOnClickListener(this)
         binding.homeAppsNum.setOnClickListener(this)
-        binding.appsMinus.setOnClickListener(this)
-        binding.appsPlus.setOnClickListener(this)
         binding.screenTimeOnOff.setOnClickListener(this)
         binding.dailyWallpaperUrl.setOnClickListener(this)
         binding.dailyWallpaper.setOnClickListener(this)
@@ -256,7 +259,6 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         binding.textSizeValue.setOnClickListener(this)
         binding.actionAccessibility.setOnClickListener(this)
         binding.closeAccessibility.setOnClickListener(this)
-        binding.accessibilityLayout.setOnClickListener(this)
         binding.notWorking.setOnClickListener(this)
         // Footer stubs — hidden, no-op
         binding.twitter.setOnClickListener(this)
@@ -265,6 +267,18 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         binding.github.setOnClickListener(this)
         binding.privacy.setOnClickListener(this)
         binding.footer.setOnClickListener(this)
+
+        binding.maxApps0.setOnClickListener(this)
+        binding.maxApps1.setOnClickListener(this)
+        binding.maxApps2.setOnClickListener(this)
+        binding.maxApps3.setOnClickListener(this)
+        binding.maxApps4.setOnClickListener(this)
+        binding.maxApps5.setOnClickListener(this)
+        binding.maxApps6.setOnClickListener(this)
+        binding.maxApps7.setOnClickListener(this)
+        binding.maxApps8.setOnClickListener(this)
+        binding.maxApps9.setOnClickListener(this)
+        binding.maxApps10.setOnClickListener(this)
 
         binding.textSizeMinus.setOnClickListener(this)
         binding.textSizePlus.setOnClickListener(this)
@@ -282,7 +296,7 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             viewModel.showDialog.postValue(Constants.Dialog.ABOUT)
             prefs.firstSettingsOpen = false
         }
-        viewModel.isVoidDefault.observe(viewLifecycleOwner) {
+        viewModel.isOlauncherDefault.observe(viewLifecycleOwner) {
             if (it) {
                 binding.setLauncher.text = getString(R.string.change_default_launcher)
                 prefs.toShowHintCounter += 1
@@ -393,16 +407,8 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             binding.notWorking.visibility = View.VISIBLE
         if (isAccessServiceEnabled(requireContext()))
             binding.actionAccessibility.text = getString(R.string.disable)
-        if (show) {
-            binding.popupOverlay.isVisible = false
-            binding.appsNumSelectLayout.visibility = View.GONE
-            binding.dateTimeSelectLayout.visibility = View.GONE
-            binding.alignmentSelectLayout.visibility = View.GONE
-            binding.textSizesLayout.visibility = View.GONE
-            binding.swipeDownSelectLayout.visibility = View.GONE
-            binding.accessibilityLayout.bringToFront()
-        }
         binding.accessibilityLayout.isVisible = show
+        binding.scrollView.animateAlpha(if (show) 0.5f else 1f)
     }
 
     private fun openAccessibilityService() {
@@ -462,7 +468,7 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
     }
 
     private fun toggleDailyWallpaperUpdate() {
-        if (prefs.dailyWallpaper.not() && viewModel.isVoidDefault.value == false) {
+        if (prefs.dailyWallpaper.not() && viewModel.isOlauncherDefault.value == false) {
             requireContext().showToast(R.string.set_as_default_launcher_first)
             return
         }
@@ -475,10 +481,10 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
     }
 
     private fun showWallpaperToasts() {
-        if (isVoidDefault(requireContext()))
+        if (isOlauncherDefault(requireContext()))
             requireContext().showToast(getString(R.string.your_wallpaper_will_update_shortly))
         else
-            requireContext().showToast(getString(R.string.void_is_not_default_launcher), Toast.LENGTH_LONG)
+            requireContext().showToast(getString(R.string.olauncher_is_not_default_launcher), Toast.LENGTH_LONG)
     }
 
     private fun updateHomeAppsNum(num: Int) {
@@ -582,8 +588,8 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
     }
 
     private fun updateHomeBottomAlignment() {
-        if (viewModel.isVoidDefault.value != true) {
-            requireContext().showToast(getString(R.string.please_set_void_as_default_first), Toast.LENGTH_LONG)
+        if (viewModel.isOlauncherDefault.value != true) {
+            requireContext().showToast(getString(R.string.please_set_olauncher_as_default_first), Toast.LENGTH_LONG)
             return
         }
         prefs.homeBottomAlignment = !prefs.homeBottomAlignment
@@ -662,6 +668,13 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
 
     private fun populateActionHints() {
         // About and rate views removed from UI — no hints to show
+    }
+
+    private fun populateProMessage() {
+        if (prefs.proMessageShown.not() && prefs.userState == Constants.UserState.SHARE) {
+            prefs.proMessageShown = true
+            viewModel.showDialog.postValue(Constants.Dialog.PRO_MESSAGE)
+        }
     }
 
     override fun onDestroyView() {

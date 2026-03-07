@@ -15,7 +15,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.AnimationUtils
-//import android.widget.TextView
+import android.widget.TextView
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -103,12 +103,9 @@ class AppDrawerFragment : Fragment() {
                     androidx.appcompat.R.id.search_src_text
                 )
             searchAutoComplete?.apply {
-                val density = resources.displayMetrics.density
-                val startPadding = (28 * density).toInt() // 20dp icon + 8dp gap
-                val verticalPadding = (8 * density).toInt()
-
-                setPadding(startPadding, verticalPadding, paddingRight, verticalPadding)
-                textSize = (prefs.textSizeScale * 24).toFloat()
+                // paddingStart = 28dp (20dp icon + 8dp margin) to not overlap with the icon initially
+                setPadding((28 * resources.displayMetrics.density).toInt(), paddingTop, paddingRight, paddingBottom)
+                textSize = (prefs.textSizeScale * 16).toFloat()
                 gravity = prefs.appLabelAlignment or android.view.Gravity.CENTER_VERTICAL
             }
         } catch (e: Exception) {
@@ -129,10 +126,8 @@ class AppDrawerFragment : Fragment() {
                 .findViewById<android.widget.AutoCompleteTextView>(
                     androidx.appcompat.R.id.search_src_text
                 ) ?: return
-
-            val density = resources.displayMetrics.density
-            val initialStartPadding = (28 * density).toInt()
-            val verticalPadding = (8 * density).toInt()
+            
+            val initialPadding = (28 * resources.displayMetrics.density).toInt()
             
             searchAutoComplete.setOnFocusChangeListener { _, hasFocus ->
                 // If losing focus but text is not empty, keep it translated
@@ -155,10 +150,10 @@ class AppDrawerFragment : Fragment() {
 
                     // Remove padding when focused so text can use the space
                     searchAutoComplete.setPadding(
-                        if (hasFocus) 0 else initialStartPadding,
-                        verticalPadding,
+                        if (hasFocus) 0 else initialPadding,
+                        searchAutoComplete.paddingTop,
                         searchAutoComplete.paddingRight,
-                        verticalPadding
+                        searchAutoComplete.paddingBottom
                     )
                 }
             }
@@ -274,25 +269,14 @@ class AppDrawerFragment : Fragment() {
             val launcherApps = requireContext()
                 .getSystemService(LauncherApps::class.java) ?: return
             val infoList = launcherApps.getActivityList(null, handle)
-            val privateModels = infoList
-                // Intentional UX: keep private-space management in Settings, not app library.
-                .filterNot { info ->
-                    val label = info.label?.toString()?.trim().orEmpty()
-                    val packageName = info.applicationInfo.packageName
-                    // Hide ALL settings activities from Private Space section
-                    packageName == "com.android.settings" ||
-                    // Also catch any "Add" label regardless of package
-                    label.equals("Add", ignoreCase = true)
-                }
-                .mapNotNull { info ->
-                val label = info.label?.toString()?.trim().orEmpty()
-                val packageName = info.applicationInfo.packageName
-                val className = info.componentName.className
+            val privateModels = infoList.filter { info ->
+                !info.label.toString().equals("Add", ignoreCase = true)
+            }.map { info ->
                 AppModel.App(
-                    appLabel = label,
+                    appLabel = info.label.toString(),
                     key = null,
-                    appPackage = packageName,
-                    activityClassName = className,
+                    appPackage = info.applicationInfo.packageName,
+                    activityClassName = info.componentName.className,
                     isNew = false,
                     user = handle
                 )
@@ -342,7 +326,7 @@ class AppDrawerFragment : Fragment() {
                     binding.appRename.visibility =
                         if (canRename && newText.isNotBlank()) View.VISIBLE else View.GONE
                         
-                    // If text is cleared, and we don't have focus, revert animation
+                    // If text is cleared and we don't have focus, revert animation
                     if (newText.isEmpty() && !binding.search.hasFocus()) {
                         val searchIcon = binding.searchIcon
                         ObjectAnimator.ofFloat(searchIcon, "translationX", 0f).apply {
