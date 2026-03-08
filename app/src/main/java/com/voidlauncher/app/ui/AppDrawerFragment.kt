@@ -50,11 +50,6 @@ class AppDrawerFragment : Fragment() {
     private var flag = Constants.FLAG_LAUNCH_APP
     private var canRename = false
 
-    // ── Private Space state ────────────────────────────────────────────────────
-    private var privateProfileHandle: UserHandle? = null
-    private var profileAvailableReceiver: BroadcastReceiver? = null
-    private var profileUnavailableReceiver: BroadcastReceiver? = null
-
     private val viewModel: MainViewModel by activityViewModels()
     private var _binding: FragmentAppDrawerBinding? = null
     private val binding get() = _binding!!
@@ -76,18 +71,11 @@ class AppDrawerFragment : Fragment() {
             canRename = it.getBoolean(Constants.Key.RENAME, false)
         }
 
-        resolvePrivateProfile()
         initViews()
         initSearch()
         initAdapter()
         initObservers()
         initClickListeners()
-        listenForPrivateProfileUnlock()
-
-        // If Private Space exists and is already unlocked, load the apps immediately
-        if (privateProfileHandle != null && !isPrivateSpaceLocked()) {
-            loadAndInjectPrivateApps()
-        }
     }
 
     private fun initViews() {
@@ -167,143 +155,6 @@ class AppDrawerFragment : Fragment() {
         }
     }
 
-    // ── Private Space detection ────────────────────────────────────────────────
-
-    /**
-     * Resolves the private user profile handle (Android 15+ / API 35+).
-     * Falls back to null on older APIs — the Private Space item will simply never show.
-     */
-    private fun resolvePrivateProfile() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
-        try {
-            val launcherApps = requireContext().getSystemService(LauncherApps::class.java) ?: return
-            privateProfileHandle = launcherApps.profiles.firstOrNull { user ->
-                try {
-                    val info = launcherApps.getLauncherUserInfo(user)
-                    info != null && info.userType == UserManager.USER_TYPE_PROFILE_PRIVATE
-                } catch (e: Exception) { false }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    /**
-     * Returns true when the Private Space profile exists AND is currently locked
-     * (quiet mode enabled = space is locked).
-     * Only relevant on API 35+.
-     */
-    private fun isPrivateSpaceLocked(): Boolean {
-        val handle = privateProfileHandle ?: return false
-        return try {
-            val userManager = requireContext().getSystemService(UserManager::class.java) ?: return false
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM)
-                userManager.isQuietModeEnabled(handle)
-            else false
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    /**
-     * Fires the system biometric/PIN prompt to unlock the Private Space.
-     * Passes `false` to requestQuietModeEnabled = "please disable quiet mode (unlock)".
-     */
-    private fun triggerPrivateSpaceUnlock() {
-        val handle = privateProfileHandle ?: return
-        try {
-            val userManager = requireContext().getSystemService(UserManager::class.java) ?: return
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                // This hands control to the system — the OS shows the biometric/PIN prompt
-                userManager.requestQuietModeEnabled(false, handle)
-            }
-        } catch (e: SecurityException) {
-            requireContext().showToast("Permission not granted for Private Space")
-        } catch (e: Exception) {
-            requireContext().showToast("Unable to unlock Private Space")
-        }
-    }
-
-    /**
-     * Registers a broadcast receiver for ACTION_PROFILE_AVAILABLE.
-     * When the user unlocks the Private Space, queries LauncherApps for the private profile's
-     * apps and injects them as a dedicated section at the top of the drawer.
-     */
-    private fun listenForPrivateProfileUnlock() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
-        if (privateProfileHandle == null) return
-
-        profileAvailableReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action != Intent.ACTION_PROFILE_AVAILABLE) return
-                // Clear the synthetic unlock row
-                adapter.showPrivateSpaceItem = false
-                // Query private space apps via LauncherApps
-                loadAndInjectPrivateApps()
-            }
-        }
-        ContextCompat.registerReceiver(
-            requireContext(),
-            profileAvailableReceiver,
-            IntentFilter(Intent.ACTION_PROFILE_AVAILABLE),
-            ContextCompat.RECEIVER_EXPORTED
-        )
-
-        // Auto-vanish: remove private apps when Private Space locks again
-        profileUnavailableReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action != Intent.ACTION_PROFILE_UNAVAILABLE) return
-                adapter.clearPrivateApps()
-            }
-        }
-        ContextCompat.registerReceiver(
-            requireContext(),
-            profileUnavailableReceiver,
-            IntentFilter(Intent.ACTION_PROFILE_UNAVAILABLE),
-            ContextCompat.RECEIVER_EXPORTED
-        )
-    }
-
-    /**
-     * Loads apps belonging to the private profile via LauncherApps and injects them
-     * as a "Private Space" section at the top of the adapter list.
-     */
-    private fun loadAndInjectPrivateApps() {
-        val handle = privateProfileHandle ?: return
-        try {
-            val launcherApps = requireContext()
-                .getSystemService(LauncherApps::class.java) ?: return
-            val infoList = launcherApps.getActivityList(null, handle)
-            val privateModels = infoList
-                // Intentional UX: keep private-space management in Settings, not app library.
-                .filterNot { info ->
-                    val label = info.label?.toString()?.trim().orEmpty()
-                    val packageName = info.applicationInfo.packageName
-                    // Hide ALL settings activities from Private Space section
-                    packageName == "com.android.settings" ||
-                    // Also catch any "Add" label regardless of package
-                    label.equals("Add", ignoreCase = true)
-                }
-                .mapNotNull { info ->
-                val label = info.label?.toString()?.trim().orEmpty()
-                val packageName = info.applicationInfo.packageName
-                val className = info.componentName.className
-                AppModel.App(
-                    appLabel = label,
-                    key = null,
-                    appPackage = packageName,
-                    activityClassName = className,
-                    isNew = false,
-                    user = handle
-                )
-            }.sortedBy { it.appLabel }
-            adapter.injectPrivateApps(privateModels)
-            viewModel.getAppList()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
     // ── Search interception ────────────────────────────────────────────────────
 
     private fun initSearch() {
@@ -320,23 +171,6 @@ class AppDrawerFragment : Fragment() {
 
             override fun onQueryTextChange(newText: String): Boolean {
                 try {
-                    // ── Private Space interception ──────────────────────────
-                    val queryLower = newText.trim().lowercase()
-                    val matchesPrivate = queryLower == "private" ||
-                            queryLower == "private space" ||
-                            queryLower == "private space" ||
-                            queryLower.startsWith("priv") && "private space".startsWith(queryLower)
-
-                    val shouldShowPrivateRow = matchesPrivate
-                            && flag == Constants.FLAG_LAUNCH_APP
-                            && privateProfileHandle != null
-                            && isPrivateSpaceLocked()
-
-                    if (adapter.showPrivateSpaceItem != shouldShowPrivateRow) {
-                        adapter.showPrivateSpaceItem = shouldShowPrivateRow
-                    }
-                    // ── end Private Space ────────────────────────────────────
-
                     adapter.filter.filter(newText)
                     binding.appDrawerTip.visibility = View.GONE
                     binding.appRename.visibility =
@@ -444,9 +278,6 @@ class AppDrawerFragment : Fragment() {
                 }
                 prefs.setAppRenameLabel(identifier, renameLabel)
                 viewModel.getAppList()
-            },
-            privateSpaceClickListener = {
-                triggerPrivateSpaceUnlock()
             }
         )
 
@@ -558,12 +389,6 @@ class AppDrawerFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        profileAvailableReceiver?.let {
-            try { requireContext().unregisterReceiver(it) } catch (_: Exception) {}
-        }
-        profileUnavailableReceiver?.let {
-            try { requireContext().unregisterReceiver(it) } catch (_: Exception) {}
-        }
         super.onDestroyView()
         _binding = null
     }

@@ -20,8 +20,6 @@ import com.voidlauncher.app.R
 import com.voidlauncher.app.data.AppModel
 import com.voidlauncher.app.data.Constants
 import com.voidlauncher.app.databinding.ItemAppDrawerBinding
-import com.voidlauncher.app.databinding.AdapterPrivateSpaceBinding
-import com.voidlauncher.app.databinding.AdapterSectionHeaderBinding
 import com.voidlauncher.app.helper.hideKeyboard
 import com.voidlauncher.app.helper.isSystemApp
 import com.voidlauncher.app.helper.showKeyboard
@@ -30,8 +28,6 @@ import java.text.Normalizer
 /** Sealed item for the drawer list. */
 sealed class DrawerItem {
     data class AppItem(val appModel: AppModel) : DrawerItem()
-    object PrivateSpace : DrawerItem()
-    data class SectionHeader(val title: String) : DrawerItem()
 }
 
 class AppDrawerAdapter(
@@ -42,13 +38,10 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
-    private val privateSpaceClickListener: (() -> Unit)? = null,
 ) : ListAdapter<DrawerItem, RecyclerView.ViewHolder>(DIFF_CALLBACK), Filterable {
 
     companion object {
         const val VIEW_TYPE_APP = 0
-        const val VIEW_TYPE_PRIVATE_SPACE = 1
-        const val VIEW_TYPE_SECTION_HEADER = 2
 
         val DIFF_CALLBACK = object : DiffUtil.ItemCallback<DrawerItem>() {
             override fun areItemsTheSame(oldItem: DrawerItem, newItem: DrawerItem): Boolean =
@@ -63,9 +56,6 @@ class AppDrawerAdapter(
                             else -> false
                         }
                     }
-                    oldItem is DrawerItem.PrivateSpace && newItem is DrawerItem.PrivateSpace -> true
-                    oldItem is DrawerItem.SectionHeader && newItem is DrawerItem.SectionHeader ->
-                        oldItem.title == newItem.title
                     else -> false
                 }
 
@@ -78,42 +68,21 @@ class AppDrawerAdapter(
     private val appFilter = createAppFilter()
     private val myUserHandle = android.os.Process.myUserHandle()
     
-    // Tracks injected apps from private space so they persist across search filtering
-    private var privateAppsList: List<AppModel> = emptyList()
     // Remembers the last query to re-filter gracefully when private space state changes
     private var currentQuery: CharSequence = ""
 
     var appsList: MutableList<AppModel> = mutableListOf()
     var appFilteredList: MutableList<AppModel> = mutableListOf()
 
-    // Controls whether the Private Space synthetic row is injected into results
-    var showPrivateSpaceItem: Boolean = false
-
-    override fun getItemViewType(position: Int): Int = when (getItem(position)) {
-        is DrawerItem.PrivateSpace -> VIEW_TYPE_PRIVATE_SPACE
-        is DrawerItem.SectionHeader -> VIEW_TYPE_SECTION_HEADER
-        else -> VIEW_TYPE_APP
-    }
+    override fun getItemViewType(position: Int): Int = VIEW_TYPE_APP
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder =
-        when (viewType) {
-            VIEW_TYPE_PRIVATE_SPACE -> PrivateSpaceViewHolder(
-                AdapterPrivateSpaceBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-            )
-            VIEW_TYPE_SECTION_HEADER -> SectionHeaderViewHolder(
-                AdapterSectionHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-            )
-            else -> AppViewHolder(
-                ItemAppDrawerBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-            )
-        }
+        AppViewHolder(
+            ItemAppDrawerBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        )
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val item = getItem(position)) {
-            is DrawerItem.PrivateSpace ->
-                (holder as PrivateSpaceViewHolder).bind(privateSpaceClickListener)
-            is DrawerItem.SectionHeader ->
-                (holder as SectionHeaderViewHolder).bind(item.title)
             is DrawerItem.AppItem -> {
                 try {
                     (holder as AppViewHolder).bind(
@@ -141,39 +110,22 @@ class AppDrawerAdapter(
                     appLabelMatches(app.appLabel, charSearch)
                 } as MutableList<AppModel>
 
-                val filteredPrivate: MutableList<AppModel> = if (charSearch.isNullOrBlank()) privateAppsList.toMutableList()
-                else privateAppsList.filter { app ->
-                    appLabelMatches(app.appLabel, charSearch)
-                } as MutableList<AppModel>
-
                 return FilterResults().apply {
-                    values = Pair(filteredMain, filteredPrivate)
+                    values = filteredMain
                 }
             }
 
             @Suppress("UNCHECKED_CAST")
             override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
                 results?.values?.let {
-                    val pair = it as Pair<MutableList<AppModel>, MutableList<AppModel>>
-                    val filteredMain = pair.first
-                    val filteredPrivate = pair.second
-
+                    val filteredMain = it as MutableList<AppModel>
                     appFilteredList = filteredMain
 
                     // Build DrawerItem list
                     val drawerItems = mutableListOf<DrawerItem>()
-                    if (showPrivateSpaceItem) {
-                        drawerItems.add(DrawerItem.PrivateSpace)
-                    }
                     
                     // Add main apps
                     filteredMain.forEach { app -> drawerItems.add(DrawerItem.AppItem(app)) }
-                    
-                    // Add private space apps under a section header if there are any
-                    if (filteredPrivate.isNotEmpty()) {
-                        drawerItems.add(DrawerItem.SectionHeader("Private Space"))
-                        filteredPrivate.forEach { app -> drawerItems.add(DrawerItem.AppItem(app)) }
-                    }
 
                     submitList(drawerItems)
                 }
@@ -199,22 +151,6 @@ class AppDrawerAdapter(
             .firstOrNull { it is DrawerItem.AppItem && (it as DrawerItem.AppItem).appModel.appPackage.isNotEmpty() }
             as? DrawerItem.AppItem
         firstApp?.let { appClickListener(it.appModel) }
-    }
-
-    /**
-     * Injects private space apps at the TOP of the list, preceded by a section header.
-     * Called by the fragment after ACTION_PROFILE_AVAILABLE is received.
-     */
-    fun injectPrivateApps(privateApps: List<AppModel>) {
-        if (privateApps.isEmpty()) return
-        privateAppsList = privateApps
-        appFilter.filter(currentQuery)
-    }
-
-    /** Called when ACTION_PROFILE_UNAVAILABLE fires (Private Space locks) */
-    fun clearPrivateApps() {
-        privateAppsList = emptyList()
-        appFilter.filter(currentQuery)
     }
 
     // ─── ViewHolder: real app item ────────────────────────────────────────────
@@ -332,23 +268,6 @@ class AppDrawerAdapter(
         private fun getAppName(context: Context, appPackage: String): String {
             val pm = context.packageManager
             return pm.getApplicationLabel(pm.getApplicationInfo(appPackage, 0)).toString()
-        }
-    }
-
-    // ─── ViewHolder: section header ───────────────────────────────────────────
-    class SectionHeaderViewHolder(private val binding: AdapterSectionHeaderBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-        fun bind(title: String) {
-            binding.sectionTitle.text = title.uppercase()
-        }
-    }
-
-    // ─── ViewHolder: Private Space synthetic row ──────────────────────────────
-    class PrivateSpaceViewHolder(private val binding: AdapterPrivateSpaceBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-
-        fun bind(clickListener: (() -> Unit)?) {
-            binding.root.setOnClickListener { clickListener?.invoke() }
         }
     }
 }
