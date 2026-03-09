@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mainActivityLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:animateLayoutChanges="true"
-    android:background="?attr/colorSurface">
+    android:animateLayoutChanges="true">
 
     <ScrollView
         android:id="@+id/scrollView"
@@ -73,7 +73,7 @@
                             android:contentDescription="@string/info"
                             android:padding="4dp"
                             android:src="@drawable/ic_info"
-                            android:tint="?attr/primaryColorTrans80" />
+                            app:tint="?attr/primaryColorTrans80" />
                     </LinearLayout>
 
                     <!-- System settings gear icon on the right -->
@@ -84,7 +84,7 @@
                         android:contentDescription="Settings"
                         android:padding="4dp"
                         android:src="@drawable/ic_settings"
-                        android:tint="?attr/primaryColorTrans80" />
+                        app:tint="?attr/primaryColorTrans80" />
                 </LinearLayout>
 
                 <View
@@ -330,6 +330,24 @@
                             android:text="@string/date_only"
                             android:textColor="?attr/primaryColor"
                             android:textSize="14sp" />
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center_vertical"
+                            android:background="@drawable/md3_divider" />
+
+                        <TextView
+                            android:id="@+id/timeOnly"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/google_sans_medium"
+                            android:gravity="center"
+                            android:paddingVertical="14dp"
+                            android:text="@string/time_only"
+                            android:textColor="?attr/primaryColor"
+                            android:textSize="14sp" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -372,50 +390,30 @@
                     </FrameLayout>
 
                     <!-- Inline alignment selector -->
-                    <HorizontalScrollView
+                    <LinearLayout
                         android:id="@+id/alignmentSelectLayout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:layout_marginBottom="8dp"
                         android:background="@drawable/md3_outlined_card"
-                        android:fadingEdgeLength="8dp"
-                        android:fillViewport="true"
-                        android:requiresFadingEdge="horizontal"
-                        android:scrollbars="none"
+                        android:orientation="vertical"
                         android:visibility="gone">
 
+                        <!-- Horizontal Alignment -->
                         <LinearLayout
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="center"
                             android:gravity="center"
                             android:orientation="horizontal">
 
                             <TextView
-                                android:id="@+id/alignmentBottom"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="@font/google_sans_medium"
-                                android:paddingHorizontal="20dp"
-                                android:paddingVertical="14dp"
-                                android:text="@string/bottom_off"
-                                android:textColor="?attr/primaryColor"
-                                android:textSize="14sp" />
-
-                            <View
-                                android:layout_width="1dp"
-                                android:layout_height="18dp"
-                                android:layout_gravity="center_vertical"
-                                android:background="@drawable/md3_divider" />
-
-                            <TextView
                                 android:id="@+id/alignmentLeft"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_weight="1"
                                 android:fontFamily="@font/google_sans_medium"
                                 android:gravity="center"
-                                android:paddingHorizontal="20dp"
                                 android:paddingVertical="14dp"
                                 android:text="@string/left"
                                 android:textColor="?attr/primaryColor"
@@ -424,16 +422,15 @@
                             <View
                                 android:layout_width="1dp"
                                 android:layout_height="18dp"
-                                android:layout_gravity="center_vertical"
                                 android:background="@drawable/md3_divider" />
 
                             <TextView
                                 android:id="@+id/alignmentCenter"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_weight="1"
                                 android:fontFamily="@font/google_sans_medium"
                                 android:gravity="center"
-                                android:paddingHorizontal="20dp"
                                 android:paddingVertical="14dp"
                                 android:text="@string/center"
                                 android:textColor="?attr/primaryColor"
@@ -442,22 +439,80 @@
                             <View
                                 android:layout_width="1dp"
                                 android:layout_height="18dp"
-                                android:layout_gravity="center_vertical"
                                 android:background="@drawable/md3_divider" />
 
                             <TextView
                                 android:id="@+id/alignmentRight"
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_weight="1"
                                 android:fontFamily="@font/google_sans_medium"
                                 android:gravity="center"
-                                android:paddingHorizontal="20dp"
                                 android:paddingVertical="14dp"
                                 android:text="@string/right"
                                 android:textColor="?attr/primaryColor"
                                 android:textSize="14sp" />
                         </LinearLayout>
-                    </HorizontalScrollView>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:background="@drawable/md3_divider" />
+
+                        <!-- Vertical Alignment -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/alignmentTop"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/google_sans_medium"
+                                android:gravity="center"
+                                android:paddingVertical="14dp"
+                                android:text="@string/top"
+                                android:textColor="?attr/primaryColor"
+                                android:textSize="14sp" />
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="18dp"
+                                android:background="@drawable/md3_divider" />
+
+                            <TextView
+                                android:id="@+id/alignmentMiddle"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/google_sans_medium"
+                                android:gravity="center"
+                                android:paddingVertical="14dp"
+                                android:text="@string/middle"
+                                android:textColor="?attr/primaryColor"
+                                android:textSize="14sp" />
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="18dp"
+                                android:background="@drawable/md3_divider" />
+
+                            <TextView
+                                android:id="@+id/alignmentBottom"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/google_sans_medium"
+                                android:gravity="center"
+                                android:paddingVertical="14dp"
+                                android:text="@string/bottom"
+                                android:textColor="?attr/primaryColor"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+                    </LinearLayout>
                 </LinearLayout>
 
                 <View
@@ -466,31 +521,80 @@
                     android:background="@drawable/md3_divider" />
 
                 <!-- Screen Time -->
-                <FrameLayout
+                <LinearLayout
                     android:id="@+id/screenTimeLayout"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:animateLayoutChanges="true"
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/google_sans_regular"
-                        android:paddingVertical="14dp"
-                        android:text="@string/screen_time"
-                        android:textColor="?attr/primaryColor"
-                        android:textSize="15sp" />
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
 
-                    <TextView
-                        android:id="@+id/screenTimeOnOff"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/google_sans_regular"
+                            android:paddingVertical="14dp"
+                            android:text="@string/screen_time"
+                            android:textColor="?attr/primaryColor"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:id="@+id/screenTimeValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="end|center_vertical"
+                            android:fontFamily="@font/google_sans_medium"
+                            android:paddingVertical="14dp"
+                            android:text="@string/on"
+                            android:textColor="?attr/primaryColor"
+                            android:textSize="15sp" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:id="@+id/screenTimeSelectLayout"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_gravity="end|center_vertical"
-                        android:fontFamily="@font/google_sans_medium"
-                        android:paddingVertical="14dp"
-                        android:text="@string/off"
-                        android:textColor="?attr/primaryColor"
-                        android:textSize="15sp" />
-                </FrameLayout>
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/md3_outlined_card"
+                        android:gravity="center"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/screenTimeOn"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/google_sans_medium"
+                            android:gravity="center"
+                            android:paddingVertical="14dp"
+                            android:text="@string/on"
+                            android:textColor="?attr/primaryColor"
+                            android:textSize="14sp" />
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center_vertical"
+                            android:background="@drawable/md3_divider" />
+
+                        <TextView
+                            android:id="@+id/screenTimeOff"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFamily="@font/google_sans_medium"
+                            android:gravity="center"
+                            android:paddingVertical="14dp"
+                            android:text="@string/off"
+                            android:textColor="?attr/primaryColor"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
 
             </LinearLayout>
 

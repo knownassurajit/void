@@ -38,6 +38,7 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
+    private val dragStartListener: (RecyclerView.ViewHolder) -> Unit,
 ) : ListAdapter<DrawerItem, RecyclerView.ViewHolder>(DIFF_CALLBACK), Filterable {
 
     companion object {
@@ -88,7 +89,7 @@ class AppDrawerAdapter(
                     (holder as AppViewHolder).bind(
                         flag, appLabelGravity, myUserHandle, item.appModel,
                         appClickListener, appDeleteListener, appInfoListener,
-                        appHideListener, appRenameListener
+                        appHideListener, appRenameListener, dragStartListener
                     )
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -167,6 +168,7 @@ class AppDrawerAdapter(
             appInfoListener: (AppModel) -> Unit,
             appHideListener: (AppModel, Int) -> Unit,
             appRenameListener: (AppModel, String) -> Unit,
+            dragStartListener: (RecyclerView.ViewHolder) -> Unit,
         ) = with(binding) {
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
@@ -179,28 +181,65 @@ class AppDrawerAdapter(
             appTitle.gravity = appLabelGravity
             otherProfileIndicator.isVisible = appModel.user != myUserHandle
 
-            appTitle.setOnClickListener { clickListener(appModel) }
-            appTitle.setOnLongClickListener {
-                if (appModel.appPackage.isNotEmpty()) {
-                    appDelete.alpha = when (
-                        appModel is AppModel.PinnedShortcut || !root.context.isSystemApp(appModel.appPackage)
-                    ) {
-                        true -> 1.0f
-                        false -> 0.5f
-                    }
-                    appHide.text = if (flag == Constants.FLAG_HIDDEN_APPS)
-                        root.context.getString(R.string.adapter_show)
-                    else
-                        root.context.getString(R.string.adapter_hide)
-                    appTitle.visibility = View.INVISIBLE
-                    appHide.alpha = when (appModel is AppModel.PinnedShortcut) {
-                        true -> 0.5f; false -> 1.0f
-                    }
-                    appHideLayout.visibility = View.VISIBLE
-                    appRename.isVisible = flag != Constants.FLAG_HIDDEN_APPS
+            root.setOnLongClickListener {
+                if (appModel.appPackage.isEmpty()) return@setOnLongClickListener true
+                root.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                
+                // start drag
+                dragStartListener(this@AppViewHolder)
+                
+                // show popup menu
+                val popup = androidx.appcompat.widget.PopupMenu(root.context, appTitle)
+                popup.menu.add(0, 1, 0, "Rename")
+                val hideToggleStr = if (flag == Constants.FLAG_HIDDEN_APPS) "Show" else "Hide"
+                popup.menu.add(0, 2, 0, hideToggleStr)
+                popup.menu.add(0, 3, 0, "Remove")
+                
+                popup.menu.getItem(0).isEnabled = flag != Constants.FLAG_HIDDEN_APPS
+                val isSystem = root.context.isSystemApp(appModel.appPackage)
+                val isPinned = appModel is AppModel.PinnedShortcut
+                if (isPinned || isSystem) {
+                    popup.menu.getItem(2).isEnabled = false
                 }
+                if (isPinned) {
+                    popup.menu.getItem(1).isEnabled = false
+                }
+                
+                popup.setOnMenuItemClickListener { item ->
+                    when(item.itemId) {
+                        1 -> {
+                            etAppRename.hint = getAppName(etAppRename.context, appModel.appPackage)
+                            etAppRename.setText(appModel.appLabel)
+                            etAppRename.setSelectAllOnFocus(true)
+                            renameLayout.visibility = View.VISIBLE
+                            appTitle.visibility = View.INVISIBLE
+                            appHideLayout.visibility = View.GONE
+                            etAppRename.showKeyboard()
+                            etAppRename.imeOptions = EditorInfo.IME_ACTION_DONE
+                            true
+                        }
+                        2 -> {
+                            appHideListener(appModel, bindingAdapterPosition)
+                            true
+                        }
+                        3 -> {
+                            appDeleteListener(appModel)
+                            true
+                        }
+                        else -> false
+                    }
+                }
+                popup.show()
                 true
             }
+
+            root.setOnClickListener {
+                clickListener(appModel)
+            }
+            
+            // Ensure no conflicting long click listener on title
+            appTitle.isClickable = false
+            appTitle.isLongClickable = false
 
             appRename.setOnClickListener {
                 if (appModel.appPackage.isNotEmpty()) {

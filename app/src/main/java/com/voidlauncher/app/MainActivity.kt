@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -95,7 +96,6 @@ class MainActivity : AppCompatActivity() {
             prefs.firstOpen = false
             prefs.firstOpenTime = System.currentTimeMillis()
             viewModel.setDefaultClockApp()
-            viewModel.resetLauncherLiveData.call()
         }
 
         initClickListeners()
@@ -119,6 +119,14 @@ class MainActivity : AppCompatActivity() {
     override fun onUserLeaveHint() {
         backToHomeScreen()
         super.onUserLeaveHint()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            if (prefs.showStatusBar) showStatusBar()
+            else hideStatusBar()
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -228,6 +236,27 @@ class MainActivity : AppCompatActivity() {
         binding.messageLayout.visibility = View.GONE
         if (navController.currentDestination?.id != R.id.mainFragment)
             navController.popBackStack(R.id.mainFragment, false)
+    }
+
+    private fun showStatusBar() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+            window.insetsController?.show(WindowInsets.Type.statusBars())
+        else
+            @Suppress("DEPRECATION", "InlinedApi")
+            window.decorView.apply {
+                systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            }
+    }
+
+    private fun hideStatusBar() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+            window.insetsController?.hide(WindowInsets.Type.statusBars())
+        else {
+            @Suppress("DEPRECATION")
+            window.decorView.apply {
+                systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE or View.SYSTEM_UI_FLAG_FULLSCREEN
+            }
+        }
     }
 
     private fun setPlainWallpaper() {

@@ -133,7 +133,23 @@ suspend fun getAppsList(
                 appList.addAll(pinned)
             }
 
-            appList.sortWith(compareBy(collator) { it.appLabel })
+            val customOrder = prefs.customAppOrder
+            appList.sortWith(Comparator { app1, app2 ->
+                val id1 = app1.appPackage + "|" + app1.user.toString()
+                val id2 = app2.appPackage + "|" + app2.user.toString()
+                val index1 = customOrder.indexOf(id1)
+                val index2 = customOrder.indexOf(id2)
+                
+                if (index1 != -1 && index2 != -1) {
+                    index1.compareTo(index2)
+                } else if (index1 != -1) {
+                    -1
+                } else if (index2 != -1) {
+                    1
+                } else {
+                    collator.compare(app1.appLabel, app2.appLabel)
+                }
+            })
         } catch (e: Exception) {
             e.printStackTrace()
         }

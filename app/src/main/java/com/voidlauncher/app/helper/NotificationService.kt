@@ -12,12 +12,22 @@ class NotificationService : NotificationListenerService() {
     companion object {
         val notificationsLiveData: MutableLiveData<List<NotificationGroup>> = MutableLiveData(emptyList())
         const val TAG = "NotificationService"
+        
+        @JvmStatic
+        var instance: NotificationService? = null
+            private set
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        instance = this
         Log.d(TAG, "Notification listener connected")
         updateNotifications()
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        instance = null
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

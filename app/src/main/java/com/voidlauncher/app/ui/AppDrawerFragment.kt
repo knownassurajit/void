@@ -46,6 +46,7 @@ class AppDrawerFragment : Fragment() {
     private lateinit var prefs: Prefs
     private lateinit var adapter: AppDrawerAdapter
     private lateinit var linearLayoutManager: LinearLayoutManager
+    private var itemTouchHelper: androidx.recyclerview.widget.ItemTouchHelper? = null
 
     private var flag = Constants.FLAG_LAUNCH_APP
     private var canRename = false
@@ -96,7 +97,7 @@ class AppDrawerFragment : Fragment() {
                 val verticalPadding = (8 * density).toInt()
 
                 setPadding(startPadding, verticalPadding, paddingRight, verticalPadding)
-                textSize = (prefs.appDrawerTextSizeScale * 24).toFloat()
+                textSize = (prefs.appDrawerTextSizeScale * 20).toFloat()
                 gravity = prefs.appLabelAlignment or android.view.Gravity.CENTER_VERTICAL
             }
         } catch (e: Exception) {
@@ -243,33 +244,33 @@ class AppDrawerFragment : Fragment() {
                 }
                 viewModel.getAppList()
             },
-            appHideListener = { appModel, position ->
+            appHideListener = { appModel: AppModel, position: Int ->
                 if (appModel is AppModel.PinnedShortcut) {
                     requireContext().showToast("Hiding pinned shortcuts is not supported")
-                    return@AppDrawerAdapter
-                }
-                adapter.appFilteredList.removeAt(position)
-                adapter.notifyItemRemoved(position)
-                adapter.appsList.remove(appModel)
+                } else {
+                    adapter.appFilteredList.removeAt(position)
+                    adapter.notifyItemRemoved(position)
+                    adapter.appsList.remove(appModel)
 
-                val newSet = mutableSetOf<String>()
-                newSet.addAll(prefs.hiddenApps)
-                if (flag == Constants.FLAG_HIDDEN_APPS) {
-                    newSet.remove(appModel.appPackage)
-                    newSet.remove(appModel.appPackage + "|" + appModel.user.toString())
-                } else
-                    newSet.add(appModel.appPackage + "|" + appModel.user.toString())
+                    val newSet = mutableSetOf<String>()
+                    newSet.addAll(prefs.hiddenApps)
+                    if (flag == Constants.FLAG_HIDDEN_APPS) {
+                        newSet.remove(appModel.appPackage)
+                        newSet.remove(appModel.appPackage + "|" + appModel.user.toString())
+                    } else
+                        newSet.add(appModel.appPackage + "|" + appModel.user.toString())
 
-                prefs.hiddenApps = newSet
-                if (newSet.isEmpty()) findNavController().popBackStack()
-                if (prefs.firstHide) {
-                    binding.search.hideKeyboard()
-                    prefs.firstHide = false
-                    viewModel.showDialog.postValue(Constants.Dialog.HIDDEN)
-                    findNavController().navigate(R.id.action_appListFragment_to_settingsFragment2)
+                    prefs.hiddenApps = newSet
+                    if (newSet.isEmpty()) findNavController().popBackStack()
+                    if (prefs.firstHide) {
+                        binding.search.hideKeyboard()
+                        prefs.firstHide = false
+                        viewModel.showDialog.postValue(Constants.Dialog.HIDDEN)
+                        findNavController().navigate(R.id.action_appListFragment_to_settingsFragment2)
+                    }
+                    viewModel.getAppList()
+                    viewModel.getHiddenApps()
                 }
-                viewModel.getAppList()
-                viewModel.getHiddenApps()
             },
             appRenameListener = { appModel, renameLabel ->
                 val identifier = when (appModel) {
@@ -278,6 +279,9 @@ class AppDrawerFragment : Fragment() {
                 }
                 prefs.setAppRenameLabel(identifier, renameLabel)
                 viewModel.getAppList()
+            },
+            dragStartListener = { viewHolder ->
+                itemTouchHelper?.startDrag(viewHolder)
             }
         )
 
@@ -297,9 +301,76 @@ class AppDrawerFragment : Fragment() {
         binding.recyclerView.adapter = adapter
         binding.recyclerView.addOnScrollListener(getRecyclerViewOnScrollListener())
         binding.recyclerView.itemAnimator = null
-        if (requireContext().isEinkDisplay().not())
-            binding.recyclerView.layoutAnimation =
-                AnimationUtils.loadLayoutAnimation(requireContext(), R.anim.layout_anim_from_bottom)
+
+        setupItemTouchHelper()
+    }
+
+    private fun setupItemTouchHelper() {
+        val callback = object : androidx.recyclerview.widget.ItemTouchHelper.SimpleCallback(
+            androidx.recyclerview.widget.ItemTouchHelper.UP or androidx.recyclerview.widget.ItemTouchHelper.DOWN, 0
+        ) {
+            override fun isLongPressDragEnabled(): Boolean = false
+            override fun isItemViewSwipeEnabled(): Boolean = false
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val fromPos = viewHolder.bindingAdapterPosition
+                val toPos = target.bindingAdapterPosition
+                if (fromPos == RecyclerView.NO_POSITION || toPos == RecyclerView.NO_POSITION) return false
+
+                val list = adapter.appFilteredList
+                val item = list.removeAt(fromPos)
+                list.add(toPos, item)
+                adapter.notifyItemMoved(fromPos, toPos)
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
+
+            override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+                super.clearView(recyclerView, viewHolder)
+                // Save the new order
+                val newOrder = adapter.appFilteredList.map { 
+                    it.appPackage + "|" + it.user.toString() 
+                }
+                
+                // Merge with existing full custom order so we don't drop apps not currently filtered
+                val existingOrder = prefs.customAppOrder.toMutableList()
+                val orderedSet = mutableSetOf<String>()
+                
+                // First add the currently visible ordered items
+                orderedSet.addAll(newOrder)
+                // Then append any existing items that weren't in the current filter
+                orderedSet.addAll(existingOrder.filter { it !in newOrder })
+                
+                prefs.customAppOrder = orderedSet.toList()
+                
+                // Also update the unfiltered list
+                val newFullOrderIds = prefs.customAppOrder
+                adapter.appsList.sortWith(Comparator { app1, app2 ->
+                    val id1 = app1.appPackage + "|" + app1.user.toString()
+                    val id2 = app2.appPackage + "|" + app2.user.toString()
+                    val index1 = newFullOrderIds.indexOf(id1)
+                    val index2 = newFullOrderIds.indexOf(id2)
+                    
+                    if (index1 != -1 && index2 != -1) {
+                        index1.compareTo(index2)
+                    } else if (index1 != -1) {
+                        -1
+                    } else if (index2 != -1) {
+                        1
+                    } else {
+                        val collator = java.text.Collator.getInstance()
+                        collator.compare(app1.appLabel, app2.appLabel)
+                    }
+                })
+            }
+        }
+        itemTouchHelper = androidx.recyclerview.widget.ItemTouchHelper(callback)
+        itemTouchHelper?.attachToRecyclerView(binding.recyclerView)
     }
 
     private fun initObservers() {
@@ -317,7 +388,6 @@ class AppDrawerFragment : Fragment() {
             viewModel.appList.observe(viewLifecycleOwner) {
                 it?.let { appModels ->
                     adapter.setAppList(appModels.toMutableList())
-                    adapter.filter.filter(binding.search.query)
                 }
             }
         }
@@ -380,7 +450,11 @@ class AppDrawerFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        binding.search.showKeyboard(prefs.autoShowKeyboard)
+        view?.postDelayed({
+            if (isResumed && _binding != null) {
+                binding.search.showKeyboard(prefs.autoShowKeyboard)
+            }
+        }, 250)
     }
 
     override fun onStop() {

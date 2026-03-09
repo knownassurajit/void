@@ -69,7 +69,7 @@
                     android:contentDescription="@string/close"
                     android:padding="6dp"
                     android:src="@drawable/ic_close"
-                    android:tint="?attr/primaryColor" />
+                    app:tint="?attr/primaryColor" />
             </FrameLayout>
 
             <!-- Divider -->

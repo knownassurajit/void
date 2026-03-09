@@ -22,6 +22,8 @@ class Prefs(context: Context) {
     private val DAILY_WALLPAPER_URL = "DAILY_WALLPAPER_URL"
     private val HOME_ALIGNMENT = "HOME_ALIGNMENT"
     private val HOME_BOTTOM_ALIGNMENT = "HOME_BOTTOM_ALIGNMENT"
+    private val HOME_VERTICAL_ALIGNMENT = "HOME_VERTICAL_ALIGNMENT"
+    private val SHOW_SCREEN_TIME = "SHOW_SCREEN_TIME"
     private val APP_LABEL_ALIGNMENT = "APP_LABEL_ALIGNMENT"
     private val STATUS_BAR = "STATUS_BAR"
     private val DATE_TIME_VISIBILITY = "DATE_TIME_VISIBILITY"
@@ -45,6 +47,7 @@ class Prefs(context: Context) {
     private val SCREEN_TIME_LAST_UPDATED = "SCREEN_TIME_LAST_UPDATED"
     private val LAUNCHER_RESTART_TIMESTAMP = "LAUNCHER_RECREATE_TIMESTAMP"
     private val SHOWN_ON_DAY_OF_YEAR = "SHOWN_ON_DAY_OF_YEAR"
+    private val CUSTOM_APP_ORDER = "CUSTOM_APP_ORDER"
 
     private val APP_NAME_1 = "APP_NAME_1"
     private val APP_NAME_2 = "APP_NAME_2"
@@ -182,6 +185,14 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(HOME_BOTTOM_ALIGNMENT, true)
         set(value) = prefs.edit { putBoolean(HOME_BOTTOM_ALIGNMENT, value).apply() }
 
+    var homeVerticalAlignment: Int
+        get() = prefs.getInt(HOME_VERTICAL_ALIGNMENT, if (homeBottomAlignment) Gravity.BOTTOM else Gravity.CENTER_VERTICAL)
+        set(value) = prefs.edit { putInt(HOME_VERTICAL_ALIGNMENT, value).apply() }
+
+    var showScreenTime: Boolean
+        get() = prefs.getBoolean(SHOW_SCREEN_TIME, true)
+        set(value) = prefs.edit { putBoolean(SHOW_SCREEN_TIME, value).apply() }
+
     var appLabelAlignment: Int
         get() = prefs.getInt(APP_LABEL_ALIGNMENT, Gravity.START)
         set(value) = prefs.edit { putInt(APP_LABEL_ALIGNMENT, value).apply() }
@@ -241,6 +252,10 @@ class Prefs(context: Context) {
     var shownOnDayOfYear: Int
         get() = prefs.getInt(SHOWN_ON_DAY_OF_YEAR, 0)
         set(value) = prefs.edit { putInt(SHOWN_ON_DAY_OF_YEAR, value).apply() }
+
+    var customAppOrder: List<String>
+        get() = prefs.getString(CUSTOM_APP_ORDER, "")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        set(value) = prefs.edit { putString(CUSTOM_APP_ORDER, value.joinToString(",")).apply() }
 
     var hiddenApps: MutableSet<String>
         get() = prefs.getStringSet(HIDDEN_APPS, mutableSetOf()) as MutableSet<String>

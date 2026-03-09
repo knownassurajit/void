@@ -206,8 +206,19 @@ class NotesFragment : Fragment() {
             private set
 
         fun submitList(newItems: List<NoteItem>) {
+            val diffCallback = object : androidx.recyclerview.widget.DiffUtil.Callback() {
+                override fun getOldListSize() = items.size
+                override fun getNewListSize() = newItems.size
+                override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                    return items[oldItemPosition].id == newItems[newItemPosition].id
+                }
+                override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                    return items[oldItemPosition] == newItems[newItemPosition]
+                }
+            }
+            val diffResult = androidx.recyclerview.widget.DiffUtil.calculateDiff(diffCallback)
             items = newItems
-            notifyDataSetChanged()
+            diffResult.dispatchUpdatesTo(this)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {

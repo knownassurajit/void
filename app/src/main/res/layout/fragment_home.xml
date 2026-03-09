@@ -14,16 +14,27 @@
         android:layout_height="1dp"
         android:contentDescription="@string/lock_layout_description" />
 
-    <!-- Clock + Date — top-left, with generous top clearance for status bar -->
     <LinearLayout
-        android:id="@+id/dateTimeLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="72dp"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingHorizontal="28dp"
-        android:visibility="gone"
-        tools:visibility="visible">
+        android:weightSum="1">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.30">
+
+            <!-- Clock + Date — within top section -->
+            <LinearLayout
+                android:id="@+id/dateTimeLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:orientation="vertical"
+                android:paddingHorizontal="28dp"
+                android:visibility="gone"
+                tools:visibility="visible">
 
         <!-- Time — thin display, very large, always 24h HH:MM -->
         <TextClock
@@ -65,18 +76,23 @@
             tools:text="2h 11m • 15 unlocks"
             tools:visibility="visible" />
 
-    </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
 
-    <!-- Home apps — bottom aligned inside a single filled card -->
-    <LinearLayout
-        android:id="@+id/homeAppsLayout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="bottom"
-        android:orientation="vertical"
-        android:paddingHorizontal="24dp"
-        android:paddingTop="140dp"
-        android:paddingBottom="80dp">
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.70">
+
+            <!-- Home apps — bottom aligned inside a single filled card -->
+            <LinearLayout
+                android:id="@+id/homeAppsLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="bottom"
+                android:orientation="vertical"
+                android:paddingHorizontal="24dp"
+                android:paddingBottom="80dp">
 
         <TextView
             android:id="@+id/homeApp1"
@@ -268,6 +284,24 @@
             android:visibility="gone"
             tools:visibility="visible" />
 
+        <TextView
+            android:id="@+id/addAppButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:fontFamily="@font/google_sans_medium"
+            android:text="+"
+            android:hint="+"
+            android:includeFontPadding="false"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="10dp"
+            android:textColor="#EEEEEE"
+            android:textSize="24sp"
+            android:visibility="gone" />
+
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
     
     <!-- Battery percentage — bottom centered -->
@@ -299,25 +333,5 @@
         android:textSize="13sp"
         android:visibility="gone"
         tools:visibility="visible" />
-
-    <!-- Set-default CTA — bottom-center, outlined -->
-    <TextView
-        android:id="@+id/setDefaultLauncher"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginHorizontal="24dp"
-        android:layout_marginBottom="64dp"
-        android:background="@drawable/md3_outlined_card"
-        android:ellipsize="end"
-        android:fontFamily="@font/google_sans_medium"
-        android:letterSpacing="0.03"
-        android:maxLines="1"
-        android:paddingHorizontal="28dp"
-        android:paddingVertical="16dp"
-        android:text="@string/set_as_default_launcher_u"
-        android:textColor="?attr/primaryColor"
-        android:textSize="15sp"
-        android:visibility="gone" />
 
 </FrameLayout>

@@ -18,7 +18,6 @@
 
     <!-- Surfaces (slightly elevated from bg) -->
     <color name="void_surface_dark">#FF0D0D0D</color>
-    <color name="void_surface_light">#FFF5F5F5</color>
 
     <!-- Outlines for cards/dividers -->
     <color name="void_outline_dark">#33FFFFFF</color>
@@ -30,14 +29,12 @@
 
     <!-- Legacy aliases (used by existing code, mapped to new system) -->
     <color name="colorPrimary">#FF000000</color>
-    <color name="colorPrimaryDark">#FF121212</color>
     <color name="colorAccent">#FFFFFFFF</color>
 
     <color name="white">#FFFFFFFF</color>
     <color name="black">#FF000000</color>
 
     <!-- Semi-transparent blacks -->
-    <color name="blackTrans90">#E6000000</color>
     <color name="blackTrans80">#CC000000</color>
     <color name="blackTrans50">#80000000</color>
     <color name="blackInverse">#FFFFFFFF</color>
@@ -54,7 +51,6 @@
     <color name="whiteInverse">#FF000000</color>
     <color name="whiteInverseTrans10">#1A000000</color>
     <color name="whiteInverseTrans25">#40000000</color>
-    <color name="whiteInverseTrans50">#80000000</color>
     <color name="whiteInverseTrans80">#CC000000</color>
     <color name="whiteInverseTrans90">#E6000000</color>
 </resources>

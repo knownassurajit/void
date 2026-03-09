@@ -37,7 +37,6 @@
     <string name="right">Right</string>
     <string name="center">Center</string>
     <string name="home_layout_alignment">App alignment</string>
-    <string name="swipe_left_app">Swipe left app</string>
     <string name="swipe_right_app">Swipe right app</string>
     <string name="app_drawer_tips">Tip: Start typing an app name to auto-launch it</string>
     <string name="okay">Okay</string>
@@ -49,7 +48,6 @@
     <string name="show_date_time">Show date time</string>
     <string name="appearance">Appearance</string>
     <string name="gestures">Gestures</string>
-    <string name="theme_mode">Theme mode</string>
     <string name="system_default">System</string>
     <string name="dark">Dark</string>
     <string name="light">Light</string>
@@ -67,6 +65,10 @@
     <string name="not_now">Not now</string>
     <string name="date">Date</string>
     <string name="date_only">Date only</string>
+    <string name="time_only">Time only</string>
+    <string name="top">Top</string>
+    <string name="middle">Middle</string>
+    <string name="bottom">Bottom</string>
     <string name="bottom_on">On</string>
     <string name="bottom_off">Off</string>
     <string name="please_set_void_as_default_first">Please set VOID Launcher as default first</string>
@@ -127,5 +129,4 @@
     <string name="screen_time">Screen time</string>
     <string name="learn_more">Learn more</string>
     <string name="notification_bar">Notification bar</string>
-    <string name="about_void">About and FAQs</string>
 </resources>

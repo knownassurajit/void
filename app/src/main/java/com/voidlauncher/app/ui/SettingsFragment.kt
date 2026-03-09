@@ -118,8 +118,12 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             binding.appsNumSelectLayout.visibility = View.GONE
         }
 
-        if (view.id != R.id.dateTime && view.id != R.id.dateTimeOn && view.id != R.id.dateTimeOff && view.id != R.id.dateOnly) {
+        if (view.id != R.id.dateTime && view.id != R.id.dateTimeOn && view.id != R.id.dateTimeOff && view.id != R.id.dateOnly && view.id != R.id.timeOnly) {
             binding.dateTimeSelectLayout.visibility = View.GONE
+        }
+
+        if (view.id != R.id.screenTimeLayout && view.id != R.id.screenTimeValue && view.id != R.id.screenTimeOn && view.id != R.id.screenTimeOff) {
+            binding.screenTimeSelectLayout.visibility = View.GONE
         }
 
         if (view.id != R.id.swipeDownAction && view.id != R.id.notifications && view.id != R.id.search) {
@@ -128,7 +132,13 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
 
         when (view.id) {
             R.id.voidHiddenApps -> showHiddenApps()
-            R.id.screenTimeOnOff -> viewModel.showDialog.postValue(Constants.Dialog.DIGITAL_WELLBEING)
+            R.id.screenTimeLayout -> {
+                val isVisible = binding.screenTimeSelectLayout.visibility == View.VISIBLE
+                binding.screenTimeSelectLayout.visibility = if (isVisible) View.GONE else View.VISIBLE
+            }
+            R.id.screenTimeOn -> toggleScreenTime(true)
+            R.id.screenTimeOff -> toggleScreenTime(false)
+            R.id.screenTimeValue -> viewModel.showDialog.postValue(Constants.Dialog.DIGITAL_WELLBEING)
             R.id.appInfo -> openAppInfo(requireContext(), Process.myUserHandle(), BuildConfig.APPLICATION_ID)
             R.id.setLauncher -> viewModel.resetLauncherLiveData.call()
             R.id.toggleLock -> toggleLockMode()
@@ -158,7 +168,9 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             R.id.alignmentLeft -> viewModel.updateHomeAlignment(Gravity.START)
             R.id.alignmentCenter -> viewModel.updateHomeAlignment(Gravity.CENTER)
             R.id.alignmentRight -> viewModel.updateHomeAlignment(Gravity.END)
-            R.id.alignmentBottom -> updateHomeBottomAlignment()
+            R.id.alignmentTop -> updateHomeVerticalAlignment(Gravity.TOP)
+            R.id.alignmentMiddle -> updateHomeVerticalAlignment(Gravity.CENTER_VERTICAL)
+            R.id.alignmentBottom -> updateHomeVerticalAlignment(Gravity.BOTTOM)
             R.id.statusBar -> toggleStatusBar()
             R.id.dateTime -> {
                 val isVisible = binding.dateTimeSelectLayout.visibility == View.VISIBLE
@@ -167,6 +179,7 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
             R.id.dateTimeOn -> toggleDateTime(Constants.DateTime.ON)
             R.id.dateTimeOff -> toggleDateTime(Constants.DateTime.OFF)
             R.id.dateOnly -> toggleDateTime(Constants.DateTime.DATE_ONLY)
+            R.id.timeOnly -> toggleDateTime(Constants.DateTime.TIME_ONLY)
             R.id.appThemeText -> {
                 binding.appThemeSelectLayout.visibility = View.VISIBLE
             }
@@ -256,19 +269,26 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         binding.homeAppsNum.setOnClickListener(this)
         binding.appsMinus.setOnClickListener(this)
         binding.appsPlus.setOnClickListener(this)
-        binding.screenTimeOnOff.setOnClickListener(this)
+        binding.appsPlus.setOnClickListener(this)
+        binding.screenTimeLayout.setOnClickListener(this)
+        binding.screenTimeValue.setOnClickListener(this)
+        binding.screenTimeOn.setOnClickListener(this)
+        binding.screenTimeOff.setOnClickListener(this)
         binding.dailyWallpaperUrl.setOnClickListener(this)
         binding.dailyWallpaper.setOnClickListener(this)
         binding.alignment.setOnClickListener(this)
         binding.alignmentLeft.setOnClickListener(this)
         binding.alignmentCenter.setOnClickListener(this)
         binding.alignmentRight.setOnClickListener(this)
+        binding.alignmentTop.setOnClickListener(this)
+        binding.alignmentMiddle.setOnClickListener(this)
         binding.alignmentBottom.setOnClickListener(this)
         binding.statusBar.setOnClickListener(this)
         binding.dateTime.setOnClickListener(this)
         binding.dateTimeOn.setOnClickListener(this)
         binding.dateTimeOff.setOnClickListener(this)
         binding.dateOnly.setOnClickListener(this)
+        binding.timeOnly.setOnClickListener(this)
         binding.swipeDownAction.setOnClickListener(this)
         binding.search.setOnClickListener(this)
         binding.notifications.setOnClickListener(this)
@@ -348,7 +368,8 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
     private fun populateDateTime() {
         binding.dateTime.text = getString(
             when (prefs.dateTimeVisibility) {
-                Constants.DateTime.DATE_ONLY -> R.string.date
+                Constants.DateTime.DATE_ONLY -> R.string.date_only
+                Constants.DateTime.TIME_ONLY -> R.string.time_only
                 Constants.DateTime.ON -> R.string.on
                 else -> R.string.off
             }
@@ -598,11 +619,22 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         binding.appDrawerTextSizeCurrent.text = formattedAppDrawer
     }
 
+    private fun toggleScreenTime(show: Boolean) {
+        prefs.showScreenTime = show
+        populateScreenTimeOnOff()
+        viewModel.refreshHome(false)
+    }
+
     private fun populateScreenTimeOnOff() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (requireContext().appUsagePermissionGranted()) binding.screenTimeOnOff.text = getString(R.string.on)
-            else binding.screenTimeOnOff.text = getString(R.string.off)
-        } else binding.screenTimeLayout.visibility = View.GONE
+            if (requireContext().appUsagePermissionGranted()) {
+                binding.screenTimeValue.text = if (prefs.showScreenTime) getString(R.string.on) else getString(R.string.off)
+            } else {
+                binding.screenTimeValue.text = getString(R.string.off)
+            }
+        } else {
+            binding.screenTimeLayout.visibility = View.GONE
+        }
     }
 
     private fun populateKeyboardText() {
@@ -615,25 +647,26 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
         else binding.dailyWallpaper.text = getString(R.string.off)
     }
 
-    private fun updateHomeBottomAlignment() {
-        if (viewModel.isVoidDefault.value != true) {
-            requireContext().showToast(getString(R.string.please_set_void_as_default_first), Toast.LENGTH_LONG)
-            return
-        }
-        prefs.homeBottomAlignment = !prefs.homeBottomAlignment
+    private fun updateHomeVerticalAlignment(gravity: Int) {
+        prefs.homeVerticalAlignment = gravity
         populateAlignment()
         viewModel.updateHomeAlignment(prefs.homeAlignment)
     }
 
     private fun populateAlignment() {
-        when (prefs.homeAlignment) {
-            Gravity.START -> binding.alignment.text = getString(R.string.left)
-            Gravity.CENTER -> binding.alignment.text = getString(R.string.center)
-            Gravity.END -> binding.alignment.text = getString(R.string.right)
+        val hAlign = when (prefs.homeAlignment) {
+            Gravity.START -> getString(R.string.left)
+            Gravity.CENTER -> getString(R.string.center)
+            Gravity.END -> getString(R.string.right)
+            else -> getString(R.string.center)
         }
-        binding.alignmentBottom.text = if (prefs.homeBottomAlignment)
-            getString(R.string.bottom_on)
-        else getString(R.string.bottom_off)
+        val vAlign = when (prefs.homeVerticalAlignment) {
+            Gravity.TOP -> getString(R.string.top)
+            Gravity.CENTER_VERTICAL -> getString(R.string.middle)
+            Gravity.BOTTOM -> getString(R.string.bottom)
+            else -> getString(R.string.bottom)
+        }
+        binding.alignment.text = "$hAlign, $vAlign"
     }
 
     private fun populateLockSettings() {

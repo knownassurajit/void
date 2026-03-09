@@ -15,7 +15,10 @@ import android.widget.TextView
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.voidlauncher.app.R
 import com.voidlauncher.app.data.NotificationGroup
@@ -52,6 +55,8 @@ class NotificationsFragment : Fragment() {
 
         binding.tvClearAll.setOnClickListener {
             // Clear all notifications
+            NotificationService.instance?.cancelAllNotifications()
+            com.google.android.material.snackbar.Snackbar.make(binding.root, "Notifications cleared", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
         }
 
         binding.tvNoNotifications.setOnClickListener {
@@ -66,6 +71,31 @@ class NotificationsFragment : Fragment() {
                 findNavController().popBackStack()
             }
         })
+        
+        setupSwipeToDismiss(adapter)
+    }
+
+    private fun setupSwipeToDismiss(adapter: NotificationAdapter) {
+        val swipeCallback = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean = false
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.bindingAdapterPosition
+                val group = adapter.getItemAt(position) ?: return
+
+                for (sbn in group.notifications) {
+                    NotificationService.instance?.cancelNotification(sbn.key)
+                }
+                
+                com.google.android.material.snackbar.Snackbar.make(binding.root, "Notification dismissed", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+            }
+        }
+        val itemTouchHelper = ItemTouchHelper(swipeCallback)
+        itemTouchHelper.attachToRecyclerView(binding.rvNotifications)
     }
 
     override fun onResume() {
@@ -90,15 +120,13 @@ class NotificationsFragment : Fragment() {
         _binding = null
     }
 
-    inner class NotificationAdapter : RecyclerView.Adapter<NotificationAdapter.ViewHolder>() {
+    inner class NotificationAdapter : ListAdapter<NotificationGroup, NotificationAdapter.ViewHolder>(NotificationDiffCallback()) {
 
-        private var items = listOf<NotificationGroup>()
         private val pm: PackageManager = requireContext().packageManager
         private val expandedGroups = mutableSetOf<String>()
 
-        fun submitList(newItems: List<NotificationGroup>) {
-            items = newItems
-            notifyDataSetChanged()
+        fun getItemAt(position: Int): NotificationGroup? {
+            return if (position in 0 until itemCount) getItem(position) else null
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -107,10 +135,8 @@ class NotificationsFragment : Fragment() {
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            holder.bind(items[position])
+            holder.bind(getItem(position))
         }
-
-        override fun getItemCount() = items.size
 
         inner class ViewHolder(private val binding: RowNotificationGroupBinding) : RecyclerView.ViewHolder(binding.root) {
             fun bind(group: NotificationGroup) {
@@ -211,6 +237,16 @@ class NotificationsFragment : Fragment() {
                     container.addView(childView)
                 }
             }
+        }
+    }
+
+    private class NotificationDiffCallback : DiffUtil.ItemCallback<NotificationGroup>() {
+        override fun areItemsTheSame(oldItem: NotificationGroup, newItem: NotificationGroup): Boolean {
+            return oldItem.groupKey == newItem.groupKey
+        }
+
+        override fun areContentsTheSame(oldItem: NotificationGroup, newItem: NotificationGroup): Boolean {
+            return oldItem == newItem
         }
     }
 }

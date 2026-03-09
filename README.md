@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/icon.png" alt="VOID Launcher" width="100" height="100" style="border-radius: 50%;">
+  <img src="fastlane/metadata/android/en-US/images/icon.png" alt="VOID Launcher" width="120" height="120" style="border-radius: 50%;">
 </p>
 
 <h1 align="center">VOID Launcher</h1>
 
 <p align="center">
-  <em>A radically minimalist, ad-free Android launcher designed to combat digital addiction.</em>
+  <em>A radically minimalist, text-driven Android launcher conceptualized to combat digital addiction.</em>
 </p>
 
 <p align="center">
@@ -19,64 +19,64 @@
 
 ---
 
-## Philosophy
+## 1. Intent & Philosophy
 
-**VOID** is not just a launcher; it's a tool for digital minimalism. By stripping away colorful icons, badges, and the traditional grid layout, VOID forces intentionality. We present a hyper-clean, text-based interface where your focus dictates your actions, not the other way around. No ads, no tracking, no distractions.
+**VOID** is not just a launcher; it's a physiological tool designed for digital minimalism. Modern smartphone interfaces optimize for "engagement" (screen time) using variable reward schedules—brightly colored iconography, deeply nested notification badges, and infinite-scroll app drawers. These elements hijack the brain's dopamine pathways.
 
----
-
-## Core Features
-
-- **Text-Only Home Screen:** Up to 10 of your most important apps are pinned to the home screen as clean, customizable text labels. They sit beautifully upon minimalist, un-filled, white-underlined cards elegantly padding the bottom of the screen.
-- **Notification Grouping:** Swipe left to access a purpose-built notification screen that groups system notifications by app with smart summaries, timestamps, app-badge counts, and inline expansion — styled in the launcher's monochrome theme. Click any preview to jump directly into the conversation.
-- **Quick Notes:** Swipe right to instantly capture thoughts in a monochrome, text-based checklist — native to the launcher with priority ordering, tick-to-complete, swipe-to-delete, and a per-note options menu with inline reminder countdowns.
-- **Reverse Navigation Gestures:** Once inside the Notes or Notifications screen, executing a reverse swipe intuitively pulls you right back to your Home screen, mirroring the natural entry swipe.
-- **Hold to Edit & Reorder:** Long-press a home screen app card to trigger Inline Edit Mode. The app label dynamically shrinks to reveal an inline pen (reassign) and reorder (drag) icon instantly without jumping to a new screen.
-- **Directional Animations:** Every gesture transition slides in gracefully from the opposite direction to the swipe: e.g., swiping left pulls the Notifications screen in from the right.
-- **Robust App Launcher:** Advanced component resolution ensures that even when applications update their internal packages or icon labels, VOID will dynamically re-resolve their launch intents.
-- **Deep Private Space Integration:** Built for Android 15+. Access your hidden, secure, or work-profile apps directly from the main drawer with biometric unlock.
-- **Digital Wellbeing Built-in:** See your actual screen time and unlock count overlaid on the home screen immediately.
-- **Separate Text Size Controls:** Independent text size scaling for the home screen and app drawer.
-- **Fluid Inline Settings UI:** Configure your launcher entirely within the app with smooth-animated inline cards.
-- **Daily Wallpapers:** Automatically fetch and apply fresh, minimalist wallpapers (opt-in).
+VOID counters this by stripping away visual stimuli. It forces **intentionality**. 
+By presenting a hyper-clean, monochrome, text-based interface, your interaction with the device changes from reactive browsing to proactive computing. You open your phone to do exactly what you intended, and then you leave. No ads, no tracking, zero distractions.
 
 ---
 
-## Interaction & Gestures
+## 2. Core Design Principles
 
-```text
-Home Screen
-├── Swipe Up         → Opens App Drawer (auto-focuses search bar)
-├── Swipe Down       → Expands Notification Panel / Web Search (configurable)
-├── Swipe Left       → Notification Grouping Screen
-├── Swipe Right      → Quick Notes Screen
-├── Long Press       → Advanced Inline Settings Panel
-├── Double Tap       → Sleep/Lock Screen
-└── Hold + Drag      → Reorder home screen apps
-
-App Drawer
-├── Type to search   → Instantly filter apps or query the web
-├── Type "private"   → Unlock biometric Private Space and reveal hidden apps
-└── Long Press App   → Hide App / Open System App Info / Uninstall
-```
+- **Abstract Icons:** Rasterized icons and colorful logos are entirely banished from the home screen. Apps are represented purely by their typographical names.
+- **Monochrome Dominance:** The entire UI acts as a canvas of stark black and white (Adaptive AMOLED Black/Light modes depending on system state).
+- **The 30:70 Spatial Split:** The Home Screen enforces a rigid internal geometry. The top 30% is reserved exclusively for utility (Date, Time, live Screen Time), whilst the bottom 70% acts as the App Drawer interaction zone, preventing UI conflict.
+- **Directional Spatial Memory:** Every UI transition animates purely based on the physical gesture that invoked it. Swiping right for Notes means the screen inherently slides in from the left, teaching the user's muscle memory exactly where they are in the navigation hierarchy.
 
 ---
 
-## Technical Architecture
+## 3. Feature Set
 
-VOID Launcher embraces modern Android development practices, ensuring a tiny memory footprint while remaining highly performant.
+### The Home Screen
+- **Text-Only Favorites:** Pin up to 10 of your most critical apps to the home screen as clean text labels.
+- **Inline Edit Mode:** Long-press any app label to trigger a global edit state. The screen dynamically shrinks to reveal an inline pen (rename/reassign) and reorder (drag) icon instantly without jumping to an entirely new Activity.
+- **Live Digital Wellbeing:** Real-time extraction of actual screen time and total device unlock counts overlaid elegantly beneath the clock.
 
-- **Stack:** 100% Kotlin
-- **UI:** XML Layouts, Material Design 3 guidelines (M3 typography, outlined cards, clean padding), and Android ViewBinding.
-- **Architecture:** Single-Activity, Fragment-based navigation powered by a shared `MainViewModel` utilizing `LiveData` and Kotlin Coroutines.
-- **Notification System:** A `NotificationListenerService` intercepts system-wide notifications and groups them intelligently by app and conversation.
-- **Notes Storage:** Lightweight `SharedPreferences`-backed JSON persistence — no heavy database dependency for a launcher.
-- **Background Processes:** Reliable `WorkManager` API to execute low-impact background fetches (e.g., daily wallpaper downloads).
-- **Hardware Support:** Fully compatible with specialized hardware like E-Ink arrays.
+### The App Library (Drawer)
+- **Deep Private Space Integration:** Built natively for Android 15+. Access your hidden, secure, or work-profile apps directly from the main drawer, unlocked via Biometric Prompt.
+- **Instant Search:** Swipe up to summon a heavily optimized keyboard-ready search bar to filter apps instantly. 
+
+### Swipe Landscapes
+- **Notification Grouping (Left Swipe):** Intercepts system notifications and strips away their branding. It aggregates them by application/conversation into monochrome, expandable cards—shielding you from visual noise.
+- **Quick Notes (Right Swipe):** A built-in scratchpad for fleeting thoughts. Features priority ordering, click-to-complete, swipe-to-delete, and system alarms for reminders—all without loading a third-party app.
 
 ---
 
-## Building from Source
+## 4. Technical Architecture
+
+VOID Launcher embraces modern Android development practices, ensuring a tiny memory footprint while maintaining 60fps gesture transitions.
+
+### 4.1. Core Stack
+- **Language:** 100% Kotlin
+- **UI Toolkit:** XML Layouts heavily relying on Material Design 3 guidelines, Android ViewBinding, and standard Canvas APIs (No heavy Compose interop overhead for maximum legacy speed).
+- **Architecture Pattern:** Single-Activity, multiple-Fragment design powered by Android's Jetpack Navigation Component. Shared state is maintained via a master `MainViewModel` running Kotlin Coroutines and `LiveData`.
+
+### 4.2. Advanced Intercepts
+- **Notification Interceptor:** Implements an `android.service.notification.NotificationListenerService` that lives purely in the background to capture, read, and dismiss Android OS-level broadcast notifications to render the distraction-free Grouping screen.
+- **Accessibility Locking:** Binds to `android.accessibilityservice.AccessibilityService` explicitly to allow a double-tap gesture to physically sleep/lock the device display without requiring root access.
+- **Usage Stats Extraction:** Queries `android.app.usage.UsageStatsManager` to aggregate daily foreground time and unlock events.
+
+### 4.3. Persistence 
+- **Lightweight Storage:** Uses standard `SharedPreferences` for configuration data, avoiding the massive initialization overhead of an SQL/Room database. Notes and tasks are serialized and hydrated from a lightweight JSON structure locally.
+
+### 4.4. Intent Resolution Engine
+- **Dynamic Linking:** Standard launchers crash when a user updates an app and the underlying `Activity` package name changes. VOID implements a deep `LauncherApps` Intent resolution engine that actively re-resolves the target application package at launch-time, ensuring dead links are automatically healed.
+
+---
+
+## 5. Building from Source
 
 **Prerequisites:**
 - Android Studio Koala (or newer)
