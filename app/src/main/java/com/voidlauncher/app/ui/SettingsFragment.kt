@@ -40,6 +40,7 @@ import com.voidlauncher.app.helper.setPlainWallpaper
 import com.voidlauncher.app.helper.shareApp
 import com.voidlauncher.app.helper.showToast
 import com.voidlauncher.app.listener.DeviceAdmin
+import com.google.android.material.transition.MaterialSharedAxis
 
 class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListener {
 
@@ -50,6 +51,12 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
 
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Gentle, consistent Material motion keeps navigation feeling natural.
+        applyMaterialScreenTransitions(MaterialSharedAxis.Z)
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
@@ -228,13 +235,13 @@ class SettingsFragment : Fragment(), View.OnClickListener, View.OnLongClickListe
                 populateSwipeApps()
             }
 
-            // Footer and social links removed — no-op
+            // Footer/social stubs remain hidden; footer itself now opens contributor credits.
             R.id.share,
             R.id.rate,
             R.id.twitter,
             R.id.github,
-            R.id.privacy,
-            R.id.footer -> { /* removed from UI */ }
+            R.id.privacy -> { /* intentionally no-op */ }
+            R.id.footer -> requireContext().openUrl("https://github.com/knownassurajit")
         }
     }
 

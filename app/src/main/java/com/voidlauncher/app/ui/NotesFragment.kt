@@ -30,6 +30,7 @@ import com.voidlauncher.app.databinding.RowNoteItemBinding
 import com.voidlauncher.app.helper.NoteReminderReceiver
 import com.voidlauncher.app.listener.OnSwipeTouchListener
 import java.util.Calendar
+import com.google.android.material.transition.MaterialSharedAxis
 
 class NotesFragment : Fragment() {
 
@@ -37,6 +38,12 @@ class NotesFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var repo: NoteRepository
     private lateinit var adapter: NoteAdapter
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Gentle, consistent Material motion keeps navigation feeling natural.
+        applyMaterialScreenTransitions(MaterialSharedAxis.X)
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentNotesBinding.inflate(inflater, container, false)

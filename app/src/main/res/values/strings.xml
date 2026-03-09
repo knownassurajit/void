@@ -129,4 +129,5 @@
     <string name="screen_time">Screen time</string>
     <string name="learn_more">Learn more</string>
     <string name="notification_bar">Notification bar</string>
+    <string name="credit_github_knownassurajit">Credits: knownassurajit</string>
 </resources>

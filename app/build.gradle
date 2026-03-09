@@ -53,11 +53,13 @@ dependencies {
     implementation libs.recyclerview
 
     // Android lifecycle
-    implementation libs.lifecycle.extensions
+    implementation libs.lifecycle.runtime.ktx
+    implementation libs.lifecycle.livedata.ktx
     implementation libs.lifecycle.viewmodel.ktx
 
     // Navigation
     implementation libs.navigation.fragment.ktx
+    implementation libs.fragment.ktx
 
     // Work Manager
     implementation libs.work.runtime.ktx

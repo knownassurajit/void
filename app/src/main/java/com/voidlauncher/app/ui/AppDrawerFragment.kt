@@ -40,6 +40,7 @@ import com.voidlauncher.app.helper.openUrl
 import com.voidlauncher.app.helper.showKeyboard
 import com.voidlauncher.app.helper.showToast
 import com.voidlauncher.app.helper.uninstall
+import com.google.android.material.transition.MaterialSharedAxis
 
 class AppDrawerFragment : Fragment() {
 
@@ -54,6 +55,12 @@ class AppDrawerFragment : Fragment() {
     private val viewModel: MainViewModel by activityViewModels()
     private var _binding: FragmentAppDrawerBinding? = null
     private val binding get() = _binding!!
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Gentle, consistent Material motion keeps navigation feeling natural.
+        applyMaterialScreenTransitions(MaterialSharedAxis.Y)
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,

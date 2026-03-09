@@ -1178,7 +1178,7 @@
                 android:gravity="center"
                 android:letterSpacing="0.04"
                 android:padding="12dp"
-                android:text="Made by Surajit Das"
+                android:text="@string/credit_github_knownassurajit"
                 android:textColor="?attr/primaryColorTrans80"
                 android:textSize="13sp" />
 

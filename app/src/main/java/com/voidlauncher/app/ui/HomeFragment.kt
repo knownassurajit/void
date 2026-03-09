@@ -50,6 +50,7 @@ import com.voidlauncher.app.listener.ViewSwipeTouchListener
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.google.android.material.transition.MaterialSharedAxis
 
 class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener {
 
@@ -68,6 +69,12 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     private var touchDownX = 0f
     private var touchDownY = 0f
     private var dragInitiated = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Gentle, consistent Material motion keeps navigation feeling natural.
+        applyMaterialScreenTransitions(MaterialSharedAxis.X)
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
