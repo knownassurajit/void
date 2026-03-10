@@ -1,4 +1,4 @@
-package com.launcher.projectvoid.data
+package com.voidlauncher.app.data
 
 import android.content.Context
 import android.content.SharedPreferences

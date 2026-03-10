@@ -1,4 +1,4 @@
-package com.launcher.projectvoid
+package com.voidlauncher.app
 
 import android.app.ActivityOptions
 import android.app.Application
@@ -10,17 +10,18 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
-import com.launcher.projectvoid.data.AppModel
-import com.launcher.projectvoid.data.Constants
-import com.launcher.projectvoid.data.Prefs
-import com.launcher.projectvoid.helper.SingleLiveEvent
-import com.launcher.projectvoid.helper.formattedTimeSpent
-import com.launcher.projectvoid.helper.getAppsList
-import com.launcher.projectvoid.helper.hasBeenMinutes
-import com.launcher.projectvoid.helper.isVoidDefault
-import com.launcher.projectvoid.helper.isPackageInstalled
-import com.launcher.projectvoid.helper.showToast
-import com.launcher.projectvoid.helper.usageStats.EventLogWrapper
+import com.voidlauncher.app.data.AppModel
+import com.voidlauncher.app.data.Constants
+import com.voidlauncher.app.data.Prefs
+import com.voidlauncher.app.helper.SingleLiveEvent
+import com.voidlauncher.app.helper.WallpaperWorker
+import com.voidlauncher.app.helper.formattedTimeSpent
+import com.voidlauncher.app.helper.getAppsList
+import com.voidlauncher.app.helper.hasBeenMinutes
+import com.voidlauncher.app.helper.isVoidDefault
+import com.voidlauncher.app.helper.isPackageInstalled
+import com.voidlauncher.app.helper.showToast
+import com.voidlauncher.app.helper.usageStats.EventLogWrapper
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -431,6 +432,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         isVoidDefault.value = isVoidDefault(appContext)
     }
 
+    /**
+     * Daily wallpaper scheduling is DISABLED.
+     * VOID Launcher uses a solid system-adaptive background (black/white).
+     * Any pending wallpaper workers are cancelled instead of scheduled.
+     */
+    fun setWallpaperWorker() {
+        // No-op: cancel any existing wallpaper work
+        WorkManager.getInstance(appContext).cancelUniqueWork(Constants.WALLPAPER_WORKER_NAME)
+        prefs.dailyWallpaper = false
+    }
+
+    fun cancelWallpaperWorker() {
+        WorkManager.getInstance(appContext).cancelUniqueWork(Constants.WALLPAPER_WORKER_NAME)
+        prefs.dailyWallpaperUrl = ""
+        prefs.dailyWallpaper = false
+    }
+
     fun updateHomeAlignment(gravity: Int) {
         prefs.homeAlignment = gravity
         homeAppAlignment.value = prefs.homeAlignment
@@ -457,7 +475,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         )
         val viewTimeSpent = appContext.formattedTimeSpent(timeSpent)
-        screenTimeValue.postValue(viewTimeSpent)
+        val unlocks = eventLogWrapper.getScreenUnlocks(startTime, endTime)
+        val text = if (unlocks > 0) "$viewTimeSpent • $unlocks unlocks" else viewTimeSpent
+        
+        screenTimeValue.postValue(text)
         prefs.screenTimeLastUpdated = endTime
     }
 

@@ -1,4 +1,4 @@
-package com.launcher.projectvoid.data
+package com.voidlauncher.app.data
 
 data class NoteItem(
     val id: Long = System.currentTimeMillis(),

@@ -1,4 +1,4 @@
-package com.launcher.projectvoid.helper
+package com.voidlauncher.app.helper
 
 import android.app.PendingIntent
 import android.app.NotificationChannel
@@ -10,20 +10,19 @@ import android.media.AudioManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.launcher.projectvoid.MainActivity
-import com.launcher.projectvoid.R
+import com.voidlauncher.app.MainActivity
+import com.voidlauncher.app.R
 
 class NoteReminderReceiver : BroadcastReceiver() {
 
     companion object {
         const val CHANNEL_ID = "note_reminders"
-        const val ACTION_IN_APP_REMINDER = "com.launcher.void.ACTION_IN_APP_REMINDER"
+        const val ACTION_IN_APP_REMINDER = "com.voidlauncher.app.ACTION_IN_APP_REMINDER"
         const val EXTRA_NOTE_ID = "note_id"
         const val EXTRA_NOTE_TITLE = "note_title"
         const val EXTRA_NOTE_TEXT = "note_text"
         const val NOTIFICATION_GROUP = "note_reminder_group"
 
-        @android.annotation.SuppressLint("MissingPermission")
         fun dispatchReminder(context: Context, noteId: Long, noteTitle: String?, noteText: String) {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -85,7 +84,6 @@ class NoteReminderReceiver : BroadcastReceiver() {
                 builder.setDefaults(NotificationCompat.DEFAULT_SOUND)
             }
 
-            @android.annotation.SuppressLint("MissingPermission", "NotificationPermission")
             NotificationManagerCompat.from(context).notify(noteId.toInt(), builder.build())
         }
 

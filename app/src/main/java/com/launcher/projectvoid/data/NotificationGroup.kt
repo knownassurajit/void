@@ -1,11 +1,10 @@
-package com.launcher.projectvoid.data
+package com.voidlauncher.app.data
 
 import android.service.notification.StatusBarNotification
 
 data class NotificationGroup(
     val groupKey: String,
     val packageName: String,
-    val appLabel: String = "",
     val latestTimestamp: Long,
     val childCount: Int,
     val highestImportance: Int,

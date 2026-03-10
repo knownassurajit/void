@@ -1,4 +1,4 @@
-package com.launcher.projectvoid.helper
+package com.voidlauncher.app.helper
 
 object AppLifecycleState {
     @Volatile
