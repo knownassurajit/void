@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
                         .pointerInput(Unit) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(pass = PointerEventPass.Initial)
-                                val isTopEdge = down.position.y < 250f
+                                val isTopEdge = down.position.y < size.height * 0.1f
                                 var totalY = 0f
                                 while (true) {
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
