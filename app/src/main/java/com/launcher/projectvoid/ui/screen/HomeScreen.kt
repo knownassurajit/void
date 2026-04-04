@@ -197,7 +197,25 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         textAlign = clockTextAlign,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                onClickLabel = "Open Digital Wellbeing"
+                            ) {
+                                try {
+                                    val intent = Intent("com.google.android.apps.wellbeing.action.APP_USAGE_DASHBOARD")
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    try {
+                                        val fallback = Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                                        fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        context.startActivity(fallback)
+                                    } catch (ex: Exception) {
+                                        // Ignore if settings cannot be opened
+                                    }
+                                }
+                            }
                     )
                 }
             }
