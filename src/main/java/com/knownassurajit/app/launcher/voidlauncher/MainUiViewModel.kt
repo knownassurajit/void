@@ -118,9 +118,11 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
 
         // Register battery receiver
         try {
-            appContext.registerReceiver(
+            androidx.core.content.ContextCompat.registerReceiver(
+                appContext,
                 batteryReceiver,
-                IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
             )
         } catch (_: Exception) {}
 

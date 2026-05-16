@@ -147,7 +147,7 @@ fun AppDrawerScreen(
                 addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
             }
         }
-        context.registerReceiver(receiver, filter)
+        androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
         onDispose {
             context.unregisterReceiver(receiver)
         }
