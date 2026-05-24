@@ -12,6 +12,7 @@ import java.text.Collator
 
 object PrivateSpaceHelper {
     fun getPrivateSpaceProfile(context: Context): android.os.UserHandle? {
+        if (!FeatureAvailability.isPrivateSpaceAvailable) return null
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return null
         val um = context.getSystemService(Context.USER_SERVICE) as UserManager
         val la = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps

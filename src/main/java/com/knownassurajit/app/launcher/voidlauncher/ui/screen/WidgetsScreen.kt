@@ -52,13 +52,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.WidgetInfo
+import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.text.style.TextAlign
 
 private const val WIDGET_HOST_ID = 1024
 
-// ── ViewModel ──
+// ── ViewModel (Integrated Only Stub/Mock if needed, but here we keep it) ──
 
 class WidgetsViewModel(application: Application) : AndroidViewModel(application) {
     private val ctx = application.applicationContext
@@ -185,6 +190,11 @@ fun WidgetsScreen(
     onBack: () -> Unit,
     viewModel: WidgetsViewModel = viewModel()
 ) {
+    if (!FeatureAvailability.isWidgetsAvailable) {
+        FeatureUnavailableScreen("Widgets", "The Widgets module is not available in the Play Store version of Void Launcher due to policy restrictions.", onBack)
+        return
+    }
+
     val pinnedWidgets by viewModel.pinnedWidgets.collectAsState()
     val allWidgets by viewModel.allWidgets.collectAsState()
     val widgetIds by viewModel.widgetIds.collectAsState()

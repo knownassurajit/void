@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
+import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
 import kotlin.math.abs
 
 // ── ViewModel ──
@@ -199,6 +200,11 @@ fun NotificationSummaryScreen(
     viewModel: NotificationSummaryViewModel = viewModel(),
     onBack: () -> Unit
 ) {
+    if (!FeatureAvailability.isNotificationSummaryAvailable) {
+        FeatureUnavailableScreen("Notification Summary", "The AI Notification Summary module is not available in the Play Store version of Void Launcher due to policy restrictions.", onBack)
+        return
+    }
+
     val summaries by viewModel.summaries.collectAsState()
     val aiAvailable by viewModel.isAiAvailable.collectAsState()
 

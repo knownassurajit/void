@@ -41,6 +41,7 @@ import androidx.navigation.compose.rememberNavController
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.helper.NotificationService
 import com.knownassurajit.app.launcher.voidlauncher.helper.getUserHandleFromString
+import com.knownassurajit.app.launcher.voidlauncher.helper.openCalendar
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.AppDrawerScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.HomeScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotesScreen
@@ -190,24 +191,26 @@ class MainActivity : ComponentActivity() {
                         popExitTransition = { directionExit(initialState, targetState, uiState) }
                     ) {
                         composable<HomeRoute> {
-                        HomeScreen(
-                            state = uiState,
-                            onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
-                            onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
-                            onOpenNotifications = {
-                                if (uiState.showStatusBar) {
-                                    StatusBarPanelOpener.expandNotificationsPanel(this@MainActivity)
-                                }
-                            },
-                            onOpenNotificationSummary = { navController.navigate(NotificationSummaryRoute) { launchSingleTop = true } },
-                            onOpenWidgets = { navController.navigate(WidgetsRoute) { launchSingleTop = true } },
-                            onOpenNotes = { navController.navigate(NotesRoute) { launchSingleTop = true } },
-                            onAppClick = { app -> launchHomeApp(app) },
-                            onClockClick = { mainViewModel.setDefaultClockApp() },
-                            onDateClick = { /* open calendar */ },
-                            onHomeAppsChanged = { viewModel.refreshFromPrefs() }
-                        )
-                    }
+                            HomeScreen(
+                                state = uiState,
+                                onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
+                                onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
+                                onOpenNotifications = {
+                                    if (uiState.showStatusBar) {
+                                        StatusBarPanelOpener.expandNotificationsPanel(this@MainActivity)
+                                    } else {
+                                        navController.navigate(NotificationPanelRoute) { launchSingleTop = true }
+                                    }
+                                },
+                                onOpenNotificationSummary = { navController.navigate(NotificationSummaryRoute) { launchSingleTop = true } },
+                                onOpenWidgets = { navController.navigate(WidgetsRoute) { launchSingleTop = true } },
+                                onOpenNotes = { navController.navigate(NotesRoute) { launchSingleTop = true } },
+                                onAppClick = { app -> launchHomeApp(app) },
+                                onClockClick = { mainViewModel.setDefaultClockApp() },
+                                onDateClick = { openCalendar(this@MainActivity) },
+                                onHomeAppsChanged = { viewModel.refreshFromPrefs() }
+                            )
+                        }
                     composable<AppDrawerRoute> {
                         AppDrawerScreen(
                             onBack = { navController.popBackStack() },
