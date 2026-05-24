@@ -46,11 +46,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 
+import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+
 @Composable
 fun NotificationsScreen(
     notifications: List<NotificationGroup> = emptyList(),
     onBack: () -> Unit
 ) {
+    if (!FeatureAvailability.isNotificationsAvailable) {
+        FeatureUnavailableScreen("Notifications", "The Notifications module is not available in the Play Store version of Void Launcher due to policy restrictions.", onBack)
+        return
+    }
+
     // A lightweight vertical swipe affordance lets users return without an explicit back button.
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
 

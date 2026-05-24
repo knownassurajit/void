@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,6 +71,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.knownassurajit.app.launcher.voidlauncher.helper.AppCacheManager
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
 
+import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+
 @Composable
 fun AppDrawerScreen(
     onBack: () -> Unit,
@@ -85,20 +88,16 @@ fun AppDrawerScreen(
     val privateApps = remember { mutableStateListOf<AppModel>() }
     var isPrivateSpaceLocked by remember { mutableStateOf(true) }
     var hasPrivateSpace by remember { mutableStateOf(false) }
-    var showAlphabetCategories by remember { mutableStateOf(prefs.showAlphabetCategories) }
+    val showAlphabetCategories = remember { prefs.showAlphabetCategories }
     val focusRequester = remember { FocusRequester() }
 
-    // Swipe-down to go back (reverse of swipe-up to open)
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
-
     LaunchedEffect(Unit) {
-        if (prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (FeatureAvailability.isPrivateSpaceAvailable && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
             hasPrivateSpace = profile != null
             if (profile != null) {
                 val um = context.getSystemService(Context.USER_SERVICE) as UserManager
                 isPrivateSpaceLocked = um.isQuietModeEnabled(profile)
-                // KEY FIX: Load private apps immediately if space is already unlocked
                 if (!isPrivateSpaceLocked) {
                     scope.launch {
                         val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
@@ -147,14 +146,17 @@ fun AppDrawerScreen(
                 addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
             }
         }
-        context.registerReceiver(receiver, filter)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
         onDispose {
             context.unregisterReceiver(receiver)
         }
     }
 
-    // Filter regular apps only (no private apps mixed in)
-    val filteredApps = remember(searchQuery, allApps.toList()) {
+    val filteredApps = remember(searchQuery, allApps) {
         val list = allApps.toList()
         val collator = java.text.Collator.getInstance()
         val sorted = list.sortedWith(compareBy(collator) { it.appLabel })
@@ -162,7 +164,6 @@ fun AppDrawerScreen(
         else sorted.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
     }
 
-    // Filter private apps separately
     val filteredPrivateApps = remember(searchQuery, privateApps.toList()) {
         val list = privateApps.toList()
         if (searchQuery.isBlank()) list
@@ -171,12 +172,13 @@ fun AppDrawerScreen(
 
     val showPrivateSpaceInSearch = remember(searchQuery, hasPrivateSpace) {
         hasPrivateSpace && searchQuery.isNotBlank() &&
-            "private space".contains(searchQuery, ignoreCase = true)
+                "private space".contains(searchQuery, ignoreCase = true)
     }
 
     val groupedApps = remember(filteredApps) {
         filteredApps.groupBy { it.appLabel.firstOrNull()?.uppercase() ?: "#" }.toSortedMap()
     }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -185,240 +187,296 @@ fun AppDrawerScreen(
             .imePadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Search bar row with Settings icon - Responsive and Evenly Spaced
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(focusRequester),
-                    placeholder = {
-                        Text(
-                            stringResource(R.string.search),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.outline,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                    ),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-
-                // Sub-row for icons to maintain consistent distribution
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Private Space lock/unlock toggle (API 35+)
-                    if (hasPrivateSpace) {
-                        IconButton(
-                            onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                                    PrivateSpaceHelper.togglePrivateSpace(context)
-                                    isPrivateSpaceLocked = !isPrivateSpaceLocked
-                                    if (!isPrivateSpaceLocked) {
-                                        scope.launch {
-                                            val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                                            privateApps.clear()
-                                            privateApps.addAll(pApps)
-                                        }
-                                    } else {
-                                        privateApps.clear()
-                                    }
-                                }
+            AppDrawerSearchBar(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                focusRequester = focusRequester,
+                hasPrivateSpace = hasPrivateSpace,
+                isPrivateSpaceLocked = isPrivateSpaceLocked,
+                onTogglePrivateSpace = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        PrivateSpaceHelper.togglePrivateSpace(context)
+                        isPrivateSpaceLocked = !isPrivateSpaceLocked
+                        if (!isPrivateSpaceLocked) {
+                            scope.launch {
+                                val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+                                privateApps.clear()
+                                privateApps.addAll(pApps)
                             }
-                        ) {
-                            Icon(
-                                imageVector = if (isPrivateSpaceLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
-                                contentDescription = "Private Space",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        } else {
+                            privateApps.clear()
                         }
                     }
-
-                    // Settings button (Material Icons)
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+                },
+                onOpenSettings = onOpenSettings
+            )
 
             LaunchedEffect(Unit) {
                 if (prefs.autoShowKeyboard) focusRequester.requestFocus()
             }
 
-            // App list
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                // Private Space search result — shows when user searches "private"
-                if (showPrivateSpaceInSearch) {
-                    item(key = "private_search_result") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                                        PrivateSpaceHelper.togglePrivateSpace(context)
-                                        isPrivateSpaceLocked = !isPrivateSpaceLocked
-                                        if (!isPrivateSpaceLocked) {
-                                            scope.launch {
-                                                val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                                                privateApps.clear()
-                                                privateApps.addAll(pApps)
-                                            }
-                                        } else {
-                                            privateApps.clear()
-                                        }
-                                    }
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Shield,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = stringResource(R.string.private_space),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (isPrivateSpaceLocked) "Tap to unlock" else "Tap to lock",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+            AppDrawerAppList(
+                groupedApps = groupedApps,
+                showAlphabetCategories = showAlphabetCategories,
+                showPrivateSpaceInSearch = showPrivateSpaceInSearch,
+                isPrivateSpaceLocked = isPrivateSpaceLocked,
+                filteredPrivateApps = filteredPrivateApps,
+                privateSpaceEnabled = prefs.privateSpaceEnabled,
+                appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
+                onAppClick = onAppClick,
+                onTogglePrivateSpace = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        PrivateSpaceHelper.togglePrivateSpace(context)
+                        isPrivateSpaceLocked = !isPrivateSpaceLocked
+                        if (!isPrivateSpaceLocked) {
+                            scope.launch {
+                                val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+                                privateApps.clear()
+                                privateApps.addAll(pApps)
                             }
-                            Spacer(modifier = Modifier.weight(1f))
-                            Icon(
-                                imageVector = if (isPrivateSpaceLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
-                }
-
-                groupedApps.forEach { (letter, apps) ->
-                    if (showAlphabetCategories) {
-                        item(key = "header_$letter") {
-                            Text(
-                                text = letter,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f),
-                                modifier = Modifier.padding(top = 24.dp, bottom = 4.dp)
-                            )
-                        }
-                    }
-                    items(items = apps, key = { "${it.appPackage}_${it.user}" }) { app ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onAppClick(app) }
-                                .padding(vertical = 14.dp),  // 14+14+20sp ≈ 48dp touch target
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = app.appLabel,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontSize = MaterialTheme.typography.bodyLarge.fontSize * prefs.appDrawerTextSizeScale
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
+                        } else {
+                            privateApps.clear()
                         }
                     }
                 }
+            )
+        }
+    }
+}
 
-                // ── Private Space Section (separate, at end) ──
-                if (prefs.privateSpaceEnabled && filteredPrivateApps.isNotEmpty()) {
-                    item(key = "private_divider") {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 16.dp),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                        )
-                    }
-                    item(key = "private_header") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Shield,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Private Space",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    items(items = filteredPrivateApps, key = { "private_${it.appPackage}_${it.user}" }) { app ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onAppClick(app) }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = app.appLabel,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontSize = MaterialTheme.typography.bodyLarge.fontSize * prefs.appDrawerTextSizeScale
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = Icons.Outlined.Lock,
-                                contentDescription = "Private App",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+@Composable
+private fun AppDrawerSearchBar(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    focusRequester: FocusRequester,
+    hasPrivateSpace: Boolean,
+    isPrivateSpaceLocked: Boolean,
+    onTogglePrivateSpace: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
+            placeholder = {
+                Text(
+                    stringResource(R.string.search),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            singleLine = true,
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.outline,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (hasPrivateSpace) {
+                IconButton(onClick = onTogglePrivateSpace) {
+                    Icon(
+                        imageVector = if (isPrivateSpaceLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
+                        contentDescription = "Private Space",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+            }
 
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Settings",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun ColumnScope.AppDrawerAppList(
+    groupedApps: Map<String, List<AppModel>>,
+    showAlphabetCategories: Boolean,
+    showPrivateSpaceInSearch: Boolean,
+    isPrivateSpaceLocked: Boolean,
+    filteredPrivateApps: List<AppModel>,
+    privateSpaceEnabled: Boolean,
+    appDrawerTextSizeScale: Float,
+    onAppClick: (AppModel) -> Unit,
+    onTogglePrivateSpace: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f)
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        if (showPrivateSpaceInSearch) {
+            item(key = "private_search_result") {
+                AppDrawerPrivateSpaceSearchRow(
+                    isLocked = isPrivateSpaceLocked,
+                    onClick = onTogglePrivateSpace
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
+        }
+
+        groupedApps.forEach { (letter, apps) ->
+            if (showAlphabetCategories) {
+                item(key = "header_$letter") {
+                    Text(
+                        text = letter,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f),
+                        modifier = Modifier.padding(top = 24.dp, bottom = 4.dp)
+                    )
+                }
+            }
+            items(items = apps, key = { app ->
+                val shortcutId = (app as? AppModel.PinnedShortcut)?.shortcutId ?: ""
+                "${app.appPackage}_${app.user}_$shortcutId"
+            }) { app ->
+                AppDrawerItem(
+                    app = app,
+                    textSizeScale = appDrawerTextSizeScale,
+                    onClick = { onAppClick(app) }
+                )
+            }
+        }
+
+        if (privateSpaceEnabled && filteredPrivateApps.isNotEmpty()) {
+            item(key = "private_divider") {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                )
+            }
+            item(key = "private_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Shield,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Private Space",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            items(items = filteredPrivateApps, key = { app ->
+                val shortcutId = (app as? AppModel.PinnedShortcut)?.shortcutId ?: ""
+                "private_${app.appPackage}_${app.user}_$shortcutId"
+            }) { app ->
+                AppDrawerItem(
+                    app = app,
+                    textSizeScale = appDrawerTextSizeScale,
+                    isPrivate = true,
+                    onClick = { onAppClick(app) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppDrawerItem(
+    app: AppModel,
+    textSizeScale: Float,
+    isPrivate: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = app.appLabel,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = MaterialTheme.typography.bodyLarge.fontSize * textSizeScale
+            ),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        if (isPrivate) {
+            Icon(
+                imageVector = Icons.Outlined.Lock,
+                contentDescription = "Private App",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppDrawerPrivateSpaceSearchRow(
+    isLocked: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Shield,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = stringResource(R.string.private_space),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = if (isLocked) "Tap to unlock" else "Tap to lock",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        Icon(
+            imageVector = if (isLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
