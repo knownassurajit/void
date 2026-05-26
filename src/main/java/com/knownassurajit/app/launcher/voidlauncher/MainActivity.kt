@@ -50,6 +50,7 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotificationsScree
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.SettingsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.WidgetsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
+import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -123,7 +124,11 @@ class MainActivity : ComponentActivity() {
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         }
+<<<<<<< Updated upstream
         registerReceiver(appReceiver, pkgFilter)
+=======
+        androidx.core.content.ContextCompat.registerReceiver(this, appReceiver, pkgFilter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+>>>>>>> Stashed changes
 
         enableEdgeToEdge()
         setContent {
@@ -341,8 +346,12 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.directionExit(
 }
 
 private fun actionToRouteName(action: String): String? = when (action) {
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> "NotificationSummaryRoute"
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> "WidgetsRoute"
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
+        if (BuildConfig.SHOW_NOTIFICATION_SUMMARY_FEATURE) "NotificationSummaryRoute" else null
+    }
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
+        if (BuildConfig.SHOW_WIDGETS_FEATURE) "WidgetsRoute" else null
+    }
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> "NotesRoute"
     else -> null
 }

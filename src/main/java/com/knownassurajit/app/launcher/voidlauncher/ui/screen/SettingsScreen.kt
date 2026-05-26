@@ -95,6 +95,17 @@ import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
+<<<<<<< Updated upstream
+=======
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.availableFonts
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolveFontFamily
+import android.os.Build
+import android.content.pm.LauncherApps
+import android.os.UserManager
+import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
+import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
+import androidx.compose.foundation.layout.padding
+>>>>>>> Stashed changes
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.availableFonts
 import kotlinx.coroutines.launch
@@ -208,6 +219,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     snackbarHostState = snackbarHostState
                 )
 
+<<<<<<< Updated upstream
                 HomeAppsSection(
                     maxHomeApps = maxHomeApps,
                     onMaxHomeAppsChange = { maxHomeApps = it },
@@ -218,6 +230,35 @@ fun SettingsScreen(onBack: () -> Unit) {
                     appSpacing = appSpacing,
                     onAppSpacingChange = { appSpacing = it }
                 )
+=======
+            // --- App Library Section ---
+            SettingsSectionHeader("App Library")
+            SettingToggleItem(
+                title = "Show Alphabet Categories",
+                subtitle = "Group by starting letter",
+                icon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) },
+                checked = showAlphabetCategories,
+                onCheckedChange = { showAlphabetCategories = it; prefs.showAlphabetCategories = it },
+                tooltipText = "Groups apps A–Z in the app drawer for quick alphabetical navigation."
+            )
+            if (BuildConfig.SHOW_PRIVATE_SPACE_FEATURE) {
+                SettingToggleItem(
+                    title = "Enable Private Space",
+                    subtitle = if (isPrivateSpaceConfigured) "Unlock OS hidden profiles" else "Not configured in system settings",
+                    icon = { Icon(Icons.Default.Security, contentDescription = null) },
+                    checked = privateSpaceEnabled && isPrivateSpaceConfigured,
+                    onCheckedChange = {
+                        if (!isPrivateSpaceConfigured) {
+                            scope.launch { snackbarHostState.showSnackbar("Private Space is not configured.") }
+                        } else {
+                            privateSpaceEnabled = it; prefs.privateSpaceEnabled = it
+                            scope.launch { snackbarHostState.showSnackbar(if (it) "Private Space Enabled" else "Private Space Disabled") }
+                        }
+                    },
+                    tooltipText = "Private Space isolates sensitive apps behind a separate authentication layer. Must be configured in system settings first."
+                )
+            }
+>>>>>>> Stashed changes
 
                 TextSizeSection(
                     homeTextSize = homeTextSize,
@@ -235,6 +276,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     snackbarHostState = snackbarHostState
                 )
 
+<<<<<<< Updated upstream
                 AppearanceSection(
                     showStatusBar = showStatusBar,
                     onShowStatusBarChange = { showStatusBar = it },
@@ -245,6 +287,96 @@ fun SettingsScreen(onBack: () -> Unit) {
                 GesturesSection(
                     enableGestures = enableGestures,
                     onEnableGesturesChange = { enableGestures = it },
+=======
+            SettingsSectionHeader(stringResource(R.string.gestures))
+            SettingToggleItem(
+                title = "Enable Gestures",
+                subtitle = "Activate screen swipes",
+                icon = { Icon(Icons.Default.Swipe, contentDescription = null) },
+                checked = enableGestures,
+                onCheckedChange = { enableGestures = it; prefs.enableGestures = it }
+            )
+            if (enableGestures) {
+                @OptIn(ExperimentalLayoutApi::class)
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Notification Summary chip
+                    if (BuildConfig.SHOW_NOTIFICATION_SUMMARY_FEATURE) {
+                        FilterChip(
+                            selected = enableSummary,
+                            onClick = {
+                                val newState = !enableSummary
+                                if (newState) {
+                                    val enabledListeners = android.provider.Settings.Secure.getString(
+                                        context.contentResolver, "enabled_notification_listeners"
+                                    ) ?: ""
+                                    val hasPermission = enabledListeners.contains(context.packageName)
+                                    if (!hasPermission) {
+                                        try {
+                                            context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                            scope.launch { snackbarHostState.showSnackbar("Grant notification access to enable summaries") }
+                                        } catch (_: Exception) {
+                                            scope.launch { snackbarHostState.showSnackbar("Could not open notification settings") }
+                                        }
+                                        return@FilterChip
+                                    }
+                                }
+                                enableSummary = newState; prefs.enableNotificationSummary = newState
+                                if (!newState) {
+                                    if (leftSwipeAction == SwipeAction.NOTIFICATION_SUMMARY) { leftSwipeAction = SwipeAction.NONE; prefs.leftSwipeAction = SwipeAction.NONE }
+                                    if (rightSwipeAction == SwipeAction.NOTIFICATION_SUMMARY) { rightSwipeAction = SwipeAction.NONE; prefs.rightSwipeAction = SwipeAction.NONE }
+                                }
+                            },
+                            label = { Text("Notification Summary") },
+                            leadingIcon = if (enableSummary) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
+                        )
+                    }
+
+                    // Widgets chip
+                    if (BuildConfig.SHOW_WIDGETS_FEATURE) {
+                        FilterChip(
+                            selected = enableWidgets,
+                            onClick = {
+                                val newState = !enableWidgets
+                                enableWidgets = newState; prefs.enableWidgets = newState
+                                if (!newState) {
+                                    if (leftSwipeAction == SwipeAction.WIDGETS) { leftSwipeAction = SwipeAction.NONE; prefs.leftSwipeAction = SwipeAction.NONE }
+                                    if (rightSwipeAction == SwipeAction.WIDGETS) { rightSwipeAction = SwipeAction.NONE; prefs.rightSwipeAction = SwipeAction.NONE }
+                                }
+                            },
+                            label = { Text("Widgets") },
+                            leadingIcon = if (enableWidgets) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
+                        )
+                    }
+
+                    // Notes chip
+                    FilterChip(
+                        selected = enableNotes,
+                        onClick = {
+                            val newState = !enableNotes
+                            enableNotes = newState; prefs.enableNotes = newState
+                            if (!newState) {
+                                if (leftSwipeAction == SwipeAction.NOTES) { leftSwipeAction = SwipeAction.NONE; prefs.leftSwipeAction = SwipeAction.NONE }
+                                if (rightSwipeAction == SwipeAction.NOTES) { rightSwipeAction = SwipeAction.NONE; prefs.rightSwipeAction = SwipeAction.NONE }
+                            }
+                        },
+                        label = { Text("Notes") },
+                        leadingIcon = if (enableNotes) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
+                    )
+                }
+                
+                SwipeActionSelector(
+                    label = stringResource(R.string.left_swipe_action),
+                    subtitle = "Assign left swipe behavior",
+                    icon = { Icon(Icons.Default.SwipeLeft, contentDescription = null) },
+                    currentAction = leftSwipeAction,
+                    excludeAction = rightSwipeAction,
+>>>>>>> Stashed changes
                     enableSummary = enableSummary,
                     onEnableSummaryChange = { enableSummary = it },
                     enableWidgets = enableWidgets,
@@ -1124,8 +1256,8 @@ private fun SwipeActionSelector(
     onChanged: (String) -> Unit
 ) {
     val allActions = mutableListOf<Pair<String, String>>()
-    if (enableSummary) allActions.add(SwipeAction.NOTIFICATION_SUMMARY to "Notification Summary")
-    if (enableWidgets) allActions.add(SwipeAction.WIDGETS to "Widgets")
+    if (enableSummary && BuildConfig.SHOW_NOTIFICATION_SUMMARY_FEATURE) allActions.add(SwipeAction.NOTIFICATION_SUMMARY to "Notification Summary")
+    if (enableWidgets && BuildConfig.SHOW_WIDGETS_FEATURE) allActions.add(SwipeAction.WIDGETS to "Widgets")
     if (enableNotes) allActions.add(SwipeAction.NOTES to "Notes")
     allActions.add(SwipeAction.NOTIFICATIONS to "System Dropdown")
     allActions.add(SwipeAction.APP to "Open App")
@@ -1135,7 +1267,7 @@ private fun SwipeActionSelector(
     val available = allActions.filter {
         it.first != excludeAction || it.first == SwipeAction.NONE || it.first == SwipeAction.NOTIFICATIONS || it.first == SwipeAction.APP || it.first == SwipeAction.ACCESSIBILITY
     }
-    val displayName = allActions.firstOrNull { it.first == currentAction }?.second ?: currentAction
+    val displayName = allActions.firstOrNull { it.first == currentAction }?.second ?: "None"
     var showDialog by remember { mutableStateOf(false) }
 
     if (showDialog) {

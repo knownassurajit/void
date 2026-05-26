@@ -53,9 +53,15 @@ android {
     productFlavors {
         create("integrated") {
             dimension = "integration"
+            buildConfigField("Boolean", "SHOW_WIDGETS_FEATURE", "true")
+            buildConfigField("Boolean", "SHOW_NOTIFICATION_SUMMARY_FEATURE", "true")
+            buildConfigField("Boolean", "SHOW_PRIVATE_SPACE_FEATURE", "true")
         }
         create("disintegrated") {
             dimension = "integration"
+            buildConfigField("Boolean", "SHOW_WIDGETS_FEATURE", "false")
+            buildConfigField("Boolean", "SHOW_NOTIFICATION_SUMMARY_FEATURE", "false")
+            buildConfigField("Boolean", "SHOW_PRIVATE_SPACE_FEATURE", "false")
         }
     }
 

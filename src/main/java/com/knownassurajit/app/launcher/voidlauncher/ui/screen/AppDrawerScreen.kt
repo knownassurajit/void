@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
+import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -92,7 +93,11 @@ fun AppDrawerScreen(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
+<<<<<<< Updated upstream
         if (FeatureAvailability.isPrivateSpaceAvailable && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+=======
+        if (BuildConfig.SHOW_PRIVATE_SPACE_FEATURE && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+>>>>>>> Stashed changes
             val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
             hasPrivateSpace = profile != null
             if (profile != null) {
@@ -112,39 +117,48 @@ fun AppDrawerScreen(
     }
 
     DisposableEffect(Unit) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                if (!prefs.privateSpaceEnabled) return
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                    val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
-                    if (profile != null) {
-                        val um = context.getSystemService(Context.USER_SERVICE) as UserManager
-                        isPrivateSpaceLocked = um.isQuietModeEnabled(profile)
-                        if (!isPrivateSpaceLocked) {
-                            scope.launch {
-                                val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+        if (!BuildConfig.SHOW_PRIVATE_SPACE_FEATURE) {
+            onDispose {}
+        } else {
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    if (!prefs.privateSpaceEnabled) return
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
+                        if (profile != null) {
+                            val um = context.getSystemService(Context.USER_SERVICE) as UserManager
+                            isPrivateSpaceLocked = um.isQuietModeEnabled(profile)
+                            if (!isPrivateSpaceLocked) {
+                                scope.launch {
+                                    val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+                                    privateApps.clear()
+                                    privateApps.addAll(pApps)
+                                }
+                            } else {
                                 privateApps.clear()
-                                privateApps.addAll(pApps)
                             }
                         } else {
+                            isPrivateSpaceLocked = true
                             privateApps.clear()
+                            hasPrivateSpace = false
                         }
-                    } else {
-                        isPrivateSpaceLocked = true
-                        privateApps.clear()
-                        hasPrivateSpace = false
                     }
                 }
             }
-        }
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
-            addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
-            addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
-            if (Build.VERSION.SDK_INT >= 35) {
-                addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
-                addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
+                addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
+                addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
+                if (Build.VERSION.SDK_INT >= 35) {
+                    addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
+                    addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
+                }
             }
+            androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+            onDispose {
+                context.unregisterReceiver(receiver)
+            }
+<<<<<<< Updated upstream
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -153,6 +167,8 @@ fun AppDrawerScreen(
         }
         onDispose {
             context.unregisterReceiver(receiver)
+=======
+>>>>>>> Stashed changes
         }
     }
 
@@ -244,6 +260,7 @@ fun AppDrawerScreen(
     }
 }
 
+<<<<<<< Updated upstream
 @Composable
 private fun AppDrawerSearchBar(
     searchQuery: String,
@@ -298,6 +315,62 @@ private fun AppDrawerSearchBar(
                         contentDescription = "Private Space",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+=======
+                // ── Private Space Section (separate, at end) ──
+                if (BuildConfig.SHOW_PRIVATE_SPACE_FEATURE && prefs.privateSpaceEnabled && filteredPrivateApps.isNotEmpty()) {
+                    item(key = "private_divider") {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 16.dp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        )
+                    }
+                    item(key = "private_header") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Shield,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Private Space",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    items(items = filteredPrivateApps, key = { "private_${it.appPackage}_${it.user}" }) { app ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onAppClick(app) }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = app.appLabel,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = MaterialTheme.typography.bodyLarge.fontSize * prefs.appDrawerTextSizeScale
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Outlined.Lock,
+                                contentDescription = "Private App",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+>>>>>>> Stashed changes
                 }
             }
 
