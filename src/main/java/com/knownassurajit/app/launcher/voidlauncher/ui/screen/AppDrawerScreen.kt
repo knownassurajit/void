@@ -4,11 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.LauncherApps
 import android.os.Build
 import android.os.UserManager
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,11 +91,7 @@ fun AppDrawerScreen(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-<<<<<<< Updated upstream
-        if (FeatureAvailability.isPrivateSpaceAvailable && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-=======
-        if (BuildConfig.SHOW_PRIVATE_SPACE_FEATURE && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
->>>>>>> Stashed changes
+        if (FeatureAvailability.isPrivateSpaceAvailable && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM)  {
             val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
             hasPrivateSpace = profile != null
             if (profile != null) {
@@ -158,23 +152,12 @@ fun AppDrawerScreen(
             onDispose {
                 context.unregisterReceiver(receiver)
             }
-<<<<<<< Updated upstream
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, filter)
-        }
-        onDispose {
-            context.unregisterReceiver(receiver)
-=======
->>>>>>> Stashed changes
         }
     }
 
     val filteredApps = remember(searchQuery, allApps) {
         val list = allApps.toList()
-        val collator = java.text.Collator.getInstance()
+        val collator = Collator.getInstance()
         val sorted = list.sortedWith(compareBy(collator) { it.appLabel })
         if (searchQuery.isBlank()) sorted
         else sorted.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
@@ -260,7 +243,6 @@ fun AppDrawerScreen(
     }
 }
 
-<<<<<<< Updated upstream
 @Composable
 private fun AppDrawerSearchBar(
     searchQuery: String,
@@ -315,62 +297,6 @@ private fun AppDrawerSearchBar(
                         contentDescription = "Private Space",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-=======
-                // ── Private Space Section (separate, at end) ──
-                if (BuildConfig.SHOW_PRIVATE_SPACE_FEATURE && prefs.privateSpaceEnabled && filteredPrivateApps.isNotEmpty()) {
-                    item(key = "private_divider") {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 16.dp),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                        )
-                    }
-                    item(key = "private_header") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Shield,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Private Space",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    items(items = filteredPrivateApps, key = { "private_${it.appPackage}_${it.user}" }) { app ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onAppClick(app) }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = app.appLabel,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontSize = MaterialTheme.typography.bodyLarge.fontSize * prefs.appDrawerTextSizeScale
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = Icons.Outlined.Lock,
-                                contentDescription = "Private App",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
->>>>>>> Stashed changes
                 }
             }
 
