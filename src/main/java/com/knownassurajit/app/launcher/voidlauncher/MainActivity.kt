@@ -344,10 +344,10 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.directionExit(
 
 private fun actionToRouteName(action: String): String? = when (action) {
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
-        if (BuildConfig.SHOW_NOTIFICATION_SUMMARY_FEATURE) "NotificationSummaryRoute" else null
+        if (true) "NotificationSummaryRoute" else null
     }
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
-        if (BuildConfig.SHOW_WIDGETS_FEATURE) "WidgetsRoute" else null
+        if (true) "WidgetsRoute" else null
     }
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> "NotesRoute"
     else -> null

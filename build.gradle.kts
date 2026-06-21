@@ -49,21 +49,6 @@ android {
         }
     }
 
-    flavorDimensions += "integration"
-    productFlavors {
-        create("integrated") {
-            dimension = "integration"
-            buildConfigField("Boolean", "SHOW_WIDGETS_FEATURE", "true")
-            buildConfigField("Boolean", "SHOW_NOTIFICATION_SUMMARY_FEATURE", "true")
-            buildConfigField("Boolean", "SHOW_PRIVATE_SPACE_FEATURE", "true")
-        }
-        create("disintegrated") {
-            dimension = "integration"
-            buildConfigField("Boolean", "SHOW_WIDGETS_FEATURE", "false")
-            buildConfigField("Boolean", "SHOW_NOTIFICATION_SUMMARY_FEATURE", "false")
-            buildConfigField("Boolean", "SHOW_PRIVATE_SPACE_FEATURE", "false")
-        }
-    }
 
     buildFeatures {
         compose = true
@@ -105,9 +90,9 @@ dependencies {
 
     // ML Kit GenAI — integrated flavor only. The disintegrated AAB ships without
     // these so the resulting bundle has no GenAI surface for Play to review.
-    "integratedImplementation"(libs.mlkit.genai.summarization)
-    "integratedImplementation"(libs.mlkit.genai.prompt)
-    "integratedImplementation"(libs.kotlinx.coroutines.play.services)
+    implementation(libs.mlkit.genai.summarization)
+    implementation(libs.mlkit.genai.prompt)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
 }

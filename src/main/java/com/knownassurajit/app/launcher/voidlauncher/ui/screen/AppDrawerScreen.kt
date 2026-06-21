@@ -111,7 +111,7 @@ fun AppDrawerScreen(
     }
 
     DisposableEffect(Unit) {
-        if (!BuildConfig.SHOW_PRIVATE_SPACE_FEATURE) {
+        if (false) {
             onDispose {}
         } else {
             val receiver = object : BroadcastReceiver() {
