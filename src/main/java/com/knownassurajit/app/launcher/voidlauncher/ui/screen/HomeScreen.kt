@@ -427,7 +427,7 @@ private fun ColumnScope.HomeAppsSection(
     var isDragging by remember { mutableStateOf(false) }
     var draggedIndex by remember { mutableIntStateOf(-1) }
     var dragY by remember { mutableFloatStateOf(0f) }
-    val itemHeights = remember { mutableStateListOf<Float>() }
+    val itemHeights = remember { FloatArray(11) }
 
     LaunchedEffect(isDragging) {
         onDraggingGlobalChanged(isDragging)
