@@ -1124,8 +1124,8 @@ private fun SwipeActionSelector(
     onChanged: (String) -> Unit
 ) {
     val allActions = mutableListOf<Pair<String, String>>()
-    if (enableSummary && BuildConfig.SHOW_NOTIFICATION_SUMMARY_FEATURE) allActions.add(SwipeAction.NOTIFICATION_SUMMARY to "Notification Summary")
-    if (enableWidgets && BuildConfig.SHOW_WIDGETS_FEATURE) allActions.add(SwipeAction.WIDGETS to "Widgets")
+    if (enableSummary) allActions.add(SwipeAction.NOTIFICATION_SUMMARY to "Notification Summary")
+    if (enableWidgets) allActions.add(SwipeAction.WIDGETS to "Widgets")
     if (enableNotes) allActions.add(SwipeAction.NOTES to "Notes")
     allActions.add(SwipeAction.NOTIFICATIONS to "System Dropdown")
     allActions.add(SwipeAction.APP to "Open App")

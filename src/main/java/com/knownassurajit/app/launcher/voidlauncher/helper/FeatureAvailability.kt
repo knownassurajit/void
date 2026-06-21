@@ -1,17 +1,15 @@
 package com.knownassurajit.app.launcher.voidlauncher.helper
 
-import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
-
 object FeatureAvailability {
     val isWidgetsAvailable: Boolean
-        get() = BuildConfig.FLAVOR == "integrated"
+        get() = true
 
     val isNotificationSummaryAvailable: Boolean
-        get() = BuildConfig.FLAVOR == "integrated"
+        get() = true
 
     val isNotificationsAvailable: Boolean
-        get() = BuildConfig.FLAVOR == "integrated"
+        get() = true
         
     val isPrivateSpaceAvailable: Boolean
-        get() = BuildConfig.FLAVOR == "integrated"
+        get() = true
 }
