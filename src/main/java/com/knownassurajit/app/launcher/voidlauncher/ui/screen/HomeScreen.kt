@@ -813,7 +813,7 @@ private fun dispatchSwipeAction(
     val prefs = com.knownassurajit.app.launcher.voidlauncher.data.Prefs(context)
     when (action) {
         com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
-            if (true && prefs.enableNotificationSummary) onSummary()
+            if (prefs.enableNotificationSummary) onSummary()
         }
         com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
             if (true && prefs.enableWidgets) onWidgets()
