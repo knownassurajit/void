@@ -347,7 +347,7 @@ private fun actionToRouteName(action: String): String? = when (action) {
         "NotificationSummaryRoute"
     }
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
-        if (true) "WidgetsRoute" else null
+        "WidgetsRoute"
     }
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> "NotesRoute"
     else -> null
