@@ -816,7 +816,7 @@ private fun dispatchSwipeAction(
             if (prefs.enableNotificationSummary) onSummary()
         }
         com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
-            if (true && prefs.enableWidgets) onWidgets()
+            if (prefs.enableWidgets) onWidgets()
         }
         com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> {
             if (prefs.enableNotes) onNotes()
