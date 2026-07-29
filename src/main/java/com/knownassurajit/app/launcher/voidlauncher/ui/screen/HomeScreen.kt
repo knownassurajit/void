@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalConfiguration
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
+import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 import com.knownassurajit.app.launcher.voidlauncher.HomeApp
 import com.knownassurajit.app.launcher.voidlauncher.MainUiState
 import com.knownassurajit.app.launcher.voidlauncher.R
@@ -426,7 +427,7 @@ private fun ColumnScope.HomeAppsSection(
     var isDragging by remember { mutableStateOf(false) }
     var draggedIndex by remember { mutableIntStateOf(-1) }
     var dragY by remember { mutableFloatStateOf(0f) }
-    val itemHeights = remember { mutableStateListOf<Float>() }
+    val itemHeights = remember { FloatArray(11) }
 
     LaunchedEffect(isDragging) {
         onDraggingGlobalChanged(isDragging)
@@ -809,13 +810,19 @@ private fun dispatchSwipeAction(
     onNotes: () -> Unit,
     onNotifications: () -> Unit
 ) {
+    val prefs = com.knownassurajit.app.launcher.voidlauncher.data.Prefs(context)
     when (action) {
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> onSummary()
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> onWidgets()
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> onNotes()
+        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
+            if (prefs.enableNotificationSummary) onSummary()
+        }
+        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
+            if (prefs.enableWidgets) onWidgets()
+        }
+        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> {
+            if (prefs.enableNotes) onNotes()
+        }
         com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATIONS -> onNotifications()
         com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.APP -> {
-            val prefs = com.knownassurajit.app.launcher.voidlauncher.data.Prefs(context)
             val pkg = if (direction == "left") prefs.leftSwipeAppPackage else prefs.rightSwipeAppPackage
             if (pkg.isNotEmpty()) {
                 try {

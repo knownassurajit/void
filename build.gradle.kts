@@ -18,7 +18,7 @@ android {
         val major = 0
         val minor = 0
         val patch = 0
-        val build = 9
+        val build = 10
         
         versionCode = major * 1_000_000 + minor * 10_000 + patch * 100 + build
         versionName = "$major.$minor.$patch.$build"
@@ -49,15 +49,6 @@ android {
         }
     }
 
-    flavorDimensions += "integration"
-    productFlavors {
-        create("integrated") {
-            dimension = "integration"
-        }
-        create("disintegrated") {
-            dimension = "integration"
-        }
-    }
 
     buildFeatures {
         compose = true
@@ -99,9 +90,9 @@ dependencies {
 
     // ML Kit GenAI — integrated flavor only. The disintegrated AAB ships without
     // these so the resulting bundle has no GenAI surface for Play to review.
-    "integratedImplementation"(libs.mlkit.genai.summarization)
-    "integratedImplementation"(libs.mlkit.genai.prompt)
-    "integratedImplementation"(libs.kotlinx.coroutines.play.services)
+    implementation(libs.mlkit.genai.summarization)
+    implementation(libs.mlkit.genai.prompt)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
 }

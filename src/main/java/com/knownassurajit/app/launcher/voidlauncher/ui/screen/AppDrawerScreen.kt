@@ -4,11 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.LauncherApps
 import android.os.Build
 import android.os.UserManager
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +22,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
+import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -92,7 +91,7 @@ fun AppDrawerScreen(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        if (FeatureAvailability.isPrivateSpaceAvailable && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (FeatureAvailability.isPrivateSpaceAvailable && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM)  {
             val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
             hasPrivateSpace = profile != null
             if (profile != null) {
@@ -112,53 +111,53 @@ fun AppDrawerScreen(
     }
 
     DisposableEffect(Unit) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                if (!prefs.privateSpaceEnabled) return
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                    val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
-                    if (profile != null) {
-                        val um = context.getSystemService(Context.USER_SERVICE) as UserManager
-                        isPrivateSpaceLocked = um.isQuietModeEnabled(profile)
-                        if (!isPrivateSpaceLocked) {
-                            scope.launch {
-                                val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+        if (false) {
+            onDispose {}
+        } else {
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    if (!prefs.privateSpaceEnabled) return
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
+                        if (profile != null) {
+                            val um = context.getSystemService(Context.USER_SERVICE) as UserManager
+                            isPrivateSpaceLocked = um.isQuietModeEnabled(profile)
+                            if (!isPrivateSpaceLocked) {
+                                scope.launch {
+                                    val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+                                    privateApps.clear()
+                                    privateApps.addAll(pApps)
+                                }
+                            } else {
                                 privateApps.clear()
-                                privateApps.addAll(pApps)
                             }
                         } else {
+                            isPrivateSpaceLocked = true
                             privateApps.clear()
+                            hasPrivateSpace = false
                         }
-                    } else {
-                        isPrivateSpaceLocked = true
-                        privateApps.clear()
-                        hasPrivateSpace = false
                     }
                 }
             }
-        }
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
-            addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
-            addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
-            if (Build.VERSION.SDK_INT >= 35) {
-                addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
-                addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
+                addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
+                addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
+                if (Build.VERSION.SDK_INT >= 35) {
+                    addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
+                    addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
+                }
             }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, filter)
-        }
-        onDispose {
-            context.unregisterReceiver(receiver)
+            androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+            onDispose {
+                context.unregisterReceiver(receiver)
+            }
         }
     }
 
     val filteredApps = remember(searchQuery, allApps) {
         val list = allApps.toList()
-        val collator = java.text.Collator.getInstance()
+        val collator = Collator.getInstance()
         val sorted = list.sortedWith(compareBy(collator) { it.appLabel })
         if (searchQuery.isBlank()) sorted
         else sorted.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }

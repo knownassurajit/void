@@ -50,6 +50,7 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotificationsScree
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.SettingsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.WidgetsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
+import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -124,6 +125,7 @@ class MainActivity : ComponentActivity() {
             addDataScheme("package")
         }
         registerReceiver(appReceiver, pkgFilter)
+        androidx.core.content.ContextCompat.registerReceiver(this, appReceiver, pkgFilter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
 
         enableEdgeToEdge()
         setContent {
@@ -341,8 +343,12 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.directionExit(
 }
 
 private fun actionToRouteName(action: String): String? = when (action) {
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> "NotificationSummaryRoute"
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> "WidgetsRoute"
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
+        "NotificationSummaryRoute"
+    }
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
+        "WidgetsRoute"
+    }
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> "NotesRoute"
     else -> null
 }

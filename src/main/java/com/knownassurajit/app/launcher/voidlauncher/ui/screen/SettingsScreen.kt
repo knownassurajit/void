@@ -95,6 +95,7 @@ import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
+import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.availableFonts
 import kotlinx.coroutines.launch
@@ -124,7 +125,6 @@ fun SettingsScreen(onBack: () -> Unit) {
     var clockSectionWeight by remember { mutableFloatStateOf(prefs.clockSectionWeight) }
     var privateSpaceEnabled by remember { mutableStateOf(prefs.privateSpaceEnabled) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     var showAppPicker by remember { mutableStateOf<String?>(null) }
     var showDeveloperInfo by remember { mutableStateOf(false) }
     var appFont by remember { mutableStateOf(prefs.appFont) }
@@ -1135,7 +1135,7 @@ private fun SwipeActionSelector(
     val available = allActions.filter {
         it.first != excludeAction || it.first == SwipeAction.NONE || it.first == SwipeAction.NOTIFICATIONS || it.first == SwipeAction.APP || it.first == SwipeAction.ACCESSIBILITY
     }
-    val displayName = allActions.firstOrNull { it.first == currentAction }?.second ?: currentAction
+    val displayName = allActions.firstOrNull { it.first == currentAction }?.second ?: "None"
     var showDialog by remember { mutableStateOf(false) }
 
     if (showDialog) {
