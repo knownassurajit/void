@@ -17,8 +17,11 @@ data class HomescreenPreferences(
     val showClock: Boolean,
     val showDate: Boolean,
     val showScreenTime: Boolean,
+    val showHomeApps: Boolean,
     val maxApps: Int,
     val clockSectionWeight: Float,
+    val clockSizeScale: Float,
+    val homeSectionOrder: String,
     val homeTextSizeScale: Float,
     val appDrawerTextSizeScale: Float,
     val appSpacingDp: Float,
@@ -75,6 +78,7 @@ class Prefs(context: Context) {
     private val SHOW_DATE_WIDGET = "SHOW_DATE_WIDGET"
     private val SHOW_CLOCK_SECONDS = "SHOW_CLOCK_SECONDS"
     private val SHOW_SCREEN_TIME_WIDGET = "SHOW_SCREEN_TIME_WIDGET"
+    private val SHOW_HOME_APPS = "SHOW_HOME_APPS"
     private val CLOCK_ALIGNMENT = "CLOCK_ALIGNMENT"
     private val CLOCK_VERTICAL_ALIGNMENT = "CLOCK_VERTICAL_ALIGNMENT"
     private val LEFT_SWIPE_ACTION = "LEFT_SWIPE_ACTION"
@@ -82,6 +86,8 @@ class Prefs(context: Context) {
     private val MAX_HOME_APPS = "MAX_HOME_APPS"
     private val SHOW_ALPHABET_CATEGORIES = "SHOW_ALPHABET_CATEGORIES"
     private val CLOCK_SECTION_WEIGHT = "CLOCK_SECTION_WEIGHT"
+    private val CLOCK_SIZE_SCALE = "CLOCK_SIZE_SCALE"
+    private val HOME_SECTION_ORDER = "HOME_SECTION_ORDER"
     private val PRIVATE_SPACE_ENABLED = "PRIVATE_SPACE_ENABLED"
     private val ENABLE_GESTURES = "ENABLE_GESTURES"
     private val ENABLE_NOTIFICATION_SUMMARY = "ENABLE_NOTIFICATION_SUMMARY"
@@ -182,10 +188,13 @@ class Prefs(context: Context) {
         SHOW_CLOCK_WIDGET,
         SHOW_DATE_WIDGET,
         SHOW_SCREEN_TIME_WIDGET,
+        SHOW_HOME_APPS,
         CLOCK_ALIGNMENT,
         CLOCK_VERTICAL_ALIGNMENT,
         MAX_HOME_APPS,
         CLOCK_SECTION_WEIGHT,
+        CLOCK_SIZE_SCALE,
+        HOME_SECTION_ORDER,
         HOME_TEXT_SIZE_SCALE,
         APP_DRAWER_TEXT_SIZE_SCALE,
         APP_SPACING_DP,
@@ -252,8 +261,12 @@ class Prefs(context: Context) {
             showClock = prefs.getBoolean(SHOW_CLOCK_WIDGET, prefs.getInt(DATE_TIME_VISIBILITY, Constants.DateTime.ON) == Constants.DateTime.ON),
             showDate = prefs.getBoolean(SHOW_DATE_WIDGET, prefs.getInt(DATE_TIME_VISIBILITY, Constants.DateTime.ON) != Constants.DateTime.OFF),
             showScreenTime = prefs.getBoolean(SHOW_SCREEN_TIME_WIDGET, true),
+            showHomeApps = prefs.getBoolean(SHOW_HOME_APPS, true),
             maxApps = prefs.getInt(MAX_HOME_APPS, prefs.getInt(HOME_APPS_NUM, 4)),
             clockSectionWeight = prefs.getFloat(CLOCK_SECTION_WEIGHT, 0.25f),
+            clockSizeScale = prefs.getFloat(CLOCK_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f),
+            homeSectionOrder = prefs.getString(HOME_SECTION_ORDER, "clock_first")
+                .takeUnless { it != "apps_first" } ?: "clock_first",
             homeTextSizeScale = prefs.getFloat(HOME_TEXT_SIZE_SCALE, prefs.getFloat(TEXT_SIZE_SCALE, 1.0f)),
             appDrawerTextSizeScale = prefs.getFloat(APP_DRAWER_TEXT_SIZE_SCALE, prefs.getFloat(TEXT_SIZE_SCALE, 1.0f)),
             appSpacingDp = prefs.getFloat(APP_SPACING_DP, 16f),
@@ -795,6 +808,13 @@ class Prefs(context: Context) {
         }
     }
 
+    var showHomeApps: Boolean
+        get() = prefs.getBoolean(SHOW_HOME_APPS, true)
+        set(value) {
+            prefs.edit { putBoolean(SHOW_HOME_APPS, value).apply() }
+            emitHomescreenPrefs()
+        }
+
     fun getAppPackage(location: Int): String {
         return when (location) {
             1 -> prefs.getString(APP_PACKAGE_1, "").toString()
@@ -1057,6 +1077,23 @@ class Prefs(context: Context) {
         get() = prefs.getStringSet("WIDGET_SPANS", emptySet()) ?: emptySet()
         set(value) = prefs.edit { putStringSet("WIDGET_SPANS", value).apply() }
 
+    /** Widget heights encoded as "provider|heightDp". */
+    var widgetHeights: Set<String>
+        get() = prefs.getStringSet("WIDGET_HEIGHTS", emptySet()) ?: emptySet()
+        set(value) = prefs.edit { putStringSet("WIDGET_HEIGHTS", value).apply() }
+
+    /** Ordered widget providers, encoded as a pipe-delimited string. */
+    var widgetOrder: List<String>
+        get() = prefs.getString("WIDGET_ORDER", null)
+            ?.split('|')
+            ?.filter(String::isNotBlank)
+            ?: emptyList()
+        set(value) = prefs.edit { putString("WIDGET_ORDER", value.joinToString("|")).apply() }
+
+    var showWidgetLabels: Boolean
+        get() = prefs.getBoolean("SHOW_WIDGET_LABELS", true)
+        set(value) = prefs.edit { putBoolean("SHOW_WIDGET_LABELS", value).apply() }
+
     /** Allocated AppWidget IDs encoded as "provider|appWidgetId" */
     var widgetAllocatedIds: Set<String>
         get() = prefs.getStringSet("WIDGET_ALLOCATED_IDS", emptySet()) ?: emptySet()
@@ -1080,6 +1117,21 @@ class Prefs(context: Context) {
         const val ACCESSIBILITY = "accessibility"
         const val NONE = "none"
     }
+
+    var clockSizeScale: Float
+        get() = prefs.getFloat(CLOCK_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f)
+        set(value) {
+            prefs.edit { putFloat(CLOCK_SIZE_SCALE, value.coerceIn(0.5f, 1.5f)) }
+            emitHomescreenPrefs()
+        }
+
+    var homeSectionOrder: String
+        get() = prefs.getString(HOME_SECTION_ORDER, "clock_first")
+            .takeUnless { it != "apps_first" } ?: "clock_first"
+        set(value) {
+            prefs.edit { putString(HOME_SECTION_ORDER, if (value == "apps_first") value else "clock_first") }
+            emitHomescreenPrefs()
+        }
 
     var enableGestures: Boolean
         get() = prefs.getBoolean(ENABLE_GESTURES, true)

@@ -123,6 +123,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     var leftSwipeAction by remember { mutableStateOf(prefs.leftSwipeAction) }
     var rightSwipeAction by remember { mutableStateOf(prefs.rightSwipeAction) }
     var clockSectionWeight by remember { mutableFloatStateOf(prefs.clockSectionWeight) }
+    var clockSizeScale by remember { mutableFloatStateOf(prefs.clockSizeScale) }
+    var showHomeApps by remember { mutableStateOf(prefs.showHomeApps) }
+    var homeSectionOrder by remember { mutableStateOf(prefs.homeSectionOrder) }
     var privateSpaceEnabled by remember { mutableStateOf(prefs.privateSpaceEnabled) }
     val snackbarHostState = remember { SnackbarHostState() }
     var showAppPicker by remember { mutableStateOf<String?>(null) }
@@ -205,6 +208,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                     onClockVerticalAlignmentChange = { clockVerticalAlignment = it },
                     clockSectionWeight = clockSectionWeight,
                     onClockSectionWeightChange = { clockSectionWeight = it },
+                    clockSizeScale = clockSizeScale,
+                    onClockSizeScaleChange = { clockSizeScale = it },
+                    showHomeApps = showHomeApps,
+                    onShowHomeAppsChange = { showHomeApps = it },
+                    homeSectionOrder = homeSectionOrder,
+                    onHomeSectionOrderChange = { homeSectionOrder = it },
                     snackbarHostState = snackbarHostState
                 )
 
@@ -463,6 +472,12 @@ private fun ClockAndDateSection(
     onClockVerticalAlignmentChange: (Int) -> Unit,
     clockSectionWeight: Float,
     onClockSectionWeightChange: (Float) -> Unit,
+    clockSizeScale: Float,
+    onClockSizeScaleChange: (Float) -> Unit,
+    showHomeApps: Boolean,
+    onShowHomeAppsChange: (Boolean) -> Unit,
+    homeSectionOrder: String,
+    onHomeSectionOrderChange: (String) -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
     val context = LocalContext.current
@@ -515,6 +530,13 @@ private fun ClockAndDateSection(
         }
     )
     SettingToggleItem(
+        title = "Show Home Apps",
+        subtitle = "Display pinned apps on the home screen",
+        icon = { Icon(Icons.Default.Apps, contentDescription = null) },
+        checked = showHomeApps,
+        onCheckedChange = { onShowHomeAppsChange(it); prefs.showHomeApps = it }
+    )
+    SettingToggleItem(
         title = "24-Hour Format",
         subtitle = "Use military time notation",
         icon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
@@ -552,11 +574,36 @@ private fun ClockAndDateSection(
         title = "Clock Size",
         subtitle = "Adjust clock scale",
         icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
-        value = if (clockSectionWeight < 0.5f) 1.0f else clockSectionWeight,
+        value = clockSizeScale,
         range = 0.5f..1.5f,
         tooltipText = "Scale your clock font up or down. A smaller max value ensures 24h+seconds configurations fit without clipping.",
+        onChanged = { onClockSizeScaleChange(it); prefs.clockSizeScale = it }
+    )
+    SettingSliderItem(
+        title = "Clock Section Weight",
+        subtitle = "Share of available home screen space",
+        icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
+        value = clockSectionWeight,
+        range = 0.15f..0.85f,
+        tooltipText = "Choose how much space the clock section receives when home apps are visible.",
         onChanged = { onClockSectionWeightChange(it); prefs.clockSectionWeight = it }
     )
+    SettingsSectionHeader("Home Section Order")
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = homeSectionOrder == "clock_first",
+            onClick = { onHomeSectionOrderChange("clock_first"); prefs.homeSectionOrder = "clock_first" },
+            label = { Text("Clock first") }
+        )
+        FilterChip(
+            selected = homeSectionOrder == "apps_first",
+            onClick = { onHomeSectionOrderChange("apps_first"); prefs.homeSectionOrder = "apps_first" },
+            label = { Text("Apps first") }
+        )
+    }
 }
 
 @Composable

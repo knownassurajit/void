@@ -9,4 +9,7 @@ data class WidgetInfo(
     val previewImage: Drawable?,
     val appName: String,
     val isPinned: Boolean = false
-)
+) {
+    val key: String
+        get() = provider.provider.flattenToString()
+}

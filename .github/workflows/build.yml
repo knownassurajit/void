@@ -7,7 +7,7 @@ on:
 jobs:
 
   # ─────────────────────────────────────────────
-  # DEVELOP — Unit tests + Lint only
+  # DEVELOP — Unit tests + Lint
   # ─────────────────────────────────────────────
   build-develop:
     if: github.ref == 'refs/heads/develop'
@@ -28,17 +28,11 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run Unit Tests (Integrated)
-        run: ./gradlew testIntegratedDebugUnitTest
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest
 
-      - name: Run Unit Tests (Disintegrated)
-        run: ./gradlew testDisintegratedDebugUnitTest
-
-      - name: Run Lint Analysis (Integrated)
-        run: ./gradlew lintIntegratedDebug
-
-      - name: Run Lint Analysis (Disintegrated)
-        run: ./gradlew lintDisintegratedDebug
+      - name: Run Lint Analysis
+        run: ./gradlew lintDebug
 
       - name: Upload Test & Lint Reports
         uses: actions/upload-artifact@v4
@@ -52,12 +46,11 @@ jobs:
         if: always()
         run: |
           echo "## Develop Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Tested Integrated build (Full features)" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Tested Disintegrated build (Play Store safe, no ML Kit, no Notification permissions)" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Single-variant OSS build: unit tests + lint" >> $GITHUB_STEP_SUMMARY
           echo "Reports are available in the artifacts." >> $GITHUB_STEP_SUMMARY
 
   # ─────────────────────────────────────────────
-  # STAGE — Debug builds → GitHub Pre-release
+  # STAGE — Debug build → GitHub Pre-release
   # ─────────────────────────────────────────────
   build-stage:
     if: github.ref == 'refs/heads/stage'
@@ -83,11 +76,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Integrated Debug APK
-        run: ./gradlew assembleIntegratedDebug
-
-      - name: Build Disintegrated Debug APK
-        run: ./gradlew assembleDisintegratedDebug
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
 
       - name: Extract Version from Gradle
         id: version
@@ -122,44 +112,36 @@ jobs:
           echo "$LOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Rename APKs
+      - name: Rename APK
         id: rename
         run: |
           VERSION="${{ steps.version.outputs.app_version }}"
-          
-          INT_APK=$(find . -path "*/apk/integrated/debug/*.apk" | head -n 1)
-          NEW_INT_NAME="void-integrated-stage-v${VERSION}.apk"
-          mv "$INT_APK" "${NEW_INT_NAME}"
-          echo "integrated_apk=${NEW_INT_NAME}" >> $GITHUB_OUTPUT
-          
-          DIS_APK=$(find . -path "*/apk/disintegrated/debug/*.apk" | head -n 1)
-          NEW_DIS_NAME="void-disintegrated-stage-v${VERSION}.apk"
-          mv "$DIS_APK" "${NEW_DIS_NAME}"
-          echo "disintegrated_apk=${NEW_DIS_NAME}" >> $GITHUB_OUTPUT
+          APK=$(find . -path "*/apk/debug/*.apk" | head -n 1)
+          NEW_NAME="void-stage-v${VERSION}.apk"
+          mv "$APK" "${NEW_NAME}"
+          echo "apk=${NEW_NAME}" >> $GITHUB_OUTPUT
 
       - name: Extract Timestamp
         id: timestamp
         run: echo "time=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
 
-      - name: Create Pre-release and Upload APKs
+      - name: Create Pre-release and Upload APK
         if: success()
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ${{ steps.rename.outputs.integrated_apk }}
-            ${{ steps.rename.outputs.disintegrated_apk }}
+            ${{ steps.rename.outputs.apk }}
           tag_name: stage-v${{ steps.version.outputs.app_version }}-${{ github.run_number }}
           name: "Void Launcher v${{ steps.version.outputs.app_version }} (Stage #${{ github.run_number }})"
           body: |
-            🔧 **Debug build for internal testing**
-            
-            ⏱ **Build generated on:** ${{ steps.timestamp.outputs.time }}
-            🏷 **Run Number:** #${{ github.run_number }}
-            
-            ### Included Builds
-            - **`void-integrated-stage-v${{ steps.version.outputs.app_version }}.apk`**: Full featured build including ML Kit GenAI capabilities, Widget integrations, and Notification service features.
-            - **`void-disintegrated-stage-v${{ steps.version.outputs.app_version }}.apk`**: Play Store compliant build with restricted features entirely omitted.
-            
+            **Debug build for internal testing** (single-variant OSS)
+
+            **Build generated on:** ${{ steps.timestamp.outputs.time }}
+            **Run Number:** #${{ github.run_number }}
+
+            ### Build
+            - `void-stage-v${{ steps.version.outputs.app_version }}.apk` — full feature set (AI, widgets, Private Space, notes)
+
             ## What's Changed
             ${{ steps.changelog.outputs.changelog }}
           draft: false
@@ -168,7 +150,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ─────────────────────────────────────────────
-  # MASTER — Signed Release builds → GitHub Stable Release
+  # MASTER — Signed Release → GitHub Stable Release
   # ─────────────────────────────────────────────
   build-master:
     if: github.ref == 'refs/heads/master'
@@ -192,34 +174,30 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run Unit Tests
-        run: |
-          ./gradlew testIntegratedReleaseUnitTest
-          ./gradlew testDisintegratedReleaseUnitTest
+        run: ./gradlew testDebugUnitTest
 
       - name: Run Lint Analysis
-        run: |
-          ./gradlew lintIntegratedRelease
-          ./gradlew lintDisintegratedRelease
+        run: ./gradlew lintDebug
 
-      - name: Build Integrated Release APK
-        run: ./gradlew assembleIntegratedRelease
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
 
-      - name: Build Disintegrated Release AAB
-        run: ./gradlew bundleDisintegratedRelease
+      - name: Build Release AAB
+        run: ./gradlew bundleRelease
 
       - name: Find Release Build Directories
         id: locate
         run: |
-          INT_DIR=$(dirname "$(find . -path "*/apk/integrated/release/*.apk" | head -n 1)")
-          DIS_DIR=$(dirname "$(find . -path "*/bundle/disintegratedRelease/*.aab" | head -n 1)")
-          echo "int_dir=$INT_DIR" >> $GITHUB_OUTPUT
-          echo "dis_dir=$DIS_DIR" >> $GITHUB_OUTPUT
+          APK_DIR=$(dirname "$(find . -path "*/apk/release/*.apk" | head -n 1)")
+          AAB_DIR=$(dirname "$(find . -path "*/bundle/release/*.aab" | head -n 1)")
+          echo "apk_dir=$APK_DIR" >> $GITHUB_OUTPUT
+          echo "aab_dir=$AAB_DIR" >> $GITHUB_OUTPUT
 
-      - name: Sign Integrated APK
+      - name: Sign Release APK
         uses: r0adkll/sign-android-release@v1
-        id: sign_int
+        id: sign_apk
         with:
-          releaseDirectory: ${{ steps.locate.outputs.int_dir }}
+          releaseDirectory: ${{ steps.locate.outputs.apk_dir }}
           signingKeyBase64: ${{ secrets.SIGNING_KEY }}
           alias: ${{ secrets.ALIAS }}
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -227,11 +205,11 @@ jobs:
         env:
           BUILD_TOOLS_VERSION: "35.0.0"
 
-      - name: Sign Disintegrated AAB
+      - name: Sign Release AAB
         uses: r0adkll/sign-android-release@v1
-        id: sign_dis
+        id: sign_aab
         with:
-          releaseDirectory: ${{ steps.locate.outputs.dis_dir }}
+          releaseDirectory: ${{ steps.locate.outputs.aab_dir }}
           signingKeyBase64: ${{ secrets.SIGNING_KEY }}
           alias: ${{ secrets.ALIAS }}
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -276,16 +254,14 @@ jobs:
         id: rename
         run: |
           VERSION="${{ steps.version.outputs.app_version }}"
-          
-          INT_APK="${{ steps.sign_int.outputs.signedReleaseFile }}"
-          NEW_INT_NAME="void-integrated-release-v${VERSION}.apk"
-          mv "$INT_APK" "${NEW_INT_NAME}"
-          echo "integrated_apk=${NEW_INT_NAME}" >> $GITHUB_OUTPUT
-          
-          DIS_AAB="${{ steps.sign_dis.outputs.signedReleaseFile }}"
-          NEW_DIS_NAME="void-disintegrated-release-v${VERSION}.aab"
-          mv "$DIS_AAB" "${NEW_DIS_NAME}"
-          echo "disintegrated_aab=${NEW_DIS_NAME}" >> $GITHUB_OUTPUT
+          APK="${{ steps.sign_apk.outputs.signedReleaseFile }}"
+          NEW_APK="void-release-v${VERSION}.apk"
+          mv "$APK" "${NEW_APK}"
+          echo "apk=${NEW_APK}" >> $GITHUB_OUTPUT
+          AAB="${{ steps.sign_aab.outputs.signedReleaseFile }}"
+          NEW_AAB="void-release-v${VERSION}.aab"
+          mv "$AAB" "${NEW_AAB}"
+          echo "aab=${NEW_AAB}" >> $GITHUB_OUTPUT
 
       - name: Upload Builds to Artifacts
         uses: actions/upload-artifact@v4
@@ -293,8 +269,8 @@ jobs:
         with:
           name: void-release-builds-v${{ steps.version.outputs.app_version }}
           path: |
-            ${{ steps.rename.outputs.integrated_apk }}
-            ${{ steps.rename.outputs.disintegrated_aab }}
+            ${{ steps.rename.outputs.apk }}
+            ${{ steps.rename.outputs.aab }}
           retention-days: 90
 
       - name: Extract Timestamp
@@ -306,28 +282,27 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ${{ steps.rename.outputs.integrated_apk }}
-            ${{ steps.rename.outputs.disintegrated_aab }}
+            ${{ steps.rename.outputs.apk }}
+            ${{ steps.rename.outputs.aab }}
           tag_name: v${{ steps.version.outputs.app_version }}+${{ github.run_number }}
           name: "Void Launcher v${{ steps.version.outputs.app_version }} (Stable Release)"
           body: |
-            🚀 **Production Release `v${{ steps.version.outputs.app_version }}`**
-            
-            ⏱ **Build generated on:** ${{ steps.timestamp.outputs.time }}
-            🏷 **Run Number:** #${{ github.run_number }}
-            
-            ### Included Builds and Intent
-            - **`void-integrated-release-v${{ steps.version.outputs.app_version }}.apk`**: 
-              *The complete Void Launcher experience.* This build includes advanced ML Kit GenAI notification summaries, the full Widget management screen, and full system notification integrations. Use this version for sideloading the ultimate feature set.
-              
-            - **`void-disintegrated-release-v${{ steps.version.outputs.app_version }}.aab`**: 
-              *The Google Play Store compliant App Bundle.* This build strictly omits all permissions and code requiring `BIND_NOTIFICATION_LISTENER_SERVICE` and App Widgets. It is prepared as an Android App Bundle (.aab) specifically for Play Console release.
-            
+            **Production Release `v${{ steps.version.outputs.app_version }}`** (single-variant OSS)
+
+            **Build generated on:** ${{ steps.timestamp.outputs.time }}
+            **Run Number:** #${{ github.run_number }}
+
+            ### Builds
+            - `void-release-v${{ steps.version.outputs.app_version }}.apk` — sideload install
+            - `void-release-v${{ steps.version.outputs.app_version }}.aab` — optional distribution bundle
+
+            Full features included: ML Kit GenAI summaries, AppWidgetHost widgets, Private Space, notes.
+
             ## What's Changed
             ${{ steps.changelog.outputs.changelog }}
-            
+
             ## Installation
-            Download your preferred build below. Enable **Install from unknown sources** on your device if installing the APK outside the Play Store. The AAB file is intended for Play Console publishing.
+            Enable **Install from unknown sources** when sideloading the APK.
           draft: false
           prerelease: false
         env:

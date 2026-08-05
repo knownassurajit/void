@@ -3,6 +3,8 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.screen
 import android.app.Application
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
+import android.content.Intent
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -49,6 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.WidgetInfo
@@ -56,12 +63,24 @@ import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBar
-import androidx.compose.ui.text.style.TextAlign
+import kotlin.math.roundToInt
 
 private const val WIDGET_HOST_ID = 1024
+private const val DEFAULT_WIDGET_HEIGHT_DP = 240
+private const val MIN_WIDGET_HEIGHT_DP = 100
+private const val MAX_WIDGET_HEIGHT_DP = 600
+
+data class PendingWidgetBinding(
+    val widget: WidgetInfo,
+    val appWidgetId: Int,
+    val configureIntent: Intent
+)
+
+sealed interface PinWidgetResult {
+    data object Added : PinWidgetResult
+    data class NeedsConfiguration(val binding: PendingWidgetBinding) : PinWidgetResult
+    data object Denied : PinWidgetResult
+}
 
 // ── ViewModel (Integrated Only Stub/Mock if needed, but here we keep it) ──
 
@@ -116,9 +135,13 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
             prefs.pinnedWidgets = pinned
         }
 
+        val orderedKeys = prefs.widgetOrder
         _pinnedWidgets.value = all.filter { widget ->
             val key = widget.provider.provider.flattenToString()
             idMap.containsKey(key) && pinned.contains(key)
+        }.sortedBy { widget ->
+            val index = orderedKeys.indexOf(widget.key)
+            if (index < 0) Int.MAX_VALUE else index
         }
         _widgetIds.value = idMap
     }
@@ -135,9 +158,9 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         return map
     }
 
-    fun pinWidget(widget: WidgetInfo): Boolean {
+    fun beginPinWidget(widget: WidgetInfo): PinWidgetResult {
         val key = widget.provider.provider.flattenToString()
-        if (prefs.pinnedWidgets.contains(key)) return true
+        if (prefs.pinnedWidgets.contains(key)) return PinWidgetResult.Added
 
         val manager = AppWidgetManager.getInstance(ctx)
         val appWidgetId = appWidgetHost.allocateAppWidgetId()
@@ -145,25 +168,51 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         return try {
             val bound = manager.bindAppWidgetIdIfAllowed(appWidgetId, widget.provider.provider)
             if (bound) {
-                val ids = prefs.widgetAllocatedIds.toMutableSet()
-                ids.removeAll { it.startsWith("$key|") }
-                ids.add("$key|$appWidgetId")
-                prefs.widgetAllocatedIds = ids
-
-                val pins = prefs.pinnedWidgets.toMutableSet()
-                pins.add(key)
-                prefs.pinnedWidgets = pins
-
-                refreshPinnedAndIds()
-                true
+                val configure = widget.provider.configure
+                if (configure == null) {
+                    commitPin(widget, appWidgetId)
+                    PinWidgetResult.Added
+                } else {
+                    PinWidgetResult.NeedsConfiguration(
+                        PendingWidgetBinding(
+                            widget = widget,
+                            appWidgetId = appWidgetId,
+                            configureIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
+                                .setComponent(configure)
+                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                        )
+                    )
+                }
             } else {
                 appWidgetHost.deleteAppWidgetId(appWidgetId)
-                false
+                PinWidgetResult.Denied
             }
         } catch (_: Exception) {
             try { appWidgetHost.deleteAppWidgetId(appWidgetId) } catch (_: Exception) {}
-            false
+            PinWidgetResult.Denied
         }
+    }
+
+    fun commitPendingPin(binding: PendingWidgetBinding) {
+        commitPin(binding.widget, binding.appWidgetId)
+    }
+
+    fun cancelPendingPin(binding: PendingWidgetBinding) {
+        try { appWidgetHost.deleteAppWidgetId(binding.appWidgetId) } catch (_: Exception) {}
+    }
+
+    private fun commitPin(widget: WidgetInfo, appWidgetId: Int) {
+        val key = widget.key
+        val ids = prefs.widgetAllocatedIds.toMutableSet()
+        ids.removeAll { it.startsWith("$key|") }
+        ids.add("$key|$appWidgetId")
+        prefs.widgetAllocatedIds = ids
+
+        val pins = prefs.pinnedWidgets.toMutableSet()
+        pins.add(key)
+        prefs.pinnedWidgets = pins
+        prefs.widgetOrder = (prefs.widgetOrder + key).distinct()
+        refreshPinnedAndIds()
     }
 
     fun unpinWidget(widget: WidgetInfo) {
@@ -180,6 +229,35 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
 
     fun isPinned(widget: WidgetInfo): Boolean =
         prefs.pinnedWidgets.contains(widget.provider.provider.flattenToString())
+
+    fun widgetHeight(widget: WidgetInfo): Int =
+        prefs.widgetHeights.firstOrNull { it.startsWith("${widget.key}|") }
+            ?.substringAfterLast('|')?.toIntOrNull()
+            ?.coerceIn(MIN_WIDGET_HEIGHT_DP, MAX_WIDGET_HEIGHT_DP)
+            ?: maxOf(widget.provider.minHeight, DEFAULT_WIDGET_HEIGHT_DP)
+
+    fun setWidgetHeight(widget: WidgetInfo, heightDp: Int) {
+        val values = prefs.widgetHeights.toMutableSet()
+        values.removeAll { it.startsWith("${widget.key}|") }
+        values.add("${widget.key}|${heightDp.coerceIn(MIN_WIDGET_HEIGHT_DP, MAX_WIDGET_HEIGHT_DP)}")
+        prefs.widgetHeights = values
+    }
+
+    fun reorder(widget: WidgetInfo, offset: Int) {
+        val current = _pinnedWidgets.value.map(WidgetInfo::key).toMutableList()
+        val index = current.indexOf(widget.key)
+        val target = index + offset
+        if (index < 0 || target !in current.indices) return
+        current[index] = current[target].also { current[target] = current[index] }
+        prefs.widgetOrder = current
+        refreshPinnedAndIds()
+    }
+
+    fun showWidgetLabels(): Boolean = prefs.showWidgetLabels
+
+    fun setShowWidgetLabels(show: Boolean) {
+        prefs.showWidgetLabels = show
+    }
 }
 
 // ── Screen ──
@@ -190,17 +268,35 @@ fun WidgetsScreen(
     onBack: () -> Unit,
     viewModel: WidgetsViewModel = viewModel()
 ) {
-    if (!FeatureAvailability.isWidgetsAvailable) {
-        FeatureUnavailableScreen("Widgets", "The Widgets module is not available in the Play Store version of Void Launcher due to policy restrictions.", onBack)
+    val context = LocalContext.current
+    if (!FeatureAvailability.isWidgetsAvailable(context)) {
+        FeatureUnavailableScreen(
+            "Widgets",
+            "Widgets are unavailable on this device. AppWidgetHost could not be initialized.",
+            onBack
+        )
         return
     }
 
     val pinnedWidgets by viewModel.pinnedWidgets.collectAsState()
     val allWidgets by viewModel.allWidgets.collectAsState()
     val widgetIds by viewModel.widgetIds.collectAsState()
-    val context = LocalContext.current
     var showPicker by remember { mutableStateOf(false) }
     var widgetToRemove by remember { mutableStateOf<WidgetInfo?>(null) }
+    var editMode by remember { mutableStateOf(false) }
+    var pendingBinding by remember { mutableStateOf<PendingWidgetBinding?>(null) }
+    var showLabels by remember { mutableStateOf(viewModel.showWidgetLabels()) }
+    val activityLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val binding = pendingBinding ?: return@rememberLauncherForActivityResult
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            viewModel.commitPendingPin(binding)
+        } else {
+            viewModel.cancelPendingPin(binding)
+        }
+        pendingBinding = null
+    }
 
     DisposableEffect(Unit) {
         viewModel.appWidgetHost.startListening()
@@ -235,8 +331,28 @@ fun WidgetsScreen(
                 Spacer(Modifier.width(4.dp))
                 Text("Add", color = MaterialTheme.colorScheme.primary)
             }
+            TextButton(onClick = { editMode = !editMode }) {
+                Text(if (editMode) "Done" else "Edit")
+            }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        if (editMode) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Show widget labels", style = MaterialTheme.typography.bodyMedium)
+                androidx.compose.material3.Switch(
+                    checked = showLabels,
+                    onCheckedChange = {
+                        showLabels = it
+                        viewModel.setShowWidgetLabels(it)
+                    }
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
 
         if (pinnedWidgets.isEmpty()) {
             Box(
@@ -277,7 +393,22 @@ fun WidgetsScreen(
                             widget = widget,
                             widgetId = widgetId,
                             appWidgetHost = viewModel.appWidgetHost,
-                            onRemoveClick = { widgetToRemove = widget }
+                            heightDp = viewModel.widgetHeight(widget),
+                            showLabel = showLabels,
+                            editMode = editMode,
+                            onRemoveClick = { widgetToRemove = widget },
+                            onConfigureClick = {
+                                widget.provider.configure?.let { configure ->
+                                    activityLauncher.launch(
+                                        Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
+                                            .setComponent(configure)
+                                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                                    )
+                                }
+                            },
+                            onMoveUp = { viewModel.reorder(widget, -1) },
+                            onMoveDown = { viewModel.reorder(widget, 1) },
+                            onHeightChange = { viewModel.setWidgetHeight(widget, it) }
                         )
                     }
                 }
@@ -290,12 +421,19 @@ fun WidgetsScreen(
             allWidgets = allWidgets,
             viewModel = viewModel,
             onDismiss = { showPicker = false },
-            onBindFailed = {
-                Toast.makeText(
-                    context,
-                    "Cannot bind widget. Set VOID Launcher as default launcher and try again.",
-                    Toast.LENGTH_LONG
-                ).show()
+            onPin = { widget ->
+                when (val result = viewModel.beginPinWidget(widget)) {
+                    PinWidgetResult.Added -> Unit
+                    is PinWidgetResult.NeedsConfiguration -> {
+                        pendingBinding = result.binding
+                        activityLauncher.launch(result.binding.configureIntent)
+                    }
+                    PinWidgetResult.Denied -> Toast.makeText(
+                        context,
+                        "Widget binding denied. Allow VOID Launcher to add widgets and try again.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         )
     }
@@ -331,38 +469,54 @@ private fun LiveWidgetItem(
     widget: WidgetInfo,
     widgetId: Int,
     appWidgetHost: AppWidgetHost,
-    onRemoveClick: () -> Unit
+    heightDp: Int,
+    showLabel: Boolean,
+    editMode: Boolean,
+    onRemoveClick: () -> Unit,
+    onConfigureClick: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onHeightChange: (Int) -> Unit
 ) {
-    val widgetHeightDp = remember(widget.provider) {
-        maxOf(widget.provider.minHeight, 100).dp
-    }
-
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = widget.label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(
-                onClick = onRemoveClick,
-                modifier = Modifier.size(28.dp)
+        if (showLabel || editMode) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = "Remove ${widget.label}",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(16.dp)
-                )
+                if (showLabel) {
+                    Text(
+                        text = widget.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                if (editMode) {
+                    IconButton(onClick = onConfigureClick, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.Edit, "Configure ${widget.label}", modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.ArrowUpward, "Move ${widget.label} up", modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.ArrowDownward, "Move ${widget.label} down", modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = { onHeightChange(heightDp - 40) }, modifier = Modifier.size(28.dp)) {
+                        Text("−", style = MaterialTheme.typography.titleMedium)
+                    }
+                    IconButton(onClick = { onHeightChange(heightDp + 40) }, modifier = Modifier.size(28.dp)) {
+                        Text("+", style = MaterialTheme.typography.titleMedium)
+                    }
+                    IconButton(onClick = onRemoveClick, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Outlined.Close, "Remove ${widget.label}", modifier = Modifier.size(16.dp))
+                    }
+                }
             }
         }
 
@@ -372,6 +526,10 @@ private fun LiveWidgetItem(
                 try {
                     appWidgetHost.createView(ctx, widgetId, widget.provider).apply {
                         setAppWidget(widgetId, widget.provider)
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            (heightDp * ctx.resources.displayMetrics.density).roundToInt()
+                        )
                     }
                 } catch (_: Exception) {
                     android.widget.FrameLayout(ctx)
@@ -379,7 +537,13 @@ private fun LiveWidgetItem(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(widgetHeightDp)
+                .height(heightDp.dp),
+            update = { hostView ->
+                hostView.layoutParams = hostView.layoutParams?.apply {
+                    height = (heightDp * hostView.resources.displayMetrics.density).roundToInt()
+                }
+                hostView.requestLayout()
+            }
         )
     }
 }
@@ -390,7 +554,7 @@ private fun WidgetPickerSheet(
     allWidgets: List<WidgetInfo>,
     viewModel: WidgetsViewModel,
     onDismiss: () -> Unit,
-    onBindFailed: () -> Unit
+    onPin: (WidgetInfo) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val groupedWidgets = remember(allWidgets) {
@@ -445,8 +609,7 @@ private fun WidgetPickerSheet(
                                 .fillMaxWidth()
                                 .clickable {
                                     if (!pinned) {
-                                        val ok = viewModel.pinWidget(widget)
-                                        if (!ok) onBindFailed()
+                                        onPin(widget)
                                     }
                                 }
                                 .padding(vertical = 10.dp),

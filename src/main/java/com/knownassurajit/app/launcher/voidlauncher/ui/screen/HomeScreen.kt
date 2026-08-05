@@ -45,9 +45,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +79,7 @@ import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
+import com.knownassurajit.app.launcher.voidlauncher.helper.HomeReorderHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -221,6 +222,7 @@ fun HomeScreen(
 
     // This state is shared between global swipes and app reordering
     var isDraggingGlobal by remember { mutableStateOf(false) }
+    val isDraggingGlobalLatest = rememberUpdatedState(isDraggingGlobal)
 
     // Consume back press on home screen — prevents re-transition to self
     BackHandler { /* Do nothing — home screen is the root */ }
@@ -230,72 +232,103 @@ fun HomeScreen(
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
-            .pointerInput(state.leftSwipeAction, state.rightSwipeAction, state.enableGestures, isDraggingGlobal) {
-                if (!isDraggingGlobal) {
-                    detectDragGestures(
-                        onDragStart = { dragOffset = Offset.Zero },
-                        onDragEnd = {
-                            val absX = abs(dragOffset.x)
-                            val absY = abs(dragOffset.y)
-                            if (absX > swipeThreshold || absY > swipeThreshold) {
-                                if (absX > absY) {
-                                    if (state.enableGestures) {
-                                        if (dragOffset.x > 0) {
-                                            dispatchSwipeAction("left", state.leftSwipeAction, context,
-                                                onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
-                                        } else {
-                                            dispatchSwipeAction("right", state.rightSwipeAction, context,
-                                                onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
-                                        }
+            // Stable keys — do NOT key on isDraggingGlobal (restarts cancel child reorder).
+            .pointerInput(state.leftSwipeAction, state.rightSwipeAction, state.enableGestures) {
+                detectDragGestures(
+                    onDragStart = { dragOffset = Offset.Zero },
+                    onDragEnd = {
+                        if (isDraggingGlobalLatest.value) {
+                            dragOffset = Offset.Zero
+                            return@detectDragGestures
+                        }
+                        val absX = abs(dragOffset.x)
+                        val absY = abs(dragOffset.y)
+                        if (absX > swipeThreshold || absY > swipeThreshold) {
+                            if (absX > absY) {
+                                if (state.enableGestures) {
+                                    if (dragOffset.x > 0) {
+                                        dispatchSwipeAction("left", state.leftSwipeAction, context,
+                                            onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
+                                    } else {
+                                        dispatchSwipeAction("right", state.rightSwipeAction, context,
+                                            onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
                                     }
+                                }
+                            } else {
+                                if (dragOffset.y > 0) {
+                                    onOpenNotifications()
                                 } else {
-                                    if (dragOffset.y > 0) {
-                                        // This calls onOpenNotifications which MainActivity handles 
-                                        // by either expanding the status bar OR navigating to custom panel
-                                        onOpenNotifications()
-                                    }
-                                    else onOpenApps()
+                                    onOpenApps()
                                 }
                             }
-                            dragOffset = Offset.Zero
-                        },
-                        onDragCancel = { dragOffset = Offset.Zero },
-                        onDrag = { change, amount ->
-                            change.consume()
-                            dragOffset += amount
                         }
-                    )
-                }
+                        dragOffset = Offset.Zero
+                    },
+                    onDragCancel = { dragOffset = Offset.Zero },
+                    onDrag = { change, amount ->
+                        if (isDraggingGlobalLatest.value) return@detectDragGestures
+                        change.consume()
+                        dragOffset += amount
+                    }
+                )
             }
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            HomeClockSection(
-                state = state,
-                clockAlign = clockAlign,
-                clockVertical = clockVertical,
-                clockTextAlign = clockTextAlign,
-                onClockClick = onClockClick,
-                onDateClick = onDateClick
-            )
-            
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 24.dp),
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f)
-            )
+            val clockEnabled = state.showClock || state.showDate ||
+                (state.showScreenTime && state.screenTime.isNotBlank())
+            val appsEnabled = state.showHomeApps
+            val bothEnabled = clockEnabled && appsEnabled
+            val clockWeight = if (bothEnabled) state.clockSectionWeight.coerceIn(0.15f, 0.85f) else 1f
+            val appsWeight = if (bothEnabled) 1f - clockWeight else 1f
 
-            HomeAppsSection(
-                state = state,
-                appAlign = appAlign,
-                appVertical = appVertical,
-                appTextAlign = appTextAlign,
-                onAppClick = onAppClick,
-                onHomeAppsChanged = onHomeAppsChanged,
-                onShowAppPicker = { showAppPicker = true },
-                prefs = prefs,
-                haptic = haptic,
-                onDraggingGlobalChanged = { isDraggingGlobal = it }
-            )
+            @Composable
+            fun Clock() {
+                HomeClockSection(
+                    state = state,
+                    clockAlign = clockAlign,
+                    clockVertical = clockVertical,
+                    clockTextAlign = clockTextAlign,
+                    weight = clockWeight,
+                    onClockClick = onClockClick,
+                    onDateClick = onDateClick
+                )
+            }
+
+            @Composable
+            fun Apps() {
+                HomeAppsSection(
+                    state = state,
+                    appAlign = appAlign,
+                    appVertical = appVertical,
+                    appTextAlign = appTextAlign,
+                    weight = appsWeight,
+                    onAppClick = onAppClick,
+                    onHomeAppsChanged = onHomeAppsChanged,
+                    onShowAppPicker = { showAppPicker = true },
+                    prefs = prefs,
+                    haptic = haptic,
+                    onDraggingGlobalChanged = { isDraggingGlobal = it }
+                )
+            }
+
+            @Composable
+            fun Divider() {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f)
+                )
+            }
+
+            if (state.homeSectionOrder == "apps_first") {
+                if (appsEnabled) Apps()
+                if (bothEnabled) Divider()
+                if (clockEnabled) Clock()
+            } else {
+                if (clockEnabled) Clock()
+                if (bothEnabled) Divider()
+                if (appsEnabled) Apps()
+            }
         }
     }
 
@@ -316,6 +349,7 @@ private fun ColumnScope.HomeClockSection(
     clockAlign: Alignment.Horizontal,
     clockVertical: Arrangement.Vertical,
     clockTextAlign: TextAlign,
+    weight: Float,
     onClockClick: () -> Unit,
     onDateClick: () -> Unit
 ) {
@@ -323,7 +357,7 @@ private fun ColumnScope.HomeClockSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .weight(0.25f)
+            .weight(weight)
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = clockAlign,
         verticalArrangement = clockVertical
@@ -339,7 +373,7 @@ private fun ColumnScope.HomeClockSection(
                     text = state.currentTime,
                     style = MaterialTheme.typography.displayLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = MaterialTheme.typography.displayLarge.fontSize * state.homeTextSizeScale * (if (state.clockSectionWeight < 0.5f) 1.0f else state.clockSectionWeight) * (if (state.showSeconds) 0.7f else 1.0f),
+                        fontSize = MaterialTheme.typography.displayLarge.fontSize * state.homeTextSizeScale * state.clockSizeScale * (if (state.showSeconds) 0.7f else 1.0f),
                         letterSpacing = (-1.5).sp
                     ),
                     maxLines = 1,
@@ -407,6 +441,7 @@ private fun ColumnScope.HomeAppsSection(
     appAlign: Alignment.Horizontal,
     appVertical: Alignment.Vertical,
     appTextAlign: TextAlign,
+    weight: Float,
     onAppClick: (HomeApp) -> Unit,
     onHomeAppsChanged: () -> Unit,
     onShowAppPicker: () -> Unit,
@@ -425,9 +460,24 @@ private fun ColumnScope.HomeAppsSection(
     // ── Drag-to-reorder state ──
     val reorderList = remember { mutableStateListOf<HomeApp>() }
     var isDragging by remember { mutableStateOf(false) }
-    var draggedIndex by remember { mutableIntStateOf(-1) }
+    var draggedKey by remember { mutableStateOf<HomeReorderHelper.ReorderKey?>(null) }
     var dragY by remember { mutableFloatStateOf(0f) }
     val itemHeights = remember { FloatArray(11) }
+    val density = LocalDensity.current
+    val spacingPx = with(density) { computedSpacing.dp.toPx() }
+
+    fun homeAppKey(app: HomeApp): HomeReorderHelper.ReorderKey =
+        HomeReorderHelper.ReorderKey(
+            packageName = app.packageName,
+            userString = app.userString,
+            isShortcut = app.isShortcut,
+            shortcutId = app.shortcutId
+        )
+
+    val draggedIndex = remember(draggedKey, reorderList.toList()) {
+        val key = draggedKey ?: return@remember -1
+        reorderList.indexOfFirst { homeAppKey(it) == key }
+    }
 
     LaunchedEffect(isDragging) {
         onDraggingGlobalChanged(isDragging)
@@ -440,11 +490,11 @@ private fun ColumnScope.HomeAppsSection(
         }
     }
 
-    fun commitReorder() {
-        reorderList.forEachIndexed { idx, app ->
-            val targetPosition = state.homeApps.getOrNull(idx)?.position ?: (idx + 1)
+    fun persistHomeAppOrder(ordered: List<HomeApp>) {
+        val maxSlots = prefs.maxHomeApps.coerceIn(1, 10)
+        ordered.forEachIndexed { idx, app ->
             prefs.setAppAtLocation(
-                targetPosition,
+                idx + 1,
                 app.label,
                 app.packageName,
                 app.activityClassName,
@@ -453,41 +503,42 @@ private fun ColumnScope.HomeAppsSection(
                 app.shortcutId
             )
         }
+        for (slot in (ordered.size + 1)..maxSlots) {
+            prefs.setAppAtLocation(slot, "", "", null, "", false, "")
+        }
         onHomeAppsChanged()
     }
 
-    fun handleDragDelta(deltaY: Float) {
-        dragY += deltaY
-        val currentHeight = if (draggedIndex in itemHeights.indices) itemHeights[draggedIndex] else 0f
+    fun commitReorder() {
+        if (reorderList.isEmpty()) return
+        persistHomeAppOrder(reorderList.toList())
+    }
 
-        if (dragY > 0 && draggedIndex < reorderList.lastIndex) {
-            val neighborHeight = if (draggedIndex + 1 in itemHeights.indices) itemHeights[draggedIndex + 1] else currentHeight
-            if (dragY > neighborHeight * 0.5f) {
-                val from = draggedIndex
-                val moved = reorderList.removeAt(from)
-                reorderList.add(from + 1, moved)
-                draggedIndex = from + 1
-                dragY -= neighborHeight
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    fun handleDragDelta(deltaY: Float) {
+        if (draggedIndex < 0) return
+        val previousIndex = draggedIndex
+        val (newList, newIndex, remaining) = HomeReorderHelper.applyDragCascade(
+            list = reorderList.toList(),
+            draggedIndex = draggedIndex,
+            dragY = dragY + deltaY,
+            itemHeights = itemHeights,
+            keyOf = ::homeAppKey
+        )
+        if (newIndex != previousIndex || newList != reorderList.toList()) {
+            reorderList.clear()
+            reorderList.addAll(newList)
+            if (newIndex in newList.indices) {
+                draggedKey = homeAppKey(newList[newIndex])
             }
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
-        else if (dragY < 0 && draggedIndex > 0) {
-            val neighborHeight = if (draggedIndex - 1 in itemHeights.indices) itemHeights[draggedIndex - 1] else currentHeight
-            if (-dragY > neighborHeight * 0.5f) {
-                val from = draggedIndex
-                val moved = reorderList.removeAt(from)
-                reorderList.add(from - 1, moved)
-                draggedIndex = from - 1
-                dragY += neighborHeight
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            }
-        }
+        dragY = remaining
     }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .weight(0.75f)
+            .weight(weight)
             .padding(horizontal = 24.dp, vertical = 8.dp)
     ) {
         Box(
@@ -514,19 +565,17 @@ private fun ColumnScope.HomeAppsSection(
                 horizontalAlignment = appAlign,
                 verticalArrangement = appArrangement
             ) {
-                while (itemHeights.size < displayApps.size) itemHeights.add(0f)
-                while (itemHeights.size > displayApps.size) itemHeights.removeAt(itemHeights.lastIndex)
-
                 displayApps.forEachIndexed { index, app ->
-                    val isThisDragged = isDragging && index == draggedIndex
+                    val key = homeAppKey(app)
+                    val isThisDragged = isDragging && draggedKey == key
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .zIndex(if (isThisDragged) 10f else 0f)
                             .onGloballyPositioned { coords ->
-                                if (index < itemHeights.size) {
-                                    itemHeights[index] = coords.size.height.toFloat()
+                                if (index in itemHeights.indices) {
+                                    itemHeights[index] = coords.size.height.toFloat() + spacingPx
                                 }
                             }
                             .graphicsLayer {
@@ -553,13 +602,13 @@ private fun ColumnScope.HomeAppsSection(
                             textAlign = appTextAlign,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .pointerInput(index) {
+                                .pointerInput(key) {
                                     detectDragGesturesAfterLongPress(
                                         onDragStart = {
                                             isDragging = true
                                             reorderList.clear()
                                             reorderList.addAll(state.homeApps)
-                                            draggedIndex = index
+                                            draggedKey = key
                                             dragY = 0f
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         },
@@ -570,12 +619,17 @@ private fun ColumnScope.HomeAppsSection(
                                         onDragEnd = {
                                             commitReorder()
                                             isDragging = false
-                                            draggedIndex = -1
+                                            draggedKey = null
                                             dragY = 0f
                                         },
                                         onDragCancel = {
+                                            if (reorderList.isNotEmpty() &&
+                                                reorderList.toList() != state.homeApps
+                                            ) {
+                                                commitReorder()
+                                            }
                                             isDragging = false
-                                            draggedIndex = -1
+                                            draggedKey = null
                                             dragY = 0f
                                         }
                                     )
@@ -750,10 +804,7 @@ private fun HomeAppPickerSheet(
                     .height(360.dp)
                     .padding(top = 8.dp)
             ) {
-                items(filtered, key = { app ->
-                    val shortcutId = (app as? AppModel.PinnedShortcut)?.shortcutId ?: ""
-                    "${app.appPackage}_${app.user}_$shortcutId"
-                }) { app ->
+                items(filtered, key = { it.id }) { app ->
                     val isOnHome = currentPackages.contains(app.appPackage)
                     Row(
                         modifier = Modifier

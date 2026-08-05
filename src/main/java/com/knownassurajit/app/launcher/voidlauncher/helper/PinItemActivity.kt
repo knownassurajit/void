@@ -29,7 +29,7 @@ class PinItemActivity : AppCompatActivity() {
                 handleShortcutRequest(pinItemRequest)
 
             LauncherApps.PinItemRequest.REQUEST_TYPE_APPWIDGET ->
-                showToast("Widgets are not supported")
+                handleWidgetRequest(pinItemRequest)
 
             else -> showToast("Unknown action not supported")
         }
@@ -47,5 +47,13 @@ class PinItemActivity : AppCompatActivity() {
         } else {
             showToast("Invalid shortcut info")
         }
+    }
+
+    private fun handleWidgetRequest(pinItemRequest: LauncherApps.PinItemRequest) {
+        val success = pinItemRequest.accept()
+        showToast(
+            if (success) "Widget pin request accepted"
+            else "Failed to pin widget"
+        )
     }
 }
