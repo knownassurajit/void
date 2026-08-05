@@ -12,8 +12,8 @@ Package: `com.knownassurajit.app.launcher.voidlauncher` · App ID: `com.voidlaun
 
 - Enforce **small, explicit, reviewable diffs**.
 - Prefer **Kotlin-first, Compose-only** for new UI.
-- Preserve **flavor parity**: `integrated` and `disintegrated` expose identical public APIs.
-- Treat `src/main` as shared core; do not ship legacy `app/` code.
+- Ship a **single-variant OSS build**; use runtime capability gates (`FeatureAvailability`) instead of Play stub flavors.
+- Treat `src/main` as the sole runtime source set; do not ship legacy `app/` code.
 - Never commit secrets, generated artifacts, local env files, or debug-only shims.
 - Every change must end with:
   - build passes
@@ -28,19 +28,17 @@ Package: `com.knownassurajit.app.launcher.voidlauncher` · App ID: `com.voidlaun
 ## Repo Layout
 
 ```text
-src/main/           shared runtime
-src/integrated/     restricted features enabled
-src/disintegrated/  Play-safe no-op stubs
-app/                legacy fragment code; do not extend
+src/main/           shared + full runtime
+src/test/           unit tests
+src/androidTest/    instrumentation / e2e
 .github/workflows/  CI/CD
-docs/               design / ops / decisions
+docs/               architecture / features / settings / testing / bugs
 ```
 
 Rules:
 - Keep feature code co-located.
-- Isolate platform/flavor code behind stable interfaces.
-- Mirror restricted features across flavors with identical FQNs.
-- Prefer abstraction seams over conditionals in `src/main`.
+- Isolate platform capabilities behind `FeatureAvailability` and helpers.
+- Prefer abstraction seams over conditionals when behavior diverges by API/permission.
 
 ---
 
@@ -49,28 +47,25 @@ Rules:
 Run from repo root only.
 
 ```bash
-./gradlew assembleIntegratedDebug
-./gradlew assembleDisintegratedDebug
-./gradlew assembleIntegratedRelease
-./gradlew bundleDisintegratedRelease
+./gradlew assembleDebug
+./gradlew assembleRelease
+./gradlew bundleRelease
 
-./gradlew testIntegratedDebugUnitTest
-./gradlew testDisintegratedDebugUnitTest
-
-./gradlew lintIntegratedDebug
-./gradlew lintDisintegratedDebug
+./gradlew testDebugUnitTest
+./gradlew lintDebug
+./gradlew connectedDebugAndroidTest
 ```
 
 Single test:
 ```bash
-./gradlew testIntegratedDebugUnitTest --tests "fully.qualified.TestClass"
+./gradlew testDebugUnitTest --tests "fully.qualified.TestClass"
 ```
 
 Before merge:
-- build both flavors
-- lint both flavors
-- run affected tests
-- run E2E/instrumentation
+- build debug + release
+- lint
+- run affected unit tests
+- run e2e/instrumentation when UI paths change
 - verify release artifacts
 - verify version bump
 
@@ -111,29 +106,19 @@ Rules:
 
 ---
 
-## Flavor Policy
+## Capability Policy (single-variant OSS)
 
-### integrated
+VOID ships one open-source build with full features in `src/main`.
 
-Enable:
-- ML Kit GenAI
-- NotificationListenerService
-- widgets
-- Private Space support
-- restricted APIs/permissions
+Runtime gates live in `FeatureAvailability`:
+- Widgets → AppWidgetHost availability
+- Private Space → API 35+ / profile presence
+- Notification listener → optional permission for live panels
+- AICore → soft capability for richer summarization tiers
 
-### disintegrated
+Degrade gracefully when a capability or permission is missing. Do not reintroduce Play stub flavors unless a Play SKU is explicitly planned.
 
-- Ship Play-safe no-op behavior.
-- Keep package/class/signature parity with `integrated`.
-- Return defaults instead of exceptions.
-- Avoid flavor branching in shared code.
-
-Rules:
-- Real impl → `src/integrated`
-- Stub impl → `src/disintegrated`
-- Shared abstractions → `src/main`
-- Always degrade gracefully.
+See `docs/architecture/flavor-decision.md`.
 
 ---
 

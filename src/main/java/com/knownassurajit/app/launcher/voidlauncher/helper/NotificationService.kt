@@ -3,10 +3,8 @@ package com.knownassurajit.app.launcher.voidlauncher.helper
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Intent
-import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.os.Process
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -61,14 +59,9 @@ class NotificationService : NotificationListenerService() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        // Fail closed: only the system server (UID 1000) is allowed to bind a
-        // NotificationListenerService. Reject any other caller defensively, in case
-        // a future OEM build or test harness attempts to bind without the permission check.
-        val uid = Binder.getCallingUid()
-        if (uid != Process.SYSTEM_UID && uid != Process.myUid()) {
-            Log.w(TAG, "Rejected onBind from unexpected uid=$uid")
-            return null
-        }
+        // Framework already enforces BIND_NOTIFICATION_LISTENER_SERVICE for this service.
+        // Do not call Binder.getCallingUid() here — Lint flags it as unsafe on the
+        // main-thread onBind path when no binder transaction identity is active.
         return super.onBind(intent)
     }
 

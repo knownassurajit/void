@@ -200,8 +200,13 @@ fun NotificationSummaryScreen(
     viewModel: NotificationSummaryViewModel = viewModel(),
     onBack: () -> Unit
 ) {
-    if (!FeatureAvailability.isNotificationSummaryAvailable) {
-        FeatureUnavailableScreen("Notification Summary", "The AI Notification Summary module is not available in the Play Store version of Void Launcher due to policy restrictions.", onBack)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    if (!FeatureAvailability.isNotificationSummaryAvailable(context)) {
+        FeatureUnavailableScreen(
+            "Notification Summary",
+            "AI notification summary is unavailable on this device. Check notification listener access and on-device AI support.",
+            onBack
+        )
         return
     }
 

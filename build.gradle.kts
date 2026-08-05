@@ -88,11 +88,14 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.profileinstaller)
 
-    // ML Kit GenAI — integrated flavor only. The disintegrated AAB ships without
-    // these so the resulting bundle has no GenAI surface for Play to review.
+    // ML Kit GenAI — included in the single-variant OSS build.
     implementation(libs.mlkit.genai.summarization)
     implementation(libs.mlkit.genai.prompt)
     implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

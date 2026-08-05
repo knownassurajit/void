@@ -11,7 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Android-green?style=flat-square&logo=android" alt="Platform">
   <img src="https://img.shields.io/badge/Min%20SDK-26%20(Oreo)-blue?style=flat-square" alt="Min SDK">
-  <img src="https://img.shields.io/badge/Target%20SDK-35%20(Android%2015)-blue?style=flat-square" alt="Target SDK">
+  <img src="https://img.shields.io/badge/Target%20SDK-36%20(Android%2016)-blue?style=flat-square" alt="Target SDK">
   <img src="https://img.shields.io/badge/Language-Kotlin-purple?style=flat-square&logo=kotlin" alt="Language">
   <img src="https://img.shields.io/badge/UI-Jetpack_Compose-orange?style=flat-square&logo=jetpack-compose" alt="UI">
   <img src="https://img.shields.io/badge/License-GPLv3-red?style=flat-square" alt="License">
@@ -74,7 +74,7 @@ VOID Launcher leverages the latest Android development stack for maximum perform
 ### Prerequisites
 - **Android Studio Koala** (or newer)
 - **JDK 17** or **JDK 21**
-- **Android SDK Platform 35**
+- **Android SDK Platform 36**
 
 ### Building from Source
 
@@ -83,12 +83,26 @@ VOID Launcher leverages the latest Android development stack for maximum perform
 git clone https://github.com/knownassurajit/void.git
 cd void
 
-# Build a debug APK for the desired flavor
-./gradlew clean assembleIntegratedDebug      # full feature set
-./gradlew clean assembleDisintegratedDebug   # Play-policy compliant
+# Single-variant open-source build (full features)
+./gradlew clean assembleDebug
+./gradlew assembleRelease
+./gradlew bundleRelease
 ```
 
-Output APKs land under `build/outputs/apk/{integrated|disintegrated}/debug/`.
+Output APKs land under `build/outputs/apk/debug/` or `build/outputs/apk/release/`.
+
+### Testing
+
+```bash
+./gradlew testDebugUnitTest
+./gradlew lintDebug
+# with a device/emulator:
+./gradlew connectedDebugAndroidTest
+```
+
+See [`docs/`](docs/) for architecture, features, settings, testing guides, and bug fix notes.
+
+> **Note:** The former `integrated` / `disintegrated` product flavors were removed. VOID ships as one OSS build with runtime capability gates. See [`docs/architecture/flavor-decision.md`](docs/architecture/flavor-decision.md).
 
 ---
 

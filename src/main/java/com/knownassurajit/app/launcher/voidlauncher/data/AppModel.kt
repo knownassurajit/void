@@ -9,6 +9,7 @@ sealed class AppModel : Comparable<AppModel> {
     abstract val appPackage: String
     abstract val user: UserHandle
     abstract val isNew: Boolean
+    abstract val id: String
 
     data class App(
         override val appLabel: String,
@@ -17,7 +18,9 @@ sealed class AppModel : Comparable<AppModel> {
         val activityClassName: String?,
         override val isNew: Boolean = false,
         override val user: UserHandle,
-    ) : AppModel()
+    ) : AppModel() {
+        override val id: String get() = "${appPackage}_${user}_${activityClassName ?: ""}"
+    }
 
     data class PinnedShortcut(
         override val appLabel: String,
@@ -26,7 +29,9 @@ sealed class AppModel : Comparable<AppModel> {
         val shortcutId: String,
         override val isNew: Boolean = false,
         override val user: UserHandle,
-    ) : AppModel()
+    ) : AppModel() {
+        override val id: String get() = "${appPackage}_${user}_$shortcutId"
+    }
 
     override fun compareTo(other: AppModel): Int = when {
         key != null && other.key != null -> key!!.compareTo(other.key)

@@ -91,22 +91,33 @@ fun AppDrawerScreen(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        if (FeatureAvailability.isPrivateSpaceAvailable && prefs.privateSpaceEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM)  {
-            val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
-            hasPrivateSpace = profile != null
-            if (profile != null) {
-                val um = context.getSystemService(Context.USER_SERVICE) as UserManager
-                isPrivateSpaceLocked = um.isQuietModeEnabled(profile)
-                if (!isPrivateSpaceLocked) {
-                    scope.launch {
-                        val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                        privateApps.clear()
-                        privateApps.addAll(pApps)
+        try {
+            if (FeatureAvailability.isPrivateSpaceAvailable(context) &&
+                prefs.privateSpaceEnabled &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
+            ) {
+                val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
+                hasPrivateSpace = profile != null
+                if (profile != null) {
+                    isPrivateSpaceLocked = PrivateSpaceHelper.isQuietModeEnabled(context)
+                    if (!isPrivateSpaceLocked) {
+                        scope.launch {
+                            try {
+                                val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+                                privateApps.clear()
+                                privateApps.addAll(pApps)
+                            } catch (_: Exception) {
+                                privateApps.clear()
+                            }
+                        }
                     }
                 }
+            } else {
+                hasPrivateSpace = false
             }
-        } else {
+        } catch (_: Exception) {
             hasPrivateSpace = false
+            privateApps.clear()
         }
     }
 
@@ -211,7 +222,17 @@ fun AppDrawerScreen(
             )
 
             LaunchedEffect(Unit) {
-                if (prefs.autoShowKeyboard) focusRequester.requestFocus()
+                if (!prefs.autoShowKeyboard) return@LaunchedEffect
+                // Wait until the search field FocusRequester is attached to avoid
+                // IllegalStateException during the drawer enter transition.
+                kotlinx.coroutines.delay(320)
+                try {
+                    focusRequester.requestFocus()
+                } catch (_: IllegalStateException) {
+                    // FocusRequester not ready — degrade silently
+                } catch (_: Exception) {
+                    // Ignore soft-keyboard focus failures
+                }
             }
 
             AppDrawerAppList(
@@ -351,10 +372,7 @@ private fun ColumnScope.AppDrawerAppList(
                     )
                 }
             }
-            items(items = apps, key = { app ->
-                val shortcutId = (app as? AppModel.PinnedShortcut)?.shortcutId ?: ""
-                "${app.appPackage}_${app.user}_$shortcutId"
-            }) { app ->
+            items(items = apps, key = { it.id }) { app ->
                 AppDrawerItem(
                     app = app,
                     textSizeScale = appDrawerTextSizeScale,
@@ -390,10 +408,7 @@ private fun ColumnScope.AppDrawerAppList(
                     )
                 }
             }
-            items(items = filteredPrivateApps, key = { app ->
-                val shortcutId = (app as? AppModel.PinnedShortcut)?.shortcutId ?: ""
-                "private_${app.appPackage}_${app.user}_$shortcutId"
-            }) { app ->
+            items(items = filteredPrivateApps, key = { "private_${it.id}" }) { app ->
                 AppDrawerItem(
                     app = app,
                     textSizeScale = appDrawerTextSizeScale,

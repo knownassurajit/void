@@ -53,8 +53,13 @@ fun NotificationsScreen(
     notifications: List<NotificationGroup> = emptyList(),
     onBack: () -> Unit
 ) {
-    if (!FeatureAvailability.isNotificationsAvailable) {
-        FeatureUnavailableScreen("Notifications", "The Notifications module is not available in the Play Store version of Void Launcher due to policy restrictions.", onBack)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    if (!FeatureAvailability.isNotificationsAvailable(context)) {
+        FeatureUnavailableScreen(
+            "Notifications",
+            "Notifications require the notification listener permission. Enable it in system settings to use this panel.",
+            onBack
+        )
         return
     }
 

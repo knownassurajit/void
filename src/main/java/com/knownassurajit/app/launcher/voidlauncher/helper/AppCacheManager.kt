@@ -32,12 +32,19 @@ object AppCacheManager {
                         val obj = jsonArray.getJSONObject(i)
                         val type = obj.getString("type")
                         if (type == "App") {
+                    val activityClassName = when {
+                        !obj.has("activityClassName") || obj.isNull("activityClassName") -> null
+                        else -> obj.optString("activityClassName").takeIf { it.isNotBlank() && it != "null" }
+                    }
                             list.add(
                                 AppModel.App(
-                                    appLabel = obj.getString("appLabel"),
-                                    appPackage = obj.getString("appPackage"),
-                                    activityClassName = obj.getString("activityClassName"),
-                                    user = getUserHandleFromString(context, obj.getString("user")),
+                                    appLabel = obj.optString("appLabel", ""),
+                                    appPackage = obj.optString("appPackage", ""),
+                                    activityClassName = activityClassName,
+                                    user = getUserHandleFromString(
+                                        context,
+                                        obj.optString("user", "")
+                                    ),
                                     key = null,
                                     isNew = obj.optBoolean("isNew", false)
                                 )
@@ -45,10 +52,13 @@ object AppCacheManager {
                         } else if (type == "PinnedShortcut" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                             list.add(
                                 AppModel.PinnedShortcut(
-                                    appLabel = obj.getString("appLabel"),
-                                    appPackage = obj.getString("appPackage"),
-                                    shortcutId = obj.getString("shortcutId"),
-                                    user = getUserHandleFromString(context, obj.getString("user")),
+                                    appLabel = obj.optString("appLabel", ""),
+                                    appPackage = obj.optString("appPackage", ""),
+                                    shortcutId = obj.optString("shortcutId", ""),
+                                    user = getUserHandleFromString(
+                                        context,
+                                        obj.optString("user", "")
+                                    ),
                                     key = null
                                 )
                             )

@@ -2,6 +2,9 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.screen
 
 import android.content.Intent
 import android.provider.AlarmClock
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -55,9 +58,12 @@ import androidx.compose.ui.unit.dp
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteItem
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteRepository
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionHeader
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidMotion
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 
 @Composable
 fun NotesScreen(onBack: () -> Unit) {
@@ -77,6 +83,11 @@ fun NotesScreen(onBack: () -> Unit) {
     }
 
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var contentVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(VoidMotion.fastMs.toLong())
+        contentVisible = true
+    }
 
     Box(
         modifier = Modifier
@@ -84,11 +95,20 @@ fun NotesScreen(onBack: () -> Unit) {
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
     ) {
+        AnimatedVisibility(
+            visible = contentVisible,
+            enter = fadeIn(animationSpec = VoidMotion.standard()),
+            exit = fadeOut(animationSpec = VoidMotion.standard())
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+            VoidSectionHeader(
+                text = stringResource(R.string.notes_title),
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
             // Add note input
             OutlinedTextField(
                 value = newNoteText,
@@ -202,6 +222,7 @@ fun NotesScreen(onBack: () -> Unit) {
                     }
                 }
             }
+        }
         }
     }
 }
