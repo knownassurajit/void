@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name" translatable="false">VOID Launcher</string>
+    <string name="app_name" translatable="false">VOID</string>
     <string name="lock_layout_description" translatable="false">lock layout description to be used a unique id to lock screen</string>
     <string name="day_battery" formatted="false" translatable="false">%s, %d%%</string>
     <string name="tag_0" translatable="false">0</string>
@@ -19,10 +19,11 @@
     <string name="app">App</string>
     <string name="set_as_default_launcher">Set as default launcher</string>
     <string name="set_as_default_launcher_u"><u>Set as default launcher</u></string>
-    <string name="set_as_default_launcher_first">Set VOID Launcher as default first</string>
+    <string name="set_as_default_launcher_first">Set VOID as default first</string>
+    <string name="set_as_default_message">Set as default</string>
     <string name="app_text_color">Text color</string>
     <string name="double_tap_to_lock_screen">Double tap to lock</string>
-    <string name="admin_permission_message">VOID Launcher promises to use lock screen permission responsibly. VOID Launcher does not collect or share any data.</string>
+    <string name="admin_permission_message">VOID promises to use lock screen permission responsibly. VOID does not collect or share any data.</string>
     <string name="about">About</string>
     <string name="off">Off</string>
     <string name="on">On</string>
@@ -56,14 +57,16 @@
     <string name="system_default">System</string>
     <string name="dark">Dark</string>
     <string name="light">Light</string>
-    <string name="welcome_to_void_settings">Welcome to the VOID Launcher settings!
-        \n\nCustomize your minimalist experience and enjoy a distraction-free environment.</string>
-    <string name="keyboard_message">Hi, keyboard is the fastest way to find and launch apps in VOID Launcher. Can we request you to keep this On for a few more days and then decide?
-        \n\nThe choice is always yours.</string>
+    <string name="welcome_to_void_settings">Welcome to the VOID settings!</string>
+    <string name="settings">Settings</string>
+    <string name="keyboard_message">Hi, keyboard is the fastest way to find and launch apps in VOID. Can we request you to keep this On for a few more days and then decide?</string>
+    <string name="turn_off_keyboard">Turn off keyboard</string>
+    <string name="keep_keyboard_on">Keep keyboard on</string>
+    <string name="accessibility_permission">Accessibility permission</string>
     <string name="digital_wellbeing_message">If you want to set time limits for certain apps, Digital Wellbeing feature of Android can help you do it.           Please search for Digital Wellbeing in your phone settings and enable it.</string>
     <string name="app_usage_message">To show/hide your screen time on the home screen, please allow or disallow the app usage permission.
         \n\nNote: No app usage data is collected. Everything is processed on your device.</string>
-    <string name="accessibility_service_description">The accessibility permission is required to enable double tap to lock. Any data acquired by VOID Launcher via this service will not leave your device.</string>
+    <string name="accessibility_service_description">The accessibility permission is required to enable double tap to lock. Any data acquired by VOID via this service will not leave your device.</string>
     <string name="open">Open link</string>
     <string name="copy">Copy</string>
     <string name="close">Close</string>
@@ -72,9 +75,9 @@
     <string name="date_only">Date only</string>
     <string name="bottom_on">On</string>
     <string name="bottom_off">Off</string>
-    <string name="please_set_void_as_default_first">Please set VOID Launcher as default first</string>
+    <string name="please_set_void_as_default_first">Please set VOID as default first</string>
     <string name="tip_start_typing_for_rename">Tip: Start typing for app RENAME option</string>
-    <string name="hidden_apps_message">Note: Tap on \'VOID Launcher\' at the top of this Settings page to find your hidden apps.\n\nMore details available in our About page.</string>
+    <string name="hidden_apps_message">Note: Tap on \'VOID\' at the top of this Settings page to find your hidden apps.\n\nMore details available in our About page.</string>
     <string name="swipe_down_for">Swipe down for</string>
     <string name="search">Search</string>
     <string name="notifications">Notifications</string>
@@ -90,8 +93,7 @@
     <string name="delete_note">Delete</string>
     <string name="reminder_set">Reminder set for 30 minutes</string>
     <string name="note_reminder_title">Note Reminder</string>
-    <string name="accessibility_disclosure">Please turn on or off VOID Launcher\'s accessibility service in your device\'s settings to enable or disable this feature.
-    \n\nPlease note that this service is only used to let you turn off your device\'s screen using the double tap gesture. Our accessibility service does not collect or share any data.</string>
+    <string name="accessibility_disclosure">Please turn on or off VOID\'s accessibility service in your device\'s settings to enable or disable this feature.</string>\nPlease note that this service is only used to let you turn off your device\'s screen using the double tap gesture. Our accessibility service does not collect or share any data.</string>
     <string name="accept">Accept</string>
     <string name="permission">Permission</string>
     <string name="double_tap_lock">Double tap to lock</string>
@@ -106,7 +108,7 @@
     <string name="enabled">Enabled</string>
     <string name="disabled">Disabled</string>
     <string name="please_turn_on_double_tap_to_unlock">Please turn on double tap to lock</string>
-    <string name="launcher_failed_to_lock_device">VOID Launcher failed to lock device.\nPlease check your app settings.</string>
+    <string name="launcher_failed_to_lock_device">VOID failed to lock device.\nPlease check your app settings.</string>
     <string name="long_press_to_select_app">Long press to select app</string>
     <string name="unable_to_open_app">Unable to open app</string>
     <string name="copied">Copied</string>

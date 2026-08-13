@@ -2,7 +2,7 @@
   <img src="fastlane/metadata/android/en-US/images/icon.png" alt="VOID Launcher" width="128" height="128" style="border-radius: 20%;">
 </p>
 
-<h1 align="center">VOID Launcher</h1>
+<h1 align="center">VOID</h1>
 
 <p align="center">
   <em>A radically minimalist, high-performance Android launcher designed to combat digital addiction.</em>
