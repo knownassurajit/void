@@ -3,7 +3,6 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.screen
 import android.content.Intent
 import android.provider.AlarmClock
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +25,8 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -52,13 +52,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteItem
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteRepository
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.pointerInput
-import kotlin.math.abs
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun NotesScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -76,8 +77,6 @@ fun NotesScreen(onBack: () -> Unit) {
         notes.addAll(repo.getAllNotes())
     }
 
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -87,29 +86,34 @@ fun NotesScreen(onBack: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing)
         ) {
-            // Add note input
+            Text(
+                text = stringResource(R.string.notes_title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            VoidSectionDivider(modifier = Modifier.padding(vertical = VoidDimens.rowSpacing))
             OutlinedTextField(
                 value = newNoteText,
                 onValueChange = { newNoteText = it },
                 placeholder = {
                     Text(
                         stringResource(R.string.add_note_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.outline,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                    focusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 ),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
                     color = MaterialTheme.colorScheme.onSurface
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -125,9 +129,7 @@ fun NotesScreen(onBack: () -> Unit) {
                 )
             )
 
-            // Auto-add on newline directly from hardware keyboard
             LaunchedEffect(newNoteText) {
-                // Auto-add on newline
                 if (newNoteText.endsWith("\n")) {
                     val text = newNoteText.trim()
                     if (text.isNotBlank()) {
@@ -138,9 +140,8 @@ fun NotesScreen(onBack: () -> Unit) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Notes list with swipe-to-delete
             if (notes.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -151,13 +152,13 @@ fun NotesScreen(onBack: () -> Unit) {
                     Text(
                         stringResource(R.string.no_notes),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                     )
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     items(items = notes.toList(), key = { it.id }) { note ->
                         val dismissState = rememberSwipeToDismissBoxState(
@@ -172,17 +173,20 @@ fun NotesScreen(onBack: () -> Unit) {
 
                         SwipeToDismissBox(
                             state = dismissState,
+                            enableDismissFromStartToEnd = false,
+                            enableDismissFromEndToStart = true,
                             backgroundContent = {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(horizontal = 16.dp),
+                                        .padding(horizontal = 8.dp),
                                     contentAlignment = Alignment.CenterEnd
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Delete,
-                                        contentDescription = stringResource(R.string.delete_note),
-                                        tint = MaterialTheme.colorScheme.error
+                                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
+                                        contentDescription = stringResource(R.string.swipe_to_delete),
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
                             }
@@ -191,10 +195,6 @@ fun NotesScreen(onBack: () -> Unit) {
                                 note = note,
                                 onToggle = {
                                     repo.toggleComplete(note.id)
-                                    refreshNotes()
-                                },
-                                onDelete = {
-                                    repo.deleteNote(note.id)
                                     refreshNotes()
                                 }
                             )
@@ -208,7 +208,7 @@ fun NotesScreen(onBack: () -> Unit) {
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteRow(note: NoteItem, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun NoteRow(note: NoteItem, onToggle: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { NoteRepository(context) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -227,10 +227,12 @@ private fun NoteRow(note: NoteItem, onToggle: () -> Unit, onDelete: () -> Unit) 
                     selectedDateMillis = datePickerState.selectedDateMillis
                     showDatePicker = false
                     showTimePicker = true
-                }) { Text("Next") }
+                }) { Text(stringResource(R.string.next)) }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                androidx.compose.material3.TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         ) {
             androidx.compose.material3.DatePicker(state = datePickerState)
@@ -244,7 +246,7 @@ private fun NoteRow(note: NoteItem, onToggle: () -> Unit, onDelete: () -> Unit) 
         )
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            title = { Text("Set Time") },
+            title = { Text(stringResource(R.string.set_time)) },
             text = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     androidx.compose.material3.TimePicker(state = timePickerState)
@@ -287,71 +289,57 @@ private fun NoteRow(note: NoteItem, onToggle: () -> Unit, onDelete: () -> Unit) 
                     } catch (_: Exception) {}
 
                     showTimePicker = false
-                }) { Text("Set Reminder") }
+                }) { Text(stringResource(R.string.set_reminder)) }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+                androidx.compose.material3.TextButton(onClick = { showTimePicker = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         )
     }
 
-    // Card-based note item
-    androidx.compose.material3.OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        colors = androidx.compose.material3.CardDefaults.outlinedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showDatePicker = true }
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showDatePicker = true }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = note.isCompleted,
-                onCheckedChange = { onToggle() },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.outline,
-                    checkmarkColor = MaterialTheme.colorScheme.onPrimary
-                )
+        Checkbox(
+            checked = note.isCompleted,
+            onCheckedChange = { onToggle() },
+            colors = CheckboxDefaults.colors(
+                checkedColor = MaterialTheme.colorScheme.onSurface,
+                uncheckedColor = MaterialTheme.colorScheme.outline,
+                checkmarkColor = MaterialTheme.colorScheme.surface
+            )
+        )
+
+        Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+            Text(
+                text = note.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (note.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        else MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (note.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
-            Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
-                Text(
-                    text = note.text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (note.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant
-                            else MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (note.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // Reminder badge
-                if (note.reminderTime != null && note.reminderTime > 0L) {
-                    val formatted = remember(note.reminderTime) {
-                        java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault())
-                            .format(java.util.Date(note.reminderTime))
-                    }
-                    Text(
-                        text = "⏰ $formatted",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+            if (note.reminderTime != null && note.reminderTime > 0L) {
+                val formatted = remember(note.reminderTime) {
+                    java.text.SimpleDateFormat("EEE d MMM · h:mm a", java.util.Locale.getDefault())
+                        .format(java.util.Date(note.reminderTime))
                 }
-            }
-
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Outlined.Delete,
-                    contentDescription = stringResource(R.string.delete_note),
-                    tint = MaterialTheme.colorScheme.error
+                Text(
+                    text = formatted.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }
     }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
 }

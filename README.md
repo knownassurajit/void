@@ -2,7 +2,7 @@
   <img src="fastlane/metadata/android/en-US/images/icon.png" alt="VOID Launcher" width="128" height="128" style="border-radius: 20%;">
 </p>
 
-<h1 align="center">VOID Launcher</h1>
+<h1 align="center">VOID</h1>
 
 <p align="center">
   <em>A radically minimalist, high-performance Android launcher designed to combat digital addiction.</em>
@@ -11,7 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Android-green?style=flat-square&logo=android" alt="Platform">
   <img src="https://img.shields.io/badge/Min%20SDK-26%20(Oreo)-blue?style=flat-square" alt="Min SDK">
-  <img src="https://img.shields.io/badge/Target%20SDK-35%20(Android%2015)-blue?style=flat-square" alt="Target SDK">
+  <img src="https://img.shields.io/badge/Target%20SDK-36%20(Android%2016)-blue?style=flat-square" alt="Target SDK">
   <img src="https://img.shields.io/badge/Language-Kotlin-purple?style=flat-square&logo=kotlin" alt="Language">
   <img src="https://img.shields.io/badge/UI-Jetpack_Compose-orange?style=flat-square&logo=jetpack-compose" alt="UI">
   <img src="https://img.shields.io/badge/License-GPLv3-red?style=flat-square" alt="License">
@@ -33,7 +33,7 @@
 - **Integrated Quick Notes**: Fast, text-based checklist for capturing thoughts instantly with priority ordering and reminders.
 - **Deep Android 15 Integration**: Full support for Private Space, allowing you to access hidden and secure apps directly from the drawer.
 - **Digital Wellbeing**: Screen time and unlock counts are integrated directly into the home screen for at-a-glance awareness.
-- **Fluid Gestures**: Intuitive navigation with swipe gestures for Apps, Notifications, and Custom Actions (Notes/Widgets).
+- **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions.
 - **Modern UI**: Built with 100% Jetpack Compose and Material 3, providing smooth animations and dynamic theme support.
 
 ---
@@ -74,7 +74,7 @@ VOID Launcher leverages the latest Android development stack for maximum perform
 ### Prerequisites
 - **Android Studio Koala** (or newer)
 - **JDK 17** or **JDK 21**
-- **Android SDK Platform 35**
+- **Android SDK Platform 36**
 
 ### Building from Source
 
@@ -83,11 +83,26 @@ VOID Launcher leverages the latest Android development stack for maximum perform
 git clone https://github.com/knownassurajit/void.git
 cd void
 
-# Build the debug APK
-./gradlew clean :app:assembleDebug
+# Single-variant open-source build (full features)
+./gradlew clean assembleDebug
+./gradlew assembleRelease
+./gradlew bundleRelease
 ```
 
-The output APK will be located at `app/build/outputs/apk/debug/`.
+Output APKs land under `build/outputs/apk/debug/` or `build/outputs/apk/release/`.
+
+### Testing
+
+```bash
+./gradlew testDebugUnitTest
+./gradlew lintDebug
+# with a device/emulator:
+./gradlew connectedDebugAndroidTest
+```
+
+See [`docs/`](docs/) for architecture, features, settings, testing guides, and bug fix notes.
+
+> **Note:** The former `integrated` / `disintegrated` product flavors were removed. VOID ships as one OSS build with runtime capability gates. See [`docs/architecture/flavor-decision.md`](docs/architecture/flavor-decision.md).
 
 ---
 

@@ -39,15 +39,21 @@ data class MainUiState(
     val showClock: Boolean = true,
     val showDate: Boolean = true,
     val showScreenTime: Boolean = true,
+    val showHomeApps: Boolean = true,
     val showStatusBar: Boolean = false,
     val homeAppsCount: Int = 4,
     val leftSwipeAction: String = SwipeAction.NOTIFICATION_SUMMARY,
     val rightSwipeAction: String = SwipeAction.WIDGETS,
-    val clockSectionWeight: Float = 0.25f,
+    val clockSectionWeight: Float = 0.35f,
+    val clockSizeScale: Float = 1.0f,
+    val dateSizeScale: Float = 1.0f,
+    val screenTimeSizeScale: Float = 1.0f,
+    val homeSectionOrder: String = "clock_first",
     val homeTextSizeScale: Float = 1.0f,
     val appDrawerTextSizeScale: Float = 1.0f,
     val appSpacingDp: Float = 16f,
     val enableGestures: Boolean = true,
+    val enableSwipeDownNotifications: Boolean = true,
     val appFont: String = "inter",
     val use24HourClock: Boolean = false,
     val showSeconds: Boolean = false
@@ -63,6 +69,13 @@ data class HomeApp(
     val shortcutId: String = ""
 )
 
+/**
+ * UI-state ViewModel. Exposes a single immutable [MainUiState] StateFlow that the
+ * Compose layer collects with lifecycle awareness. Owns the time ticker, battery
+ * receiver, and prefs-driven UI state propagation.
+ *
+ * App-launching and persistence side effects live in [MainViewModel].
+ */
 class MainUiViewModel(application: Application) : AndroidViewModel(application) {
     private val appContext = application.applicationContext
     private val prefs = Prefs(appContext)
@@ -151,16 +164,22 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
                         showClock = hsPrefs.showClock,
                         showDate = hsPrefs.showDate,
                         showScreenTime = hsPrefs.showScreenTime,
+                        showHomeApps = hsPrefs.showHomeApps,
                         homeAppsCount = hsPrefs.maxApps,
                         homeApps = apps,
                         showStatusBar = hsPrefs.showStatusBar,
                         leftSwipeAction = hsPrefs.leftSwipeAction,
                         rightSwipeAction = hsPrefs.rightSwipeAction,
                         clockSectionWeight = hsPrefs.clockSectionWeight,
+                        clockSizeScale = hsPrefs.clockSizeScale,
+                        dateSizeScale = hsPrefs.dateSizeScale,
+                        screenTimeSizeScale = hsPrefs.screenTimeSizeScale,
+                        homeSectionOrder = hsPrefs.homeSectionOrder,
                         homeTextSizeScale = hsPrefs.homeTextSizeScale,
                         appDrawerTextSizeScale = hsPrefs.appDrawerTextSizeScale,
                         appSpacingDp = hsPrefs.appSpacingDp,
                         enableGestures = hsPrefs.enableGestures,
+                        enableSwipeDownNotifications = hsPrefs.enableSwipeDownNotifications,
                         appFont = hsPrefs.appFont,
                         use24HourClock = hsPrefs.use24HourClock,
                         showSeconds = hsPrefs.showSeconds
@@ -220,13 +239,20 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
                 showClock = prefs.showClockWidget,
                 showDate = prefs.showDateWidget,
                 showScreenTime = prefs.showScreenTimeWidget,
+                showHomeApps = prefs.showHomeApps,
                 showStatusBar = prefs.showStatusBar,
                 leftSwipeAction = prefs.leftSwipeAction,
                 rightSwipeAction = prefs.rightSwipeAction,
                 clockSectionWeight = prefs.clockSectionWeight,
+                clockSizeScale = prefs.clockSizeScale,
+                dateSizeScale = prefs.dateSizeScale,
+                screenTimeSizeScale = prefs.screenTimeSizeScale,
+                homeSectionOrder = prefs.homeSectionOrder,
                 homeTextSizeScale = prefs.homeTextSizeScale,
                 appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
                 appSpacingDp = prefs.appSpacingDp,
+                enableGestures = prefs.enableGestures,
+                enableSwipeDownNotifications = prefs.enableSwipeDownNotifications,
                 appFont = prefs.appFont,
                 use24HourClock = prefs.use24HourClock,
             )

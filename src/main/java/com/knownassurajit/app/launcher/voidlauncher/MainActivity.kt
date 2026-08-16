@@ -41,6 +41,7 @@ import androidx.navigation.compose.rememberNavController
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.helper.NotificationService
 import com.knownassurajit.app.launcher.voidlauncher.helper.getUserHandleFromString
+import com.knownassurajit.app.launcher.voidlauncher.helper.openCalendar
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.AppDrawerScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.HomeScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotesScreen
@@ -56,6 +57,43 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.util.Log
+
+/**
+ * Best-effort access to the hidden `StatusBarManager.expandNotificationsPanel` method.
+ * The class and method are on Android's non-SDK greylist and may be blocked on
+ * `targetSdk` 28+. We cache the result of the first lookup so we don't repeatedly
+ * pay the reflection cost — and so a single failure permanently disables the path
+ * instead of spamming the log on every gesture.
+ */
+private object StatusBarPanelOpener {
+    private const val TAG = "StatusBarPanelOpener"
+
+    @Volatile private var resolved = false
+    @Volatile private var method: java.lang.reflect.Method? = null
+
+    fun expandNotificationsPanel(context: Context) {
+        if (!resolved) synchronized(this) {
+            if (!resolved) {
+                method = try {
+                    @Suppress("PrivateApi")
+                    Class.forName("android.app.StatusBarManager")
+                        .getMethod("expandNotificationsPanel")
+                } catch (t: Throwable) {
+                    Log.w(TAG, "StatusBarManager.expandNotificationsPanel unavailable: ${t.javaClass.simpleName}")
+                    null
+                }
+                resolved = true
+            }
+        }
+        val m = method ?: return
+        try {
+            m.invoke(context.getSystemService("statusbar"))
+        } catch (t: Throwable) {
+            Log.w(TAG, "expandNotificationsPanel invoke failed: ${t.javaClass.simpleName}")
+        }
+    }
+}
 
 /** Physical status bar height, available to all screens regardless of bar visibility. */
 val LocalFixedStatusBarHeight = compositionLocalOf<Dp> { 24.dp }
@@ -85,7 +123,8 @@ class MainActivity : ComponentActivity() {
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         }
-        androidx.core.content.ContextCompat.registerReceiver(this, appReceiver, pkgFilter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+        registerReceiver(appReceiver, pkgFilter)
+        androidx.core.content.ContextCompat.registerReceiver(this, appReceiver, pkgFilter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
 
         enableEdgeToEdge()
         setContent {
@@ -136,15 +175,7 @@ class MainActivity : ComponentActivity() {
                                     totalX += deltaX
                                     totalY += deltaY
                                     if (uiState.showStatusBar && isTopEdge && totalY > 120f) {
-                                        try {
-                                            @Suppress("PrivateApi")
-                                            val sbservice = getSystemService("statusbar")
-                                            val statusbarManager = Class.forName("android.app.StatusBarManager")
-                                            val expands = statusbarManager.getMethod("expandNotificationsPanel")
-                                            expands.invoke(sbservice)
-                                        } catch (e: Exception) {
-                                            e.printStackTrace()
-                                        }
+                                        StatusBarPanelOpener.expandNotificationsPanel(this@MainActivity)
                                         break
                                     }
                                     if (!change.pressed) break
@@ -161,32 +192,22 @@ class MainActivity : ComponentActivity() {
                         popExitTransition = { directionExit(initialState, targetState, uiState) }
                     ) {
                         composable<HomeRoute> {
-                        HomeScreen(
-                            state = uiState,
-                            onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
-                            onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
-                            onOpenNotifications = {
-                                if (uiState.showStatusBar) {
-                                    try {
-                                        @Suppress("PrivateApi")
-                                        val sbservice = getSystemService("statusbar")
-                                        val statusbarManager = Class.forName("android.app.StatusBarManager")
-                                        val expands = statusbarManager.getMethod("expandNotificationsPanel")
-                                        expands.invoke(sbservice)
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                    }
-                                }
-                            },
-                            onOpenNotificationSummary = { navController.navigate(NotificationSummaryRoute) { launchSingleTop = true } },
-                            onOpenWidgets = { navController.navigate(WidgetsRoute) { launchSingleTop = true } },
-                            onOpenNotes = { navController.navigate(NotesRoute) { launchSingleTop = true } },
-                            onAppClick = { app -> launchHomeApp(app) },
-                            onClockClick = { mainViewModel.setDefaultClockApp() },
-                            onDateClick = { /* open calendar */ },
-                            onHomeAppsChanged = { viewModel.refreshFromPrefs() }
-                        )
-                    }
+                            HomeScreen(
+                                state = uiState,
+                                onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
+                                onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
+                                onOpenNotifications = {
+                                    navController.navigate(NotificationPanelRoute) { launchSingleTop = true }
+                                },
+                                onOpenNotificationSummary = { navController.navigate(NotificationSummaryRoute) { launchSingleTop = true } },
+                                onOpenWidgets = { navController.navigate(WidgetsRoute) { launchSingleTop = true } },
+                                onOpenNotes = { navController.navigate(NotesRoute) { launchSingleTop = true } },
+                                onAppClick = { app -> launchHomeApp(app) },
+                                onClockClick = { mainViewModel.setDefaultClockApp() },
+                                onDateClick = { openCalendar(this@MainActivity) },
+                                onHomeAppsChanged = { viewModel.refreshFromPrefs() }
+                            )
+                        }
                     composable<AppDrawerRoute> {
                         AppDrawerScreen(
                             onBack = { navController.popBackStack() },
@@ -317,8 +338,12 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.directionExit(
 }
 
 private fun actionToRouteName(action: String): String? = when (action) {
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> "NotificationSummaryRoute"
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> "WidgetsRoute"
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
+        "NotificationSummaryRoute"
+    }
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
+        "WidgetsRoute"
+    }
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> "NotesRoute"
     else -> null
 }
