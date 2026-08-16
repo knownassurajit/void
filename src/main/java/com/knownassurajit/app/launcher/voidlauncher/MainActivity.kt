@@ -50,7 +50,6 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotificationsScree
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.SettingsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.WidgetsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
-import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -198,11 +197,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
                                 onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
                                 onOpenNotifications = {
-                                    if (uiState.showStatusBar) {
-                                        StatusBarPanelOpener.expandNotificationsPanel(this@MainActivity)
-                                    } else {
-                                        navController.navigate(NotificationPanelRoute) { launchSingleTop = true }
-                                    }
+                                    navController.navigate(NotificationPanelRoute) { launchSingleTop = true }
                                 },
                                 onOpenNotificationSummary = { navController.navigate(NotificationSummaryRoute) { launchSingleTop = true } },
                                 onOpenWidgets = { navController.navigate(WidgetsRoute) { launchSingleTop = true } },

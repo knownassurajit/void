@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name" translatable="false">VOID Launcher</string>
+    <string name="app_name" translatable="false">VOID</string>
     <string name="lock_layout_description" translatable="false">lock layout description to be used a unique id to lock screen</string>
     <string name="day_battery" formatted="false" translatable="false">%s, %d%%</string>
     <string name="tag_0" translatable="false">0</string>
@@ -19,10 +19,11 @@
     <string name="app">App</string>
     <string name="set_as_default_launcher">Set as default launcher</string>
     <string name="set_as_default_launcher_u"><u>Set as default launcher</u></string>
-    <string name="set_as_default_launcher_first">Set VOID Launcher as default first</string>
+    <string name="set_as_default_launcher_first">Set VOID as default first</string>
+    <string name="set_as_default_message">Set as default</string>
     <string name="app_text_color">Text color</string>
     <string name="double_tap_to_lock_screen">Double tap to lock</string>
-    <string name="admin_permission_message">VOID Launcher promises to use lock screen permission responsibly. VOID Launcher does not collect or share any data.</string>
+    <string name="admin_permission_message">VOID promises to use lock screen permission responsibly. VOID does not collect or share any data.</string>
     <string name="about">About</string>
     <string name="off">Off</string>
     <string name="on">On</string>
@@ -56,14 +57,16 @@
     <string name="system_default">System</string>
     <string name="dark">Dark</string>
     <string name="light">Light</string>
-    <string name="welcome_to_void_settings">Welcome to the VOID Launcher settings!
-        \n\nCustomize your minimalist experience and enjoy a distraction-free environment.</string>
-    <string name="keyboard_message">Hi, keyboard is the fastest way to find and launch apps in VOID Launcher. Can we request you to keep this On for a few more days and then decide?
-        \n\nThe choice is always yours.</string>
+    <string name="welcome_to_void_settings">VOID settings</string>
+    <string name="settings">Settings</string>
+    <string name="keyboard_message">Hi, keyboard is the fastest way to find and launch apps in VOID. Can we request you to keep this On for a few more days and then decide?</string>
+    <string name="turn_off_keyboard">Turn off keyboard</string>
+    <string name="keep_keyboard_on">Keep keyboard on</string>
+    <string name="accessibility_permission">Accessibility permission</string>
     <string name="digital_wellbeing_message">If you want to set time limits for certain apps, Digital Wellbeing feature of Android can help you do it.           Please search for Digital Wellbeing in your phone settings and enable it.</string>
     <string name="app_usage_message">To show/hide your screen time on the home screen, please allow or disallow the app usage permission.
         \n\nNote: No app usage data is collected. Everything is processed on your device.</string>
-    <string name="accessibility_service_description">The accessibility permission is required to enable double tap to lock. Any data acquired by VOID Launcher via this service will not leave your device.</string>
+    <string name="accessibility_service_description">The accessibility permission is required to enable double tap to lock. Any data acquired by VOID via this service will not leave your device.</string>
     <string name="open">Open link</string>
     <string name="copy">Copy</string>
     <string name="close">Close</string>
@@ -72,10 +75,31 @@
     <string name="date_only">Date only</string>
     <string name="bottom_on">On</string>
     <string name="bottom_off">Off</string>
-    <string name="please_set_void_as_default_first">Please set VOID Launcher as default first</string>
+    <string name="please_set_void_as_default_first">Please set VOID as default first</string>
     <string name="tip_start_typing_for_rename">Tip: Start typing for app RENAME option</string>
-    <string name="hidden_apps_message">Note: Tap on \'VOID Launcher\' at the top of this Settings page to find your hidden apps.\n\nMore details available in our About page.</string>
+    <string name="hidden_apps_message">Note: Tap on \'VOID\' at the top of this Settings page to find your hidden apps.\n\nMore details available in our About page.</string>
     <string name="swipe_down_for">Swipe down for</string>
+    <string name="swipe_down_notifications">Swipe down for notifications</string>
+    <string name="swipe_down_notifications_subtitle">Open VOID\'s notification list</string>
+    <string name="grant_notification_access">Grant notification access</string>
+    <string name="could_not_open_notification_settings">Could not open notification settings</string>
+    <string name="notifications_need_access">Allow notification access so this list stays in sync with the system shade.</string>
+    <string name="permissions">Permissions</string>
+    <string name="permissions_intro">Runtime grants used by launcher features. Install-time items are listed for reference.</string>
+    <string name="perm_notification_listener">Notification listener</string>
+    <string name="perm_notification_listener_body">In-app notification list and AI summary</string>
+    <string name="perm_usage_access">Usage access</string>
+    <string name="perm_usage_access_body">Home screen time</string>
+    <string name="perm_accessibility">Accessibility</string>
+    <string name="perm_accessibility_body">Optional double-tap to lock</string>
+    <string name="perm_default_home">Default home app</string>
+    <string name="perm_default_home_body">Use VOID as the launcher</string>
+    <string name="perm_query_apps">Query all packages</string>
+    <string name="perm_query_apps_body">App library and home picker</string>
+    <string name="perm_widgets">Bind widgets</string>
+    <string name="perm_widgets_body">Pin live widgets (system grant when adding)</string>
+    <string name="perm_private_space">Private Space</string>
+    <string name="perm_private_space_body">Hidden profiles on Android 15+</string>
     <string name="search">Search</string>
     <string name="notifications">Notifications</string>
     <string name="no_notifications">No new notifications</string>
@@ -90,8 +114,7 @@
     <string name="delete_note">Delete</string>
     <string name="reminder_set">Reminder set for 30 minutes</string>
     <string name="note_reminder_title">Note Reminder</string>
-    <string name="accessibility_disclosure">Please turn on or off VOID Launcher\'s accessibility service in your device\'s settings to enable or disable this feature.
-    \n\nPlease note that this service is only used to let you turn off your device\'s screen using the double tap gesture. Our accessibility service does not collect or share any data.</string>
+    <string name="accessibility_disclosure">Please turn on or off VOID\'s accessibility service in your device\'s settings to enable or disable this feature.\nPlease note that this service is only used to let you turn off your device\'s screen using the double tap gesture. Our accessibility service does not collect or share any data.</string>
     <string name="accept">Accept</string>
     <string name="permission">Permission</string>
     <string name="double_tap_lock">Double tap to lock</string>
@@ -106,7 +129,7 @@
     <string name="enabled">Enabled</string>
     <string name="disabled">Disabled</string>
     <string name="please_turn_on_double_tap_to_unlock">Please turn on double tap to lock</string>
-    <string name="launcher_failed_to_lock_device">VOID Launcher failed to lock device.\nPlease check your app settings.</string>
+    <string name="launcher_failed_to_lock_device">VOID failed to lock device.\nPlease check your app settings.</string>
     <string name="long_press_to_select_app">Long press to select app</string>
     <string name="unable_to_open_app">Unable to open app</string>
     <string name="copied">Copied</string>
@@ -126,7 +149,7 @@
     <string name="adapter_show">Show</string>
     <string name="adapter_hide">Hide</string>
     <string name="are_you_using_your_phone_or_is_your_phone_using_you">Are you using your phone, or is your phone using you?</string>
-    <string name="alignment_changed">Alignment changed ✅</string>
+    <string name="alignment_changed">Alignment changed</string>
     <string name="home_screen">Home screen</string>
     <string name="hey">Hey</string>
     <string name="screen_time">Screen time</string>
@@ -157,4 +180,40 @@
     <string name="right_swipe_action">Right swipe action</string>
     <string name="show_clock">Show clock</string>
     <string name="clock_alignment">Clock alignment</string>
+
+    <string name="cancel">Cancel</string>
+    <string name="next">Next</string>
+    <string name="add">Add</string>
+    <string name="done">Done</string>
+    <string name="set_time">Set time</string>
+    <string name="set_reminder">Set reminder</string>
+    <string name="swipe_to_delete">Swipe left to delete</string>
+    <string name="widget_add">Add</string>
+    <string name="widget_empty">No widgets yet</string>
+    <string name="widget_empty_hint">Add widgets from your apps</string>
+    <string name="widget_picker_title">Add widgets</string>
+    <string name="widget_remove_title">Remove widget</string>
+    <string name="widget_remove_message">Remove \"%1$s\" from your widgets?</string>
+    <string name="widget_bind_denied">Allow VOID to create widgets, then try again.</string>
+    <string name="widget_unavailable_body">Widgets are unavailable on this device.</string>
+    <string name="widget_configure">Configure widget</string>
+    <string name="widget_remove">Remove widget</string>
+    <string name="widget_resize_handle">Resize widget</string>
+    <string name="unlock_private_space">Unlock Private Space</string>
+    <string name="lock_private_space">Lock Private Space</string>
+    <string name="private_space_settings">Private Space settings</string>
+    <string name="add_widget">Add widget</string>
+    <string name="home_apps_picker_title">Home screen apps</string>
+    <string name="search_apps_to_add">Search apps to add…</string>
+    <string name="search_apps">Search apps…</string>
+    <string name="select_font">Select font</string>
+    <string name="select_action">Select action</string>
+    <string name="select_app">Select app</string>
+    <string name="clock_first">Clock first</string>
+    <string name="apps_first">Apps first</string>
+    <string name="clock_size">Clock size</string>
+    <string name="date_size">Date size</string>
+    <string name="screen_time_size">Screen time size</string>
+    <string name="clock_section_weight">Clock / apps split</string>
+    <string name="developer_credits">Developer credits</string>
 </resources>
