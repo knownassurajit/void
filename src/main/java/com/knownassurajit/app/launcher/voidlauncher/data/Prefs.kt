@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.view.Gravity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
+import com.knownassurajit.app.launcher.voidlauncher.helper.HomeLayoutHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,8 @@ data class HomescreenPreferences(
     val maxApps: Int,
     val clockSectionWeight: Float,
     val clockSizeScale: Float,
+    val dateSizeScale: Float,
+    val screenTimeSizeScale: Float,
     val homeSectionOrder: String,
     val homeTextSizeScale: Float,
     val appDrawerTextSizeScale: Float,
@@ -29,9 +32,19 @@ data class HomescreenPreferences(
     val leftSwipeAction: String,
     val rightSwipeAction: String,
     val enableGestures: Boolean,
+    val enableSwipeDownNotifications: Boolean,
     val appFont: String,
     val use24HourClock: Boolean,
     val showSeconds: Boolean
+)
+
+data class HomeAppSlot(
+    val label: String,
+    val packageName: String,
+    val activityClassName: String?,
+    val userString: String,
+    val isShortcut: Boolean = false,
+    val shortcutId: String = ""
 )
 
 class Prefs(context: Context) {
@@ -87,9 +100,12 @@ class Prefs(context: Context) {
     private val SHOW_ALPHABET_CATEGORIES = "SHOW_ALPHABET_CATEGORIES"
     private val CLOCK_SECTION_WEIGHT = "CLOCK_SECTION_WEIGHT"
     private val CLOCK_SIZE_SCALE = "CLOCK_SIZE_SCALE"
+    private val DATE_SIZE_SCALE = "DATE_SIZE_SCALE"
+    private val SCREEN_TIME_SIZE_SCALE = "SCREEN_TIME_SIZE_SCALE"
     private val HOME_SECTION_ORDER = "HOME_SECTION_ORDER"
     private val PRIVATE_SPACE_ENABLED = "PRIVATE_SPACE_ENABLED"
     private val ENABLE_GESTURES = "ENABLE_GESTURES"
+    private val ENABLE_SWIPE_DOWN_NOTIFICATIONS = "ENABLE_SWIPE_DOWN_NOTIFICATIONS"
     private val ENABLE_NOTIFICATION_SUMMARY = "ENABLE_NOTIFICATION_SUMMARY"
     private val ENABLE_WIDGETS = "ENABLE_WIDGETS"
     private val ENABLE_NOTES = "ENABLE_NOTES"
@@ -194,6 +210,9 @@ class Prefs(context: Context) {
         MAX_HOME_APPS,
         CLOCK_SECTION_WEIGHT,
         CLOCK_SIZE_SCALE,
+        DATE_SIZE_SCALE,
+        SCREEN_TIME_SIZE_SCALE,
+        SHOW_CLOCK_SECONDS,
         HOME_SECTION_ORDER,
         HOME_TEXT_SIZE_SCALE,
         APP_DRAWER_TEXT_SIZE_SCALE,
@@ -202,6 +221,7 @@ class Prefs(context: Context) {
         LEFT_SWIPE_ACTION,
         RIGHT_SWIPE_ACTION,
         ENABLE_GESTURES,
+        ENABLE_SWIPE_DOWN_NOTIFICATIONS,
         APP_FONT,
         USE_24_HOUR_CLOCK
     )
@@ -263,8 +283,10 @@ class Prefs(context: Context) {
             showScreenTime = prefs.getBoolean(SHOW_SCREEN_TIME_WIDGET, true),
             showHomeApps = prefs.getBoolean(SHOW_HOME_APPS, true),
             maxApps = prefs.getInt(MAX_HOME_APPS, prefs.getInt(HOME_APPS_NUM, 4)),
-            clockSectionWeight = prefs.getFloat(CLOCK_SECTION_WEIGHT, 0.25f),
+            clockSectionWeight = prefs.getFloat(CLOCK_SECTION_WEIGHT, 0.35f),
             clockSizeScale = prefs.getFloat(CLOCK_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f),
+            dateSizeScale = prefs.getFloat(DATE_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f),
+            screenTimeSizeScale = prefs.getFloat(SCREEN_TIME_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f),
             homeSectionOrder = prefs.getString(HOME_SECTION_ORDER, "clock_first")
                 .takeUnless { it != "apps_first" } ?: "clock_first",
             homeTextSizeScale = prefs.getFloat(HOME_TEXT_SIZE_SCALE, prefs.getFloat(TEXT_SIZE_SCALE, 1.0f)),
@@ -274,6 +296,7 @@ class Prefs(context: Context) {
             leftSwipeAction = prefs.getString(LEFT_SWIPE_ACTION, SwipeAction.NOTIFICATION_SUMMARY) ?: SwipeAction.NOTIFICATION_SUMMARY,
             rightSwipeAction = prefs.getString(RIGHT_SWIPE_ACTION, SwipeAction.WIDGETS) ?: SwipeAction.WIDGETS,
             enableGestures = prefs.getBoolean(ENABLE_GESTURES, true),
+            enableSwipeDownNotifications = prefs.getBoolean(ENABLE_SWIPE_DOWN_NOTIFICATIONS, true),
             appFont = prefs.getString(APP_FONT, "inter") ?: "inter",
             use24HourClock = prefs.getBoolean(USE_24_HOUR_CLOCK, false),
             showSeconds = prefs.getBoolean(SHOW_CLOCK_SECONDS, false)
@@ -1028,6 +1051,22 @@ class Prefs(context: Context) {
         }
     }
 
+    fun replaceHomeApps(apps: List<HomeAppSlot>, maxSlots: Int = 10) {
+        val limit = maxSlots.coerceIn(0, 10)
+        val dense = apps.take(limit)
+        prefs.edit(commit = true) {
+            for (slot in 1..10) {
+                val app = dense.getOrNull(slot - 1)
+                putString("APP_NAME_$slot", app?.label.orEmpty())
+                putString("APP_PACKAGE_$slot", app?.packageName.orEmpty())
+                putString("APP_ACTIVITY_CLASS_NAME_$slot", app?.activityClassName.orEmpty())
+                putString("APP_USER_$slot", app?.userString.orEmpty())
+                putBoolean("IS_SHORTCUT_$slot", app?.isShortcut == true)
+                putString("SHORTCUT_ID_$slot", app?.shortcutId.orEmpty())
+            }
+        }
+    }
+
     /** Independent clock section alignment (Gravity.START / CENTER_HORIZONTAL / END). */
     var clockAlignment: Int
         get() = prefs.getInt(CLOCK_ALIGNMENT, Gravity.START)
@@ -1044,11 +1083,17 @@ class Prefs(context: Context) {
             emitHomescreenPrefs()
         }
 
-    /** Clock section weight (0.15–0.50). */
+    /** Clock section weight (default 0.35 = 35% clock / 65% apps). */
     var clockSectionWeight: Float
-        get() = prefs.getFloat(CLOCK_SECTION_WEIGHT, 0.25f)
+        get() = prefs.getFloat(CLOCK_SECTION_WEIGHT, HomeLayoutHelper.DEFAULT_CLOCK_WEIGHT)
+            .coerceIn(HomeLayoutHelper.MIN_CLOCK_WEIGHT, HomeLayoutHelper.MAX_CLOCK_WEIGHT)
         set(value) {
-            prefs.edit { putFloat(CLOCK_SECTION_WEIGHT, value) }
+            prefs.edit {
+                putFloat(
+                    CLOCK_SECTION_WEIGHT,
+                    value.coerceIn(HomeLayoutHelper.MIN_CLOCK_WEIGHT, HomeLayoutHelper.MAX_CLOCK_WEIGHT)
+                )
+            }
             emitHomescreenPrefs()
         }
 
@@ -1125,6 +1170,20 @@ class Prefs(context: Context) {
             emitHomescreenPrefs()
         }
 
+    var dateSizeScale: Float
+        get() = prefs.getFloat(DATE_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f)
+        set(value) {
+            prefs.edit { putFloat(DATE_SIZE_SCALE, value.coerceIn(0.5f, 1.5f)) }
+            emitHomescreenPrefs()
+        }
+
+    var screenTimeSizeScale: Float
+        get() = prefs.getFloat(SCREEN_TIME_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f)
+        set(value) {
+            prefs.edit { putFloat(SCREEN_TIME_SIZE_SCALE, value.coerceIn(0.5f, 1.5f)) }
+            emitHomescreenPrefs()
+        }
+
     var homeSectionOrder: String
         get() = prefs.getString(HOME_SECTION_ORDER, "clock_first")
             .takeUnless { it != "apps_first" } ?: "clock_first"
@@ -1137,6 +1196,13 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(ENABLE_GESTURES, true)
         set(value) {
             prefs.edit { putBoolean(ENABLE_GESTURES, value) }
+            emitHomescreenPrefs()
+        }
+
+    var enableSwipeDownNotifications: Boolean
+        get() = prefs.getBoolean(ENABLE_SWIPE_DOWN_NOTIFICATIONS, true)
+        set(value) {
+            prefs.edit { putBoolean(ENABLE_SWIPE_DOWN_NOTIFICATIONS, value).apply() }
             emitHomescreenPrefs()
         }
 

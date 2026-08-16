@@ -7,6 +7,8 @@ object VoidDimens {
     val sectionSpacing = 16.dp
     val rowSpacing = 8.dp
     val compactSpacing = 4.dp
+    val widgetPreviewWidth = 72.dp
+    val widgetPreviewHeight = 48.dp
 }
 
 object VoidAlpha {

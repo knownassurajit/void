@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.view.Gravity
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +37,10 @@ import androidx.compose.material.icons.filled.FontDownload
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.LinearScale
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.SpaceBar
@@ -47,6 +51,7 @@ import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Transform
 import androidx.compose.material.icons.filled.ViewDay
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Remove
@@ -87,6 +92,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -96,7 +102,10 @@ import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
 import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
+import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.availableFonts
 import kotlinx.coroutines.launch
 
@@ -124,6 +133,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     var rightSwipeAction by remember { mutableStateOf(prefs.rightSwipeAction) }
     var clockSectionWeight by remember { mutableFloatStateOf(prefs.clockSectionWeight) }
     var clockSizeScale by remember { mutableFloatStateOf(prefs.clockSizeScale) }
+    var dateSizeScale by remember { mutableFloatStateOf(prefs.dateSizeScale) }
+    var screenTimeSizeScale by remember { mutableFloatStateOf(prefs.screenTimeSizeScale) }
     var showHomeApps by remember { mutableStateOf(prefs.showHomeApps) }
     var homeSectionOrder by remember { mutableStateOf(prefs.homeSectionOrder) }
     var privateSpaceEnabled by remember { mutableStateOf(prefs.privateSpaceEnabled) }
@@ -135,6 +146,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var showSeconds by remember { mutableStateOf(prefs.showClockSeconds) }
 
     var enableGestures by remember { mutableStateOf(prefs.enableGestures) }
+    var enableSwipeDownNotifications by remember { mutableStateOf(prefs.enableSwipeDownNotifications) }
     var enableSummary by remember { mutableStateOf(prefs.enableNotificationSummary) }
     var enableWidgets by remember { mutableStateOf(prefs.enableWidgets) }
     var enableNotes by remember { mutableStateOf(prefs.enableNotes) }
@@ -210,6 +222,10 @@ fun SettingsScreen(onBack: () -> Unit) {
                     onClockSectionWeightChange = { clockSectionWeight = it },
                     clockSizeScale = clockSizeScale,
                     onClockSizeScaleChange = { clockSizeScale = it },
+                    dateSizeScale = dateSizeScale,
+                    onDateSizeScaleChange = { dateSizeScale = it },
+                    screenTimeSizeScale = screenTimeSizeScale,
+                    onScreenTimeSizeScaleChange = { screenTimeSizeScale = it },
                     showHomeApps = showHomeApps,
                     onShowHomeAppsChange = { showHomeApps = it },
                     homeSectionOrder = homeSectionOrder,
@@ -254,6 +270,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                 GesturesSection(
                     enableGestures = enableGestures,
                     onEnableGesturesChange = { enableGestures = it },
+                    enableSwipeDownNotifications = enableSwipeDownNotifications,
+                    onEnableSwipeDownNotificationsChange = { enableSwipeDownNotifications = it },
                     enableSummary = enableSummary,
                     onEnableSummaryChange = { enableSummary = it },
                     enableWidgets = enableWidgets,
@@ -272,6 +290,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                     },
                     snackbarHostState = snackbarHostState
                 )
+
+                PermissionsSection()
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
@@ -295,7 +315,7 @@ private fun DeveloperInfoDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Developer Credits") },
+        title = { Text(stringResource(R.string.developer_credits)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Made with 💜 by", style = MaterialTheme.typography.bodyMedium)
@@ -335,7 +355,7 @@ private fun DeveloperInfoDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(stringResource(R.string.close))
             }
         }
     )
@@ -405,7 +425,7 @@ private fun AestheticsSection(
     if (showFontPicker) {
         AlertDialog(
             onDismissRequest = { showFontPicker = false },
-            title = { Text("Select Font") },
+            title = { Text(stringResource(R.string.select_font)) },
             text = {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(availableFonts) { (key, displayName, family) ->
@@ -474,6 +494,10 @@ private fun ClockAndDateSection(
     onClockSectionWeightChange: (Float) -> Unit,
     clockSizeScale: Float,
     onClockSizeScaleChange: (Float) -> Unit,
+    dateSizeScale: Float,
+    onDateSizeScaleChange: (Float) -> Unit,
+    screenTimeSizeScale: Float,
+    onScreenTimeSizeScaleChange: (Float) -> Unit,
     showHomeApps: Boolean,
     onShowHomeAppsChange: (Boolean) -> Unit,
     homeSectionOrder: String,
@@ -571,21 +595,40 @@ private fun ClockAndDateSection(
         onChanged = { onClockVerticalAlignmentChange(it); prefs.clockVerticalAlignment = it }
     )
     SettingSliderItem(
-        title = "Clock Size",
-        subtitle = "Adjust clock scale",
+        title = stringResource(R.string.clock_size),
+        subtitle = "Time only",
         icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
         value = clockSizeScale,
         range = 0.5f..1.5f,
-        tooltipText = "Scale your clock font up or down. A smaller max value ensures 24h+seconds configurations fit without clipping.",
+        tooltipText = "Scale the clock independently of date and screen time.",
         onChanged = { onClockSizeScaleChange(it); prefs.clockSizeScale = it }
     )
     SettingSliderItem(
-        title = "Clock Section Weight",
-        subtitle = "Share of available home screen space",
+        title = stringResource(R.string.date_size),
+        subtitle = "Date line only",
+        icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+        value = dateSizeScale,
+        range = 0.5f..1.5f,
+        tooltipText = "Scale the date independently of the clock.",
+        onChanged = { onDateSizeScaleChange(it); prefs.dateSizeScale = it }
+    )
+    SettingSliderItem(
+        title = stringResource(R.string.screen_time_size),
+        subtitle = "Screen time line only",
+        icon = { Icon(Icons.Default.Timer, contentDescription = null) },
+        value = screenTimeSizeScale,
+        range = 0.5f..1.5f,
+        tooltipText = "Scale screen time independently of the clock and date.",
+        onChanged = { onScreenTimeSizeScaleChange(it); prefs.screenTimeSizeScale = it }
+    )
+    val clockPct = (clockSectionWeight * 100).toInt()
+    SettingSliderItem(
+        title = stringResource(R.string.clock_section_weight),
+        subtitle = "Clock $clockPct% · Apps ${100 - clockPct}%",
         icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
         value = clockSectionWeight,
-        range = 0.15f..0.85f,
-        tooltipText = "Choose how much space the clock section receives when home apps are visible.",
+        range = 0.22f..0.48f,
+        tooltipText = "Default is 35% clock / 65% apps. Sections scroll if content is larger than the allocated space.",
         onChanged = { onClockSectionWeightChange(it); prefs.clockSectionWeight = it }
     )
     SettingsSectionHeader("Home Section Order")
@@ -596,12 +639,12 @@ private fun ClockAndDateSection(
         FilterChip(
             selected = homeSectionOrder == "clock_first",
             onClick = { onHomeSectionOrderChange("clock_first"); prefs.homeSectionOrder = "clock_first" },
-            label = { Text("Clock first") }
+            label = { Text(stringResource(R.string.clock_first)) }
         )
         FilterChip(
             selected = homeSectionOrder == "apps_first",
             onClick = { onHomeSectionOrderChange("apps_first"); prefs.homeSectionOrder = "apps_first" },
-            label = { Text("Apps first") }
+            label = { Text(stringResource(R.string.apps_first)) }
         )
     }
 }
@@ -619,11 +662,6 @@ private fun HomeAppsSection(
 ) {
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
-
-    HorizontalDivider(
-        modifier = Modifier.padding(vertical = 16.dp),
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    )
 
     SettingsSectionHeader("Home Apps")
     SettingCounterItem(
@@ -765,6 +803,8 @@ private fun AppearanceSection(
 private fun GesturesSection(
     enableGestures: Boolean,
     onEnableGesturesChange: (Boolean) -> Unit,
+    enableSwipeDownNotifications: Boolean,
+    onEnableSwipeDownNotificationsChange: (Boolean) -> Unit,
     enableSummary: Boolean,
     onEnableSummaryChange: (Boolean) -> Unit,
     enableWidgets: Boolean,
@@ -788,6 +828,32 @@ private fun GesturesSection(
         icon = { Icon(Icons.Default.Swipe, contentDescription = null) },
         checked = enableGestures,
         onCheckedChange = { onEnableGesturesChange(it); prefs.enableGestures = it }
+    )
+    SettingToggleItem(
+        title = stringResource(R.string.swipe_down_notifications),
+        subtitle = stringResource(R.string.swipe_down_notifications_subtitle),
+        icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+        checked = enableSwipeDownNotifications,
+        onCheckedChange = { enabled ->
+            if (enabled && !FeatureAvailability.isNotificationListenerEnabled(context)) {
+                try {
+                    context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.grant_notification_access)
+                        )
+                    }
+                } catch (_: Exception) {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.could_not_open_notification_settings)
+                        )
+                    }
+                }
+            }
+            onEnableSwipeDownNotificationsChange(enabled)
+            prefs.enableSwipeDownNotifications = enabled
+        }
     )
     if (enableGestures) {
         @OptIn(ExperimentalLayoutApi::class)
@@ -824,7 +890,7 @@ private fun GesturesSection(
                     }
                     onEnableSummaryChange(newState); prefs.enableNotificationSummary = newState
                 },
-                label = { Text("Notification Summary") },
+                label = { Text(stringResource(R.string.swipe_action_notification_summary)) },
                 leadingIcon = if (enableSummary) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
             )
 
@@ -834,7 +900,7 @@ private fun GesturesSection(
                     val newState = !enableWidgets
                     onEnableWidgetsChange(newState); prefs.enableWidgets = newState
                 },
-                label = { Text("Widgets") },
+                label = { Text(stringResource(R.string.swipe_action_widgets)) },
                 leadingIcon = if (enableWidgets) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
             )
 
@@ -844,7 +910,7 @@ private fun GesturesSection(
                     val newState = !enableNotes
                     onEnableNotesChange(newState); prefs.enableNotes = newState
                 },
-                label = { Text("Notes") },
+                label = { Text(stringResource(R.string.swipe_action_notes)) },
                 leadingIcon = if (enableNotes) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
             )
         }
@@ -878,11 +944,84 @@ private fun GesturesSection(
 }
 
 @Composable
+private fun PermissionsSection() {
+    val context = LocalContext.current
+    SettingsSectionHeader(stringResource(R.string.permissions))
+    Text(
+        text = stringResource(R.string.permissions_intro),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+    )
+    SettingActionItem(
+        title = stringResource(R.string.perm_notification_listener),
+        subtitle = stringResource(R.string.perm_notification_listener_body),
+        icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+        onClick = {
+            try {
+                context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            } catch (_: Exception) {}
+        }
+    )
+    SettingActionItem(
+        title = stringResource(R.string.perm_usage_access),
+        subtitle = stringResource(R.string.perm_usage_access_body),
+        icon = { Icon(Icons.Default.QueryStats, contentDescription = null) },
+        onClick = {
+            try {
+                context.startActivity(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            } catch (_: Exception) {}
+        }
+    )
+    SettingActionItem(
+        title = stringResource(R.string.perm_accessibility),
+        subtitle = stringResource(R.string.perm_accessibility_body),
+        icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+        onClick = {
+            try {
+                context.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            } catch (_: Exception) {}
+        }
+    )
+    SettingActionItem(
+        title = stringResource(R.string.perm_default_home),
+        subtitle = stringResource(R.string.perm_default_home_body),
+        icon = { Icon(Icons.Default.Home, contentDescription = null) },
+        onClick = {
+            try {
+                context.startActivity(Intent(android.provider.Settings.ACTION_HOME_SETTINGS))
+            } catch (_: Exception) {}
+        }
+    )
+    SettingActionItem(
+        title = stringResource(R.string.perm_query_apps),
+        subtitle = stringResource(R.string.perm_query_apps_body),
+        icon = { Icon(Icons.Default.Apps, contentDescription = null) },
+        onClick = { /* install-time permission; listed for reference */ }
+    )
+    SettingActionItem(
+        title = stringResource(R.string.perm_widgets),
+        subtitle = stringResource(R.string.perm_widgets_body),
+        icon = { Icon(Icons.Default.Widgets, contentDescription = null) },
+        onClick = { /* bind is requested when pinning a widget */ }
+    )
+    SettingActionItem(
+        title = stringResource(R.string.perm_private_space),
+        subtitle = stringResource(R.string.perm_private_space_body),
+        icon = { Icon(Icons.Default.Security, contentDescription = null) },
+        onClick = { /* granted with the Private Space profile on API 35+ */ }
+    )
+}
+
+@Composable
 private fun SettingsSectionHeader(title: String) {
+    VoidSectionDivider(
+        modifier = Modifier.padding(top = VoidDimens.sectionSpacing, bottom = VoidDimens.rowSpacing)
+    )
     Text(
         text = title,
         style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+        modifier = Modifier.padding(bottom = VoidDimens.compactSpacing),
         color = MaterialTheme.colorScheme.primary
     )
 }
@@ -947,38 +1086,41 @@ fun SettingToggleItem(
     tooltipText: String? = null
 ) {
     val content: @Composable () -> Unit = {
-        Column(
-            modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = checked,
+                    onValueChange = onCheckedChange,
+                    role = Role.Switch
+                )
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                icon()
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = title, style = MaterialTheme.typography.bodyLarge)
-                        if (onInfoClick != null) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
-                                Icon(Icons.Outlined.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            }
+            icon()
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = title, style = MaterialTheme.typography.bodyLarge)
+                    if (onInfoClick != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Outlined.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         }
                     }
-                    if (subtitle.isNotEmpty()) {
-                        Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
-                Switch(
-                    checked = checked,
-                    onCheckedChange = onCheckedChange,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                )
+                if (subtitle.isNotEmpty()) {
+                    Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
         }
     }
 
@@ -1188,7 +1330,7 @@ private fun SwipeActionSelector(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("Select Action") },
+            title = { Text(stringResource(R.string.select_action)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     available.forEach { (actionKey, actionLabel) ->
@@ -1259,11 +1401,11 @@ private fun SettingsAppPickerSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text("Select App", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+            Text(stringResource(R.string.select_app), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
             androidx.compose.material3.OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
-                placeholder = { Text("Search apps...") },
+                placeholder = { Text(stringResource(R.string.search_apps)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 shape = MaterialTheme.shapes.extraLarge

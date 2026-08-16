@@ -14,6 +14,19 @@ import java.text.Collator
 object PrivateSpaceHelper {
     private const val TAG = "PrivateSpaceHelper"
 
+    fun isAddEntry(app: AppModel): Boolean {
+        val label = app.appLabel.trim()
+        if (label.equals("Add", ignoreCase = true) ||
+            label.equals("Add apps", ignoreCase = true) ||
+            label.equals("Add app", ignoreCase = true)
+        ) {
+            return true
+        }
+        val cls = (app as? AppModel.App)?.activityClassName.orEmpty()
+        return cls.contains("PrivateSpace", ignoreCase = true) &&
+            (cls.contains("Add", ignoreCase = true) || cls.contains("Install", ignoreCase = true))
+    }
+
     fun isPrivateSpaceSupported(context: Context): Boolean {
         return try {
             FeatureAvailability.isPrivateSpaceAvailable(context) &&
@@ -86,20 +99,20 @@ object PrivateSpaceHelper {
                 try {
                     val info = la.getLauncherUserInfo(profile)
                     if (info?.userType != UserManager.USER_TYPE_PROFILE_PRIVATE) continue
-                    if (!um.isQuietModeEnabled(profile)) {
-                        for (app in la.getActivityList(null, profile)) {
-                            val label = prefs.getAppRenameLabel(app.applicationInfo.packageName)
-                                .ifBlank { app.label.toString() }
-                            pApps.add(
-                                AppModel.App(
-                                    appLabel = label,
-                                    key = collator.getCollationKey(label),
-                                    appPackage = app.applicationInfo.packageName,
-                                    activityClassName = app.componentName.className,
-                                    isNew = false,
-                                    user = profile
-                                )
-                            )
+                    val quiet = um.isQuietModeEnabled(profile)
+                    for (app in la.getActivityList(null, profile)) {
+                        val label = prefs.getAppRenameLabel(app.applicationInfo.packageName)
+                            .ifBlank { app.label.toString() }
+                        val model = AppModel.App(
+                            appLabel = label,
+                            key = collator.getCollationKey(label),
+                            appPackage = app.applicationInfo.packageName,
+                            activityClassName = app.componentName.className,
+                            isNew = false,
+                            user = profile
+                        )
+                        if (!quiet || isAddEntry(model)) {
+                            pApps.add(model)
                         }
                     }
                 } catch (e: Exception) {

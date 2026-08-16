@@ -1,5 +1,6 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.screen
 
+import android.content.Intent
 import android.text.format.DateUtils
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.knownassurajit.app.launcher.voidlauncher.R
@@ -54,14 +56,7 @@ fun NotificationsScreen(
     onBack: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    if (!FeatureAvailability.isNotificationsAvailable(context)) {
-        FeatureUnavailableScreen(
-            "Notifications",
-            "Notifications require the notification listener permission. Enable it in system settings to use this panel.",
-            onBack
-        )
-        return
-    }
+    val listenerEnabled = FeatureAvailability.isNotificationListenerEnabled(context)
 
     // A lightweight vertical swipe affordance lets users return without an explicit back button.
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
@@ -99,7 +94,36 @@ fun NotificationsScreen(
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-        if (notifications.isEmpty()) {
+        if (!listenerEnabled) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = stringResource(R.string.notifications_need_access),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TextButton(
+                        onClick = {
+                            try {
+                                context.startActivity(
+                                    Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                )
+                            } catch (_: Exception) {}
+                        }
+                    ) {
+                        Text(stringResource(R.string.grant_notification_access))
+                    }
+                }
+            }
+        } else if (notifications.isEmpty()) {
             // Empty state
             Box(
                 modifier = Modifier

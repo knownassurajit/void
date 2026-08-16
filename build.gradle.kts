@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.knownassurajit.void_launcher.app"
+    namespace = "com.knownassurajit.app.launcher.voidlauncher"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.knownassurajit.void_launcher.app"
+        applicationId = "com.knownassurajit.app.launcher.voidlauncher"
         minSdk = 26
         targetSdk = 36
 

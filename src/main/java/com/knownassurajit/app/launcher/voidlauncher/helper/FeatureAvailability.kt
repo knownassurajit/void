@@ -23,7 +23,8 @@ object FeatureAvailability {
 
     fun isNotificationSummaryAvailable(context: Context): Boolean = true
 
-    fun isNotificationsAvailable(context: Context): Boolean = true
+    fun isNotificationsAvailable(context: Context): Boolean =
+        isNotificationListenerEnabled(context)
 
     fun isNotificationListenerEnabled(context: Context): Boolean {
         return try {

@@ -28,6 +28,7 @@ class LauncherSmokeTest {
         val prefs = Prefs(context)
         assertTrue(prefs.maxHomeApps in 1..15)
         assertTrue(prefs.clockSizeScale > 0f)
+        assertTrue(prefs.enableSwipeDownNotifications)
         assertTrue(prefs.homeSectionOrder == "clock_first" || prefs.homeSectionOrder == "apps_first")
     }
 
@@ -53,5 +54,16 @@ class LauncherSmokeTest {
             prefs.widgetOrder = previousOrder
             prefs.showWidgetLabels = previousLabels
         }
+    }
+
+    @Test
+    fun widgetBindIntent_targetsSystemBindAction() {
+        val provider = android.content.ComponentName("com.example.clock", "com.example.clock.Widget")
+        val intent = com.knownassurajit.app.launcher.voidlauncher.helper.WidgetBindHelper.createBindIntent(
+            appWidgetId = 9,
+            provider = provider
+        )
+        assertEquals(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_BIND, intent.action)
+        assertEquals(9, intent.getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, -1))
     }
 }

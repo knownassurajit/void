@@ -2,17 +2,28 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.screen
 
 import android.app.Application
 import android.appwidget.AppWidgetHost
+import android.appwidget.AppWidgetHostView
 import android.appwidget.AppWidgetManager
 import android.content.Intent
-import android.view.ViewGroup
+import android.graphics.drawable.Drawable
+import android.os.Build
+import android.widget.ImageView
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,17 +32,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,34 +56,47 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
+import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.WidgetInfo
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetBindHelper
+import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetLayoutHelper
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlin.math.roundToInt
 
 private const val WIDGET_HOST_ID = 1024
-private const val DEFAULT_WIDGET_HEIGHT_DP = 240
-private const val MIN_WIDGET_HEIGHT_DP = 100
-private const val MAX_WIDGET_HEIGHT_DP = 600
 
 data class PendingWidgetBinding(
     val widget: WidgetInfo,
@@ -78,8 +106,14 @@ data class PendingWidgetBinding(
 
 sealed interface PinWidgetResult {
     data object Added : PinWidgetResult
+    data class NeedsBind(val widget: WidgetInfo, val appWidgetId: Int, val bindIntent: Intent) : PinWidgetResult
     data class NeedsConfiguration(val binding: PendingWidgetBinding) : PinWidgetResult
     data object Denied : PinWidgetResult
+}
+
+private sealed interface WidgetGrant {
+    data class Bind(val widget: WidgetInfo, val appWidgetId: Int) : WidgetGrant
+    data class Configure(val binding: PendingWidgetBinding) : WidgetGrant
 }
 
 // ── ViewModel (Integrated Only Stub/Mock if needed, but here we keep it) ──
@@ -99,6 +133,9 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
     private val _widgetIds = MutableStateFlow<Map<String, Int>>(emptyMap())
     val widgetIds: StateFlow<Map<String, Int>> = _widgetIds.asStateFlow()
 
+    private val _widgetSpans = MutableStateFlow<Map<String, WidgetLayoutHelper.WidgetSpan>>(emptyMap())
+    val widgetSpans: StateFlow<Map<String, WidgetLayoutHelper.WidgetSpan>> = _widgetSpans.asStateFlow()
+
     init { loadWidgets() }
 
     override fun onCleared() {
@@ -116,7 +153,16 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
                     val appName = try {
                         pm.getApplicationLabel(pm.getApplicationInfo(info.provider.packageName, 0)).toString()
                     } catch (_: Exception) { info.provider.packageName }
-                    WidgetInfo(provider = info, label = label, previewImage = null, appName = appName)
+                    val preview = try {
+                        info.loadPreviewImage(ctx, ctx.resources.displayMetrics.densityDpi)
+                    } catch (_: Exception) {
+                        null
+                    } ?: try {
+                        pm.getApplicationIcon(info.provider.packageName)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    WidgetInfo(provider = info, label = label, previewImage = preview, appName = appName)
                 } catch (_: Exception) { null }
             }.sortedBy { it.appName }
             _allWidgets.value = all
@@ -144,6 +190,13 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
             if (index < 0) Int.MAX_VALUE else index
         }
         _widgetIds.value = idMap
+        refreshSpans()
+    }
+
+    private fun refreshSpans(pinned: List<WidgetInfo> = _pinnedWidgets.value) {
+        val stored = prefs.widgetSpans.mapNotNull(WidgetLayoutHelper::parseSpan).toMap()
+        val pinnedKeys = pinned.map { it.key }.toSet()
+        _widgetSpans.value = stored.filterKeys { it in pinnedKeys }
     }
 
     private fun buildWidgetIdMap(): Map<String, Int> {
@@ -168,29 +221,47 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         return try {
             val bound = manager.bindAppWidgetIdIfAllowed(appWidgetId, widget.provider.provider)
             if (bound) {
-                val configure = widget.provider.configure
-                if (configure == null) {
-                    commitPin(widget, appWidgetId)
-                    PinWidgetResult.Added
-                } else {
-                    PinWidgetResult.NeedsConfiguration(
-                        PendingWidgetBinding(
-                            widget = widget,
-                            appWidgetId = appWidgetId,
-                            configureIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
-                                .setComponent(configure)
-                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                        )
-                    )
-                }
+                afterBound(widget, appWidgetId)
             } else {
-                appWidgetHost.deleteAppWidgetId(appWidgetId)
-                PinWidgetResult.Denied
+                val bindIntent = WidgetBindHelper.createBindIntent(
+                    appWidgetId = appWidgetId,
+                    provider = widget.provider.provider,
+                    profile = widget.provider.profile
+                )
+                val canRequest = bindIntent.resolveActivity(ctx.packageManager) != null
+                if (!canRequest) {
+                    appWidgetHost.deleteAppWidgetId(appWidgetId)
+                    PinWidgetResult.Denied
+                } else {
+                    PinWidgetResult.NeedsBind(widget, appWidgetId, bindIntent)
+                }
             }
         } catch (_: Exception) {
             try { appWidgetHost.deleteAppWidgetId(appWidgetId) } catch (_: Exception) {}
             PinWidgetResult.Denied
         }
+    }
+
+    fun afterBound(widget: WidgetInfo, appWidgetId: Int): PinWidgetResult {
+        val configure = widget.provider.configure
+        return if (configure == null) {
+            commitPin(widget, appWidgetId)
+            PinWidgetResult.Added
+        } else {
+            PinWidgetResult.NeedsConfiguration(
+                PendingWidgetBinding(
+                    widget = widget,
+                    appWidgetId = appWidgetId,
+                    configureIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
+                        .setComponent(configure)
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                )
+            )
+        }
+    }
+
+    fun releaseAllocatedId(appWidgetId: Int) {
+        try { appWidgetHost.deleteAppWidgetId(appWidgetId) } catch (_: Exception) {}
     }
 
     fun commitPendingPin(binding: PendingWidgetBinding) {
@@ -224,23 +295,51 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         prefs.widgetAllocatedIds = prefs.widgetAllocatedIds.toMutableSet()
             .also { it.removeAll { e -> e.startsWith("$key|") } }
         prefs.pinnedWidgets = prefs.pinnedWidgets.toMutableSet().also { it.remove(key) }
+        prefs.widgetSpans = prefs.widgetSpans.toMutableSet().also { entries ->
+            entries.removeAll { WidgetLayoutHelper.parseSpan(it)?.first == key }
+        }
         refreshPinnedAndIds()
     }
 
     fun isPinned(widget: WidgetInfo): Boolean =
         prefs.pinnedWidgets.contains(widget.provider.provider.flattenToString())
 
-    fun widgetHeight(widget: WidgetInfo): Int =
-        prefs.widgetHeights.firstOrNull { it.startsWith("${widget.key}|") }
-            ?.substringAfterLast('|')?.toIntOrNull()
-            ?.coerceIn(MIN_WIDGET_HEIGHT_DP, MAX_WIDGET_HEIGHT_DP)
-            ?: maxOf(widget.provider.minHeight, DEFAULT_WIDGET_HEIGHT_DP)
+    fun defaultSpan(
+        widget: WidgetInfo,
+        cellDp: Int = WidgetLayoutHelper.CELL_DP
+    ): WidgetLayoutHelper.WidgetSpan {
+        val targetWidth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            widget.provider.targetCellWidth
+        } else {
+            0
+        }
+        val targetHeight = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            widget.provider.targetCellHeight
+        } else {
+            0
+        }
+        return WidgetLayoutHelper.defaultSpan(
+            minWidthDp = widget.provider.minWidth,
+            minHeightDp = widget.provider.minHeight,
+            targetCellWidth = targetWidth,
+            targetCellHeight = targetHeight,
+            cellDp = cellDp
+        )
+    }
 
-    fun setWidgetHeight(widget: WidgetInfo, heightDp: Int) {
-        val values = prefs.widgetHeights.toMutableSet()
-        values.removeAll { it.startsWith("${widget.key}|") }
-        values.add("${widget.key}|${heightDp.coerceIn(MIN_WIDGET_HEIGHT_DP, MAX_WIDGET_HEIGHT_DP)}")
-        prefs.widgetHeights = values
+    fun setWidgetSpan(widget: WidgetInfo, span: WidgetLayoutHelper.WidgetSpan) {
+        val next = WidgetLayoutHelper.clampSpan(span)
+        val current = _widgetSpans.value[widget.key]
+        if (current == next) return
+        persistSpan(widget.key, next)
+        _widgetSpans.value = _widgetSpans.value + (widget.key to next)
+    }
+
+    private fun persistSpan(key: String, span: WidgetLayoutHelper.WidgetSpan) {
+        val values = prefs.widgetSpans.toMutableSet()
+        values.removeAll { WidgetLayoutHelper.parseSpan(it)?.first == key }
+        values.add(WidgetLayoutHelper.encodeSpan(key, span))
+        prefs.widgetSpans = values
     }
 
     fun reorder(widget: WidgetInfo, offset: Int) {
@@ -251,12 +350,6 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         current[index] = current[target].also { current[target] = current[index] }
         prefs.widgetOrder = current
         refreshPinnedAndIds()
-    }
-
-    fun showWidgetLabels(): Boolean = prefs.showWidgetLabels
-
-    fun setShowWidgetLabels(show: Boolean) {
-        prefs.showWidgetLabels = show
     }
 }
 
@@ -271,8 +364,8 @@ fun WidgetsScreen(
     val context = LocalContext.current
     if (!FeatureAvailability.isWidgetsAvailable(context)) {
         FeatureUnavailableScreen(
-            "Widgets",
-            "Widgets are unavailable on this device. AppWidgetHost could not be initialized.",
+            stringResource(R.string.widgets),
+            stringResource(R.string.widget_unavailable_body),
             onBack
         )
         return
@@ -281,21 +374,47 @@ fun WidgetsScreen(
     val pinnedWidgets by viewModel.pinnedWidgets.collectAsState()
     val allWidgets by viewModel.allWidgets.collectAsState()
     val widgetIds by viewModel.widgetIds.collectAsState()
+    val widgetSpans by viewModel.widgetSpans.collectAsState()
     var showPicker by remember { mutableStateOf(false) }
     var widgetToRemove by remember { mutableStateOf<WidgetInfo?>(null) }
-    var editMode by remember { mutableStateOf(false) }
-    var pendingBinding by remember { mutableStateOf<PendingWidgetBinding?>(null) }
-    var showLabels by remember { mutableStateOf(viewModel.showWidgetLabels()) }
+    var selectedWidgetKey by remember { mutableStateOf<String?>(null) }
+    var pendingGrant by remember { mutableStateOf<WidgetGrant?>(null) }
+    var followUpIntent by remember { mutableStateOf<Intent?>(null) }
     val activityLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val binding = pendingBinding ?: return@rememberLauncherForActivityResult
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            viewModel.commitPendingPin(binding)
-        } else {
-            viewModel.cancelPendingPin(binding)
+        when (val grant = pendingGrant) {
+            is WidgetGrant.Bind -> {
+                if (result.resultCode == android.app.Activity.RESULT_OK) {
+                    when (val next = viewModel.afterBound(grant.widget, grant.appWidgetId)) {
+                        is PinWidgetResult.NeedsConfiguration -> {
+                            pendingGrant = WidgetGrant.Configure(next.binding)
+                            followUpIntent = next.binding.configureIntent
+                            return@rememberLauncherForActivityResult
+                        }
+                        else -> Unit
+                    }
+                } else {
+                    viewModel.releaseAllocatedId(grant.appWidgetId)
+                }
+                pendingGrant = null
+            }
+            is WidgetGrant.Configure -> {
+                if (result.resultCode == android.app.Activity.RESULT_OK) {
+                    viewModel.commitPendingPin(grant.binding)
+                } else {
+                    viewModel.cancelPendingPin(grant.binding)
+                }
+                pendingGrant = null
+            }
+            null -> Unit
         }
-        pendingBinding = null
+    }
+
+    LaunchedEffect(followUpIntent) {
+        val intent = followUpIntent ?: return@LaunchedEffect
+        followUpIntent = null
+        activityLauncher.launch(intent)
     }
 
     DisposableEffect(Unit) {
@@ -312,47 +431,35 @@ fun WidgetsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),
+                .padding(
+                    start = VoidDimens.screenPadding,
+                    end = VoidDimens.compactSpacing,
+                    top = VoidDimens.screenPadding,
+                    bottom = VoidDimens.rowSpacing
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Widgets",
+                text = stringResource(R.string.widgets),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            TextButton(onClick = { showPicker = true }) {
+            TextButton(onClick = {
+                selectedWidgetKey = null
+                showPicker = true
+            }) {
                 Icon(
                     Icons.Outlined.Add,
-                    contentDescription = "Add widget",
+                    contentDescription = stringResource(R.string.add_widget),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(4.dp))
-                Text("Add", color = MaterialTheme.colorScheme.primary)
-            }
-            TextButton(onClick = { editMode = !editMode }) {
-                Text(if (editMode) "Done" else "Edit")
+                Text(stringResource(R.string.widget_add), color = MaterialTheme.colorScheme.primary)
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        if (editMode) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Show widget labels", style = MaterialTheme.typography.bodyMedium)
-                androidx.compose.material3.Switch(
-                    checked = showLabels,
-                    onCheckedChange = {
-                        showLabels = it
-                        viewModel.setShowWidgetLabels(it)
-                    }
-                )
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        }
+        VoidSectionDivider()
 
         if (pinnedWidgets.isEmpty()) {
             Box(
@@ -363,53 +470,80 @@ fun WidgetsScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "No widgets added",
+                        stringResource(R.string.widget_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Tap Add to pin widgets from your installed apps",
+                        stringResource(R.string.widget_empty_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
             }
         } else {
-            LazyColumn(
+            BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxWidth()
             ) {
-                items(
-                    items = pinnedWidgets,
-                    key = { it.provider.provider.flattenToString() }
-                ) { widget ->
-                    val widgetId = widgetIds[widget.provider.provider.flattenToString()]
-                    if (widgetId != null) {
-                        LiveWidgetItem(
-                            widget = widget,
-                            widgetId = widgetId,
-                            appWidgetHost = viewModel.appWidgetHost,
-                            heightDp = viewModel.widgetHeight(widget),
-                            showLabel = showLabels,
-                            editMode = editMode,
-                            onRemoveClick = { widgetToRemove = widget },
-                            onConfigureClick = {
-                                widget.provider.configure?.let { configure ->
-                                    activityLauncher.launch(
-                                        Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
-                                            .setComponent(configure)
-                                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                                    )
-                                }
-                            },
-                            onMoveUp = { viewModel.reorder(widget, -1) },
-                            onMoveDown = { viewModel.reorder(widget, 1) },
-                            onHeightChange = { viewModel.setWidgetHeight(widget, it) }
-                        )
+                val spacing = WidgetLayoutHelper.GRID_SPACING_DP.dp
+                val gridPadding = VoidDimens.screenPadding
+                val cellDp = (
+                    (maxWidth - gridPadding * 2 - spacing * (WidgetLayoutHelper.GRID_COLUMNS - 1)) /
+                        WidgetLayoutHelper.GRID_COLUMNS
+                    ).value.toInt().coerceAtLeast(WidgetLayoutHelper.MIN_HEIGHT_DP)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(WidgetLayoutHelper.GRID_COLUMNS),
+                    modifier = Modifier.fillMaxSize(),
+                    userScrollEnabled = selectedWidgetKey == null,
+                    contentPadding = PaddingValues(
+                        horizontal = gridPadding,
+                        vertical = VoidDimens.sectionSpacing
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                    verticalArrangement = Arrangement.spacedBy(spacing)
+                ) {
+                    gridItems(
+                        items = pinnedWidgets,
+                        key = { it.provider.provider.flattenToString() },
+                        span = { widget ->
+                            val columns = widgetSpans[widget.key]?.columns
+                                ?: viewModel.defaultSpan(widget, cellDp).columns
+                            GridItemSpan(columns.coerceIn(1, WidgetLayoutHelper.GRID_COLUMNS))
+                        }
+                    ) { widget ->
+                        val widgetId = widgetIds[widget.provider.provider.flattenToString()]
+                        val span = widgetSpans[widget.key] ?: viewModel.defaultSpan(widget, cellDp)
+                        LaunchedEffect(widget.key, cellDp, span.columns, span.rows) {
+                            if (widgetSpans[widget.key] == null) {
+                                viewModel.setWidgetSpan(widget, span)
+                            }
+                        }
+                        if (widgetId != null) {
+                            LiveWidgetItem(
+                                widget = widget,
+                                widgetId = widgetId,
+                                appWidgetHost = viewModel.appWidgetHost,
+                                span = span,
+                                cellDp = cellDp,
+                                selected = selectedWidgetKey == widget.key,
+                                onSelected = { selectedWidgetKey = widget.key },
+                                onDeselect = { selectedWidgetKey = null },
+                                onRemoveClick = { widgetToRemove = widget },
+                                onConfigureClick = {
+                                    widget.provider.configure?.let { configure ->
+                                        activityLauncher.launch(
+                                            Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
+                                                .setComponent(configure)
+                                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                                        )
+                                    }
+                                },
+                                onSpanChange = { next -> viewModel.setWidgetSpan(widget, next) }
+                            )
+                        }
                     }
                 }
             }
@@ -419,18 +553,22 @@ fun WidgetsScreen(
     if (showPicker) {
         WidgetPickerSheet(
             allWidgets = allWidgets,
-            viewModel = viewModel,
+            pinnedKeys = pinnedWidgets.map { it.key }.toSet(),
             onDismiss = { showPicker = false },
             onPin = { widget ->
                 when (val result = viewModel.beginPinWidget(widget)) {
                     PinWidgetResult.Added -> Unit
+                    is PinWidgetResult.NeedsBind -> {
+                        pendingGrant = WidgetGrant.Bind(result.widget, result.appWidgetId)
+                        activityLauncher.launch(result.bindIntent)
+                    }
                     is PinWidgetResult.NeedsConfiguration -> {
-                        pendingBinding = result.binding
+                        pendingGrant = WidgetGrant.Configure(result.binding)
                         activityLauncher.launch(result.binding.configureIntent)
                     }
                     PinWidgetResult.Denied -> Toast.makeText(
                         context,
-                        "Widget binding denied. Allow VOID Launcher to add widgets and try again.",
+                        context.getString(R.string.widget_bind_denied),
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -441,10 +579,10 @@ fun WidgetsScreen(
     widgetToRemove?.let { widget ->
         AlertDialog(
             onDismissRequest = { widgetToRemove = null },
-            title = { Text("Remove Widget", style = MaterialTheme.typography.titleMedium) },
+            title = { Text(stringResource(R.string.widget_remove_title), style = MaterialTheme.typography.titleMedium) },
             text = {
                 Text(
-                    "Remove \"${widget.label}\" from your widget screen?",
+                    stringResource(R.string.widget_remove_message, widget.label),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -452,13 +590,16 @@ fun WidgetsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.unpinWidget(widget)
+                    selectedWidgetKey = null
                     widgetToRemove = null
                 }) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.remove), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { widgetToRemove = null }) { Text("Cancel") }
+                TextButton(onClick = { widgetToRemove = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
             }
         )
     }
@@ -469,82 +610,172 @@ private fun LiveWidgetItem(
     widget: WidgetInfo,
     widgetId: Int,
     appWidgetHost: AppWidgetHost,
-    heightDp: Int,
-    showLabel: Boolean,
-    editMode: Boolean,
+    span: WidgetLayoutHelper.WidgetSpan,
+    cellDp: Int,
+    selected: Boolean,
+    onSelected: () -> Unit,
+    onDeselect: () -> Unit,
     onRemoveClick: () -> Unit,
     onConfigureClick: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-    onHeightChange: (Int) -> Unit
+    onSpanChange: (WidgetLayoutHelper.WidgetSpan) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (showLabel || editMode) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (showLabel) {
-                    Text(
-                        text = widget.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
+    val heightDp = WidgetLayoutHelper.heightForRows(span.rows, cellDp)
+    val density = LocalDensity.current
+    val shape = RoundedCornerShape(12.dp)
+    val spanLatest = rememberUpdatedState(span)
+    val onSpanChangeLatest = rememberUpdatedState(onSpanChange)
+    val onSelectedLatest = rememberUpdatedState(onSelected)
+    val onDeselectLatest = rememberUpdatedState(onDeselect)
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(heightDp.dp)
+            .then(
+                if (selected) {
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
                 } else {
-                    Spacer(Modifier.weight(1f))
+                    Modifier
                 }
-                if (editMode) {
-                    IconButton(onClick = onConfigureClick, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Outlined.Edit, "Configure ${widget.label}", modifier = Modifier.size(16.dp))
+            )
+            .pointerInput(selected, widget.key) {
+                if (selected) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                    val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis.toLong()) {
+                        waitForUpOrCancellation(pass = PointerEventPass.Initial)
                     }
-                    IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Outlined.ArrowUpward, "Move ${widget.label} up", modifier = Modifier.size(16.dp))
-                    }
-                    IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Outlined.ArrowDownward, "Move ${widget.label} down", modifier = Modifier.size(16.dp))
-                    }
-                    IconButton(onClick = { onHeightChange(heightDp - 40) }, modifier = Modifier.size(28.dp)) {
-                        Text("−", style = MaterialTheme.typography.titleMedium)
-                    }
-                    IconButton(onClick = { onHeightChange(heightDp + 40) }, modifier = Modifier.size(28.dp)) {
-                        Text("+", style = MaterialTheme.typography.titleMedium)
-                    }
-                    IconButton(onClick = onRemoveClick, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Outlined.Close, "Remove ${widget.label}", modifier = Modifier.size(16.dp))
+                    if (up == null) {
+                        val stillDown = currentEvent.changes.any { it.id == down.id && it.pressed }
+                        if (stillDown) {
+                            onSelectedLatest.value()
+                            currentEvent.changes.forEach { it.consume() }
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                event.changes.forEach { it.consume() }
+                                if (event.changes.none { it.pressed }) break
+                            }
+                        }
                     }
                 }
             }
-        }
-
-        // Live system widget — touch events pass through directly to the widget
+    ) {
+        val widthDp = maxWidth.value.toInt().coerceAtLeast(1)
         AndroidView(
             factory = { ctx ->
                 try {
                     appWidgetHost.createView(ctx, widgetId, widget.provider).apply {
                         setAppWidget(widgetId, widget.provider)
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            (heightDp * ctx.resources.displayMetrics.density).roundToInt()
-                        )
+                        isLongClickable = true
+                        setOnLongClickListener {
+                            onSelectedLatest.value()
+                            true
+                        }
+                        WidgetLayoutHelper.applyHostSize(this, widgetId, widthDp, heightDp)
                     }
                 } catch (_: Exception) {
                     android.widget.FrameLayout(ctx)
                 }
             },
             modifier = Modifier
-                .fillMaxWidth()
-                .height(heightDp.dp),
-            update = { hostView ->
-                hostView.layoutParams = hostView.layoutParams?.apply {
-                    height = (heightDp * hostView.resources.displayMetrics.density).roundToInt()
+                .fillMaxSize()
+                .clip(shape),
+            update = { view ->
+                val host = view as? AppWidgetHostView ?: return@AndroidView
+                host.isLongClickable = true
+                host.setOnLongClickListener {
+                    onSelectedLatest.value()
+                    true
                 }
-                hostView.requestLayout()
+                WidgetLayoutHelper.applyHostSize(host, widgetId, widthDp, heightDp)
             }
         )
+        if (selected) {
+            val resizeLabel = stringResource(R.string.widget_resize_handle)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .pointerInput(widget.key, cellDp) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            val origin = spanLatest.value
+                            var dragX = 0f
+                            var dragY = 0f
+                            var started = false
+                            drag(down.id) { change ->
+                                val delta = change.positionChange()
+                                change.consume()
+                                dragX += delta.x
+                                dragY += delta.y
+                                if (!started) {
+                                    val slop = viewConfiguration.touchSlop
+                                    if (kotlin.math.abs(dragX) <= slop && kotlin.math.abs(dragY) <= slop) {
+                                        return@drag
+                                    }
+                                    started = true
+                                }
+                                val dxDp = with(density) { dragX.toDp().value }
+                                val dyDp = with(density) { dragY.toDp().value }
+                                onSpanChangeLatest.value(
+                                    WidgetLayoutHelper.snapSpan(
+                                        start = origin,
+                                        deltaXDp = dxDp,
+                                        deltaYDp = dyDp,
+                                        cellDp = cellDp
+                                    )
+                                )
+                            }
+                            if (!started) onDeselectLatest.value()
+                        }
+                    }
+            )
+            if (widget.provider.configure != null) {
+                IconButton(
+                    onClick = onConfigureClick,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .zIndex(1f)
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                ) {
+                    Icon(
+                        Icons.Outlined.Edit,
+                        contentDescription = stringResource(R.string.widget_configure),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            IconButton(
+                onClick = onRemoveClick,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .zIndex(1f)
+                    .size(40.dp)
+                    .background(MaterialTheme.colorScheme.errorContainer, CircleShape)
+            ) {
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = stringResource(R.string.widget_remove),
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .zIndex(1f)
+                    .size(48.dp)
+                    .semantics { contentDescription = resizeLabel },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                )
+            }
+        }
     }
 }
 
@@ -552,7 +783,7 @@ private fun LiveWidgetItem(
 @Composable
 private fun WidgetPickerSheet(
     allWidgets: List<WidgetInfo>,
-    viewModel: WidgetsViewModel,
+    pinnedKeys: Set<String>,
     onDismiss: () -> Unit,
     onPin: (WidgetInfo) -> Unit
 ) {
@@ -566,70 +797,74 @@ private fun WidgetPickerSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = VoidDimens.screenPadding - 4.dp)) {
             Text(
-                "Add Widgets",
+                stringResource(R.string.widget_picker_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = VoidDimens.sectionSpacing)
             )
 
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(480.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                contentPadding = PaddingValues(bottom = 12.dp)
+                    .fillMaxHeight(0.88f),
+                verticalArrangement = Arrangement.spacedBy(VoidDimens.compactSpacing),
+                contentPadding = PaddingValues(bottom = VoidDimens.sectionSpacing)
             ) {
                 groupedWidgets.forEach { (appName, widgets) ->
                     item(key = "group_$appName") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 12.dp, bottom = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp)) {
                             Text(
                                 text = appName,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp)
                             )
-                            Text(
-                                text = "${widgets.size}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    items(items = widgets, key = { "picker_${it.provider.provider}" }) { widget ->
-                        val pinned = viewModel.isPinned(widget)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (!pinned) {
-                                        onPin(widget)
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(end = 8.dp)
+                            ) {
+                                items(
+                                    items = widgets,
+                                    key = { it.provider.provider.flattenToString() }
+                                ) { widget ->
+                                    val pinned = widget.key in pinnedKeys
+                                    val cardWidth = WidgetLayoutHelper.previewCardWidthDp(
+                                        minWidthDp = widget.provider.minWidth,
+                                        minHeightDp = widget.provider.minHeight
+                                    )
+                                    Column(
+                                        modifier = Modifier
+                                            .width(cardWidth.dp)
+                                            .clickable(enabled = !pinned) { onPin(widget) }
+                                    ) {
+                                        WidgetPreviewThumb(
+                                            drawable = widget.previewImage,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(96.dp)
+                                        )
+                                        Text(
+                                            text = widget.label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(top = 6.dp)
+                                        )
+                                        Icon(
+                                            if (pinned) Icons.Outlined.Check else Icons.Outlined.Add,
+                                            contentDescription = null,
+                                            tint = if (pinned) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier
+                                                .padding(top = 4.dp)
+                                                .size(18.dp)
+                                        )
                                     }
                                 }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = widget.label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                if (pinned) Icons.Outlined.Check else Icons.Outlined.Add,
-                                contentDescription = null,
-                                tint = if (pinned) MaterialTheme.colorScheme.primary
-                                       else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            }
                         }
                     }
                 }
@@ -637,4 +872,29 @@ private fun WidgetPickerSheet(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
+
+@Composable
+private fun WidgetPreviewThumb(
+    drawable: Drawable?,
+    modifier: Modifier = Modifier
+) {
+    val thumbModifier = modifier
+        .clip(MaterialTheme.shapes.small)
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+    if (drawable == null) {
+        Box(thumbModifier)
+        return
+    }
+    AndroidView(
+        factory = { ctx ->
+            ImageView(ctx).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                adjustViewBounds = true
+                setImageDrawable(drawable)
+            }
+        },
+        update = { imageView -> imageView.setImageDrawable(drawable) },
+        modifier = thumbModifier
+    )
 }
