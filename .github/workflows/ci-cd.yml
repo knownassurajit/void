@@ -1,0 +1,558 @@
+name: Void CI/CD Pipeline
+
+# Consolidated develop/master pipeline.
+# - `test` runs on every push to develop/master and on every PR targeting master.
+# - `debug-release` runs only on push to develop: builds + publishes a debug pre-release.
+# - `pr-summary` runs only on pull_request targeting master: re-checks + posts a summary/comment.
+# - `stable-release` runs only on push to master: THE single signed-release + GitHub release +
+#   optional Play Console publish path (see stable-release job for details).
+#
+# The `stage` branch has its own workflow: .github/workflows/stage.yml (unchanged behavior).
+
+on:
+  push:
+    branches: [ develop, master ]
+  pull_request:
+    branches: [ master ]
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep the container's Android SDK location consistent across steps/jobs.
+  ANDROID_SDK_ROOT: /opt/android-sdk
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ─────────────────────────────────────────────
+  # TEST — Unit tests + Lint (containerized)
+  # Runs on push to develop/master AND on every pull_request targeting master.
+  # ─────────────────────────────────────────────
+  test:
+    name: Unit Tests & Lint
+    runs-on: ubuntu-latest
+    container:
+      image: eclipse-temurin:17-jdk-jammy
+
+    steps:
+      - name: Install container prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends unzip curl git
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Run Lint Analysis
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Upload Test & Lint Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports-${{ github.run_id }}
+          path: "**/build/reports/"
+          retention-days: 14
+
+      - name: Document Test Results
+        if: always()
+        run: |
+          echo "## Test & Lint Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Event: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Ref: \`${{ github.ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Single-variant OSS build: unit tests + lint" >> $GITHUB_STEP_SUMMARY
+          echo "- Reports are available in the workflow artifacts." >> $GITHUB_STEP_SUMMARY
+
+  # ─────────────────────────────────────────────
+  # DEBUG-RELEASE — push to develop only.
+  # Builds on build-develop's test/lint and additionally builds + publishes a
+  # debug APK as a GitHub pre-release (develop previously built nothing).
+  # ─────────────────────────────────────────────
+  debug-release:
+    name: Debug Build & Pre-release
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    container:
+      image: eclipse-temurin:17-jdk-jammy
+    permissions:
+      contents: write
+    concurrency:
+      group: develop-debug-release
+      cancel-in-progress: true
+
+    steps:
+      - name: Install container prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends unzip curl git
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Run Lint Analysis
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Extract Version from Gradle
+        id: version
+        run: |
+          GRADLE_FILE=$(find . -maxdepth 3 -name "build.gradle.kts" ! -path "./build/*" | head -n 1)
+          if [ -z "$GRADLE_FILE" ]; then
+            GRADLE_FILE=$(find . -maxdepth 3 -name "build.gradle" ! -path "./build/*" | head -n 1)
+          fi
+          VERSION=""
+          if grep -q -E 'val\s+major\s*=\s*[0-9]+' "$GRADLE_FILE"; then
+            MAJOR=$(grep -E 'val\s+major\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            MINOR=$(grep -E 'val\s+minor\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            PATCH=$(grep -E 'val\s+patch\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            BUILD=$(grep -E 'val\s+build\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            VERSION="${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
+          fi
+          if [ -z "$VERSION" ]; then
+            VERSION=$(date +'%Y.%m.%d')
+          fi
+          echo "app_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            LOG=$(git log --oneline -20 --pretty="- %s (%h)")
+          else
+            LOG=$(git log --pretty="- %s (%h)" ${PREV_TAG}..HEAD)
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Rename APK
+        id: rename
+        run: |
+          VERSION="${{ steps.version.outputs.app_version }}"
+          APK=$(find . -path "*/apk/debug/*.apk" | head -n 1)
+          NEW_NAME="void-develop-v${VERSION}.apk"
+          mv "$APK" "${NEW_NAME}"
+          echo "apk=${NEW_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Extract Timestamp
+        id: timestamp
+        run: echo "time=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
+
+      - name: Create Pre-release and Upload APK
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.rename.outputs.apk }}
+          tag_name: develop-v${{ steps.version.outputs.app_version }}-${{ github.run_number }}
+          name: "Void Launcher v${{ steps.version.outputs.app_version }} (Develop #${{ github.run_number }})"
+          body: |
+            **Debug build from `develop`** (single-variant OSS, unsigned debug key)
+
+            **Build generated on:** ${{ steps.timestamp.outputs.time }}
+            **Run Number:** #${{ github.run_number }}
+
+            ### Build
+            - `void-develop-v${{ steps.version.outputs.app_version }}.apk` — full feature set (AI, widgets, Private Space, notes)
+
+            ## What's Changed
+            ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────
+  # PR-SUMMARY — pull_request targeting master.
+  # Re-runs checks and posts a detailed job summary + PR comment with
+  # test/lint results and a changelog preview since the last stable release.
+  # ─────────────────────────────────────────────
+  pr-summary:
+    name: PR Summary
+    needs: test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    container:
+      image: eclipse-temurin:17-jdk-jammy
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Install container prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends unzip curl git
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Unit Tests
+        id: unit_tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Run Lint Analysis
+        id: lint
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Generate Changelog Since Last Stable Release
+        id: changelog
+        run: |
+          git fetch --tags --force
+          LAST_STABLE=$(git tag --list 'v[0-9]*' --sort=-creatordate | head -n 1)
+          if [ -z "$LAST_STABLE" ]; then
+            LOG=$(git log --oneline -20 --pretty="- %s (%h)")
+            echo "since=(no previous stable release found — showing last 20 commits)" >> $GITHUB_OUTPUT
+          else
+            LOG=$(git log --pretty="- %s (%h)" "${LAST_STABLE}"..HEAD)
+            echo "since=$LAST_STABLE" >> $GITHUB_OUTPUT
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Write Job Summary
+        if: always()
+        run: |
+          {
+            echo "## Pull Request CI Summary"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| Unit Tests (\`testDebugUnitTest\`) | ${{ steps.unit_tests.outcome }} |"
+            echo "| Lint (\`lintDebug\`) | ${{ steps.lint.outcome }} |"
+            echo ""
+            echo "### Changelog preview since ${{ steps.changelog.outputs.since }}"
+            echo ""
+            echo "${{ steps.changelog.outputs.changelog }}"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Post PR Comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const unitTests = "${{ steps.unit_tests.outcome }}";
+            const lint = "${{ steps.lint.outcome }}";
+            const since = ${{ toJSON(steps.changelog.outputs.since) }};
+            const changelog = ${{ toJSON(steps.changelog.outputs.changelog) }};
+            const body = [
+              "## CI Summary",
+              "",
+              "| Check | Result |",
+              "|---|---|",
+              `| Unit Tests (\`testDebugUnitTest\`) | ${unitTests} |`,
+              `| Lint (\`lintDebug\`) | ${lint} |`,
+              "",
+              `### Changelog preview since ${since}`,
+              "",
+              changelog,
+            ].join("\n");
+
+            const marker = "<!-- ci-cd-pr-summary -->";
+            const fullBody = `${marker}\n${body}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: fullBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: fullBody,
+              });
+            }
+
+  # ─────────────────────────────────────────────
+  # STABLE-RELEASE — push to master only.
+  # THE single consolidated release path: unit tests + lint, assembleRelease +
+  # bundleRelease, sign via r0adkll/sign-android-release@v1 (the one and only
+  # signing step — no dead keystore-decode code), rename to
+  # void-release-v$version.{apk,aab}, GitHub stable release, a release/void/$version
+  # branch for rollback tracking, and an optional Google Play internal-track publish
+  # that is a safe no-op when secrets.PLAY_CONSOLE_JSON is absent.
+  # ─────────────────────────────────────────────
+  stable-release:
+    name: Signed Release & Publish
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    container:
+      image: eclipse-temurin:17-jdk-jammy
+    permissions:
+      contents: write
+    timeout-minutes: 45
+
+    steps:
+      - name: Install container prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends unzip curl git
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # actionlint disallows referencing the `secrets` context directly inside a
+      # step's `if:` condition. Resolve it once here into a step output instead,
+      # which downstream `if:` conditions are allowed to read.
+      - name: Check for Play Console credentials
+        id: play_console_check
+        run: |
+          if [ -n "${PLAY_CONSOLE_JSON}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          PLAY_CONSOLE_JSON: ${{ secrets.PLAY_CONSOLE_JSON }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      - name: Install matching Android Build-Tools
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Run Lint Analysis
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Build Release AAB
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Find Release Build Directories
+        id: locate
+        run: |
+          APK_DIR=$(dirname "$(find . -path "*/apk/release/*.apk" | head -n 1)")
+          AAB_DIR=$(dirname "$(find . -path "*/bundle/release/*.aab" | head -n 1)")
+          echo "apk_dir=$APK_DIR" >> $GITHUB_OUTPUT
+          echo "aab_dir=$AAB_DIR" >> $GITHUB_OUTPUT
+
+      - name: Sign Release APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_apk
+        with:
+          releaseDirectory: ${{ steps.locate.outputs.apk_dir }}
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: "35.0.0"
+
+      - name: Sign Release AAB
+        uses: r0adkll/sign-android-release@v1
+        id: sign_aab
+        with:
+          releaseDirectory: ${{ steps.locate.outputs.aab_dir }}
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: "35.0.0"
+
+      - name: Extract Version from Gradle
+        id: version
+        run: |
+          GRADLE_FILE=$(find . -maxdepth 3 -name "build.gradle.kts" ! -path "./build/*" | head -n 1)
+          if [ -z "$GRADLE_FILE" ]; then
+            GRADLE_FILE=$(find . -maxdepth 3 -name "build.gradle" ! -path "./build/*" | head -n 1)
+          fi
+          VERSION=""
+          if grep -q -E 'val\s+major\s*=\s*[0-9]+' "$GRADLE_FILE"; then
+            MAJOR=$(grep -E 'val\s+major\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            MINOR=$(grep -E 'val\s+minor\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            PATCH=$(grep -E 'val\s+patch\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            BUILD=$(grep -E 'val\s+build\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            VERSION="${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
+          fi
+          if [ -z "$VERSION" ]; then
+            VERSION=$(date +'%Y.%m.%d')
+          fi
+          echo "app_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            LOG=$(git log --oneline -20 --pretty="- %s (%h)")
+          else
+            LOG=$(git log --pretty="- %s (%h)" ${PREV_TAG}..HEAD)
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Rename Builds
+        id: rename
+        run: |
+          VERSION="${{ steps.version.outputs.app_version }}"
+          APK="${{ steps.sign_apk.outputs.signedReleaseFile }}"
+          NEW_APK="void-release-v${VERSION}.apk"
+          mv "$APK" "${NEW_APK}"
+          echo "apk=${NEW_APK}" >> $GITHUB_OUTPUT
+          AAB="${{ steps.sign_aab.outputs.signedReleaseFile }}"
+          NEW_AAB="void-release-v${VERSION}.aab"
+          mv "$AAB" "${NEW_AAB}"
+          echo "aab=${NEW_AAB}" >> $GITHUB_OUTPUT
+
+      - name: Upload Builds to Artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: void-release-builds-v${{ steps.version.outputs.app_version }}
+          path: |
+            ${{ steps.rename.outputs.apk }}
+            ${{ steps.rename.outputs.aab }}
+          retention-days: 90
+
+      - name: Create Dedicated Release Branch (rollback tracking)
+        run: |
+          BRANCH_NAME="release/void/${{ steps.version.outputs.app_version }}"
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
+            echo "Release branch $BRANCH_NAME already exists on origin; leaving it as-is."
+          else
+            echo "Creating dedicated release branch $BRANCH_NAME for safe rollback tracking."
+            git checkout -b "$BRANCH_NAME"
+            git push origin "$BRANCH_NAME"
+          fi
+
+      - name: Extract Timestamp
+        id: timestamp
+        run: echo "time=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
+
+      - name: Create Stable Release and Upload Builds
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.rename.outputs.apk }}
+            ${{ steps.rename.outputs.aab }}
+          tag_name: v${{ steps.version.outputs.app_version }}
+          name: "Void Launcher v${{ steps.version.outputs.app_version }} (Stable Release)"
+          body: |
+            **Production Release `v${{ steps.version.outputs.app_version }}`** (single-variant OSS)
+
+            **Build generated on:** ${{ steps.timestamp.outputs.time }}
+            **Run Number:** #${{ github.run_number }}
+            **Rollback branch:** `release/void/${{ steps.version.outputs.app_version }}`
+
+            ### Builds
+            - `void-release-v${{ steps.version.outputs.app_version }}.apk` — sideload install
+            - `void-release-v${{ steps.version.outputs.app_version }}.aab` — optional distribution bundle
+
+            Full features included: ML Kit GenAI summaries, AppWidgetHost widgets, Private Space, notes.
+
+            ## What's Changed
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Installation
+            Enable **Install from unknown sources** when sideloading the APK.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Play Console Release Notes
+        if: steps.play_console_check.outputs.configured == 'true'
+        run: |
+          mkdir -p release_notes/en-US
+          cat > release_notes/en-US/default.txt <<EOF
+          Source:
+          branch=release/void/${{ steps.version.outputs.app_version }}
+          commit=${{ github.sha }}
+          workflow=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+
+      # Bug fix: the old play-release.yml gated this on `env.PLAY_CONSOLE_JSON != ''`,
+      # but that env var was never set at job/step level before the `if:` was evaluated
+      # (a step's own `env:` block is not visible to that same step's `if:` condition),
+      # so the gate was either always-false (dead step) or, if evaluated some other way,
+      # would attempt a production Play publish on every push to develop AND master.
+      # This now gates on the `play_console_check` step output (computed earlier in this
+      # job from the secret directly), so it's a safe no-op when PLAY_CONSOLE_JSON is
+      # unset and actually runs when it's present. (The `secrets` context itself can't be
+      # referenced directly in a step's `if:` — only in `env:`/`with:` — hence the
+      # earlier check step instead of `if: secrets.PLAY_CONSOLE_JSON != ''` here.)
+      - name: Publish to Google Play (Internal Track)
+        if: steps.play_console_check.outputs.configured == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_CONSOLE_JSON }}
+          packageName: com.knownassurajit.app.launcher.voidlauncher
+          releaseFiles: ${{ steps.rename.outputs.aab }}
+          track: internal
+          status: completed
+          whatsNewDirectory: release_notes
+          releaseName: void-${{ steps.version.outputs.app_version }}-${{ github.run_number }}
