@@ -1,10 +1,15 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 private val VoidDarkColorScheme = darkColorScheme(
@@ -44,19 +49,31 @@ private val VoidDarkColorScheme = darkColorScheme(
     surfaceDim = VoidBlack
 )
 
-// MD3 Expressive — 3-tier shape vocabulary
+// MD3 Expressive — recommended shape tokens
 private val VoidExpressiveShapes = Shapes(
-    extraSmall = RoundedCornerShape(0.dp),     // flat list rows
-    small = RoundedCornerShape(8.dp),          // chips, small pills
-    medium = RoundedCornerShape(8.dp),         // interactive elements
-    large = RoundedCornerShape(20.dp),         // cards, sheets
-    extraLarge = RoundedCornerShape(20.dp)     // search bar, bottom sheets
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(28.dp)
 )
 
 @Composable
-fun VoidAppTheme(appFont: String = "inter", content: @Composable () -> Unit) {
+fun VoidAppTheme(
+    appFont: String = "inter",
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val context = LocalContext.current
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        else -> VoidDarkColorScheme
+    }
+
     MaterialTheme(
-        colorScheme = VoidDarkColorScheme,
+        colorScheme = colorScheme,
         typography = getTypography(appFont),
         shapes = VoidExpressiveShapes,
         content = content
