@@ -362,6 +362,7 @@ fun WidgetsScreen(
     viewModel: WidgetsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val widgetBindDenied = stringResource(R.string.widget_bind_denied)
     if (!FeatureAvailability.isWidgetsAvailable(context)) {
         FeatureUnavailableScreen(
             stringResource(R.string.widgets),
@@ -568,7 +569,7 @@ fun WidgetsScreen(
                     }
                     PinWidgetResult.Denied -> Toast.makeText(
                         context,
-                        context.getString(R.string.widget_bind_denied),
+                        widgetBindDenied,
                         Toast.LENGTH_LONG
                     ).show()
                 }
