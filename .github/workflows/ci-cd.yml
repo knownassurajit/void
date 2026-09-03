@@ -49,7 +49,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@00186d05c5dea8ab6b52aa2e3012398c3cc3d24b
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
@@ -64,7 +64,7 @@ jobs:
         run: ./gradlew lintDebug --no-daemon
 
       - name: Upload Test & Lint Reports
-        uses: actions/upload-artifact@ea165f8d65b6f75b7ca4f3a20b5e1e8e7e1adf6b
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: test-reports-${{ github.run_id }}
@@ -109,7 +109,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@00186d05c5dea8ab6b52aa2e3012398c3cc3d24b
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
@@ -174,7 +174,7 @@ jobs:
 
       - name: Create Pre-release and Upload APK
         if: success()
-        uses: softprops/action-gh-release@da05d552573ad5ece0dc98dfdbf2d8a2073d3c74
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda
         with:
           files: |
             ${{ steps.rename.outputs.apk }}
@@ -223,7 +223,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@00186d05c5dea8ab6b52aa2e3012398c3cc3d24b
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
@@ -322,7 +322,7 @@ jobs:
   # ─────────────────────────────────────────────
   # STABLE-RELEASE — push to master only.
   # THE single consolidated release path: unit tests + lint, assembleRelease +
-  # bundleRelease, sign via r0adkll/sign-android-release@905b7e5e42ca7be027a28dc2d7e91c9da3c3d23e (the one and only
+  # bundleRelease, sign via r0adkll/sign-android-release@349ebdef58775b1e0d8099458af0816dc79b6407 (the one and only
   # signing step — no dead keystore-decode code), rename to
   # void-release-v$version.{apk,aab}, GitHub stable release, a release/void/$version
   # branch for rollback tracking, and an optional Google Play internal-track publish
@@ -364,7 +364,7 @@ jobs:
           PLAY_CONSOLE_JSON: ${{ secrets.PLAY_CONSOLE_JSON }}
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@00186d05c5dea8ab6b52aa2e3012398c3cc3d24b
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
@@ -396,7 +396,7 @@ jobs:
           echo "aab_dir=$AAB_DIR" >> $GITHUB_OUTPUT
 
       - name: Sign Release APK
-        uses: r0adkll/sign-android-release@905b7e5e42ca7be027a28dc2d7e91c9da3c3d23e
+        uses: r0adkll/sign-android-release@349ebdef58775b1e0d8099458af0816dc79b6407
         id: sign_apk
         with:
           releaseDirectory: ${{ steps.locate.outputs.apk_dir }}
@@ -408,7 +408,7 @@ jobs:
           BUILD_TOOLS_VERSION: "35.0.0"
 
       - name: Sign Release AAB
-        uses: r0adkll/sign-android-release@905b7e5e42ca7be027a28dc2d7e91c9da3c3d23e
+        uses: r0adkll/sign-android-release@349ebdef58775b1e0d8099458af0816dc79b6407
         id: sign_aab
         with:
           releaseDirectory: ${{ steps.locate.outputs.aab_dir }}
@@ -466,7 +466,7 @@ jobs:
           echo "aab=${NEW_AAB}" >> $GITHUB_OUTPUT
 
       - name: Upload Builds to Artifacts
-        uses: actions/upload-artifact@ea165f8d65b6f75b7ca4f3a20b5e1e8e7e1adf6b
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: success()
         with:
           name: void-release-builds-v${{ steps.version.outputs.app_version }}
@@ -494,7 +494,7 @@ jobs:
 
       - name: Create Stable Release and Upload Builds
         if: success()
-        uses: softprops/action-gh-release@da05d552573ad5ece0dc98dfdbf2d8a2073d3c74
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda
         with:
           files: |
             ${{ steps.rename.outputs.apk }}
@@ -547,7 +547,7 @@ jobs:
       # earlier check step instead of `if: secrets.PLAY_CONSOLE_JSON != ''` here.)
       - name: Publish to Google Play (Internal Track)
         if: steps.play_console_check.outputs.configured == 'true'
-        uses: r0adkll/upload-google-play@8959b834a12e9d0c61d9c5dce63f6e2cfd80d7ae
+        uses: r0adkll/upload-google-play@935ef9c68bb393a8e6116b1575626a7f5be3a7fb
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_CONSOLE_JSON }}
           packageName: com.knownassurajit.app.launcher.voidlauncher
@@ -569,6 +569,6 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/dependency-review-action@da3b6d89b7ff0e7b01db34e8fa88de4ec57b3fef
+      - uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9
         with:
           fail-on-severity: high
