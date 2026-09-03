@@ -820,6 +820,8 @@ private fun GesturesSection(
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
     val scope = rememberCoroutineScope()
+    val grantNotificationAccess = stringResource(R.string.grant_notification_access)
+    val couldNotOpenNotificationSettings = stringResource(R.string.could_not_open_notification_settings)
 
     SettingsSectionHeader(stringResource(R.string.gestures))
     SettingToggleItem(
@@ -839,15 +841,11 @@ private fun GesturesSection(
                 try {
                     context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                     scope.launch {
-                        snackbarHostState.showSnackbar(
-                            context.getString(R.string.grant_notification_access)
-                        )
+                        snackbarHostState.showSnackbar(grantNotificationAccess)
                     }
                 } catch (_: Exception) {
                     scope.launch {
-                        snackbarHostState.showSnackbar(
-                            context.getString(R.string.could_not_open_notification_settings)
-                        )
+                        snackbarHostState.showSnackbar(couldNotOpenNotificationSettings)
                     }
                 }
             }

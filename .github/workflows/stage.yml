@@ -1,0 +1,108 @@
+name: Void Stage Pipeline
+
+on:
+  push:
+    branches: [ stage ]
+
+jobs:
+
+  # ─────────────────────────────────────────────
+  # STAGE — Debug build → GitHub Pre-release
+  # (Moved verbatim from build.yml's build-stage job; behavior unchanged.)
+  # ─────────────────────────────────────────────
+  build-stage:
+    if: github.ref == 'refs/heads/stage'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: stage-build
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Extract Version from Gradle
+        id: version
+        run: |
+          GRADLE_FILE=$(find . -maxdepth 3 -name "build.gradle.kts" ! -path "./build/*" | head -n 1)
+          if [ -z "$GRADLE_FILE" ]; then
+            GRADLE_FILE=$(find . -maxdepth 3 -name "build.gradle" ! -path "./build/*" | head -n 1)
+          fi
+          VERSION=""
+          if grep -q -E 'val\s+major\s*=\s*[0-9]+' "$GRADLE_FILE"; then
+            MAJOR=$(grep -E 'val\s+major\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            MINOR=$(grep -E 'val\s+minor\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            PATCH=$(grep -E 'val\s+patch\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            BUILD=$(grep -E 'val\s+build\s*=\s*[0-9]+' "$GRADLE_FILE" | head -1 | grep -o -E '[0-9]+')
+            VERSION="${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
+          fi
+          if [ -z "$VERSION" ]; then
+            VERSION=$(date +'%Y.%m.%d')
+          fi
+          echo "app_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            LOG=$(git log --oneline -20 --pretty="- %s (%h)")
+          else
+            LOG=$(git log --pretty="- %s (%h)" ${PREV_TAG}..HEAD)
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Rename APK
+        id: rename
+        run: |
+          VERSION="${{ steps.version.outputs.app_version }}"
+          APK=$(find . -path "*/apk/debug/*.apk" | head -n 1)
+          NEW_NAME="void-stage-v${VERSION}.apk"
+          mv "$APK" "${NEW_NAME}"
+          echo "apk=${NEW_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Extract Timestamp
+        id: timestamp
+        run: echo "time=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
+
+      - name: Create Pre-release and Upload APK
+        if: success()
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda
+        with:
+          files: |
+            ${{ steps.rename.outputs.apk }}
+          tag_name: stage-v${{ steps.version.outputs.app_version }}-${{ github.run_number }}
+          name: "Void Launcher v${{ steps.version.outputs.app_version }} (Stage #${{ github.run_number }})"
+          body: |
+            **Debug build for internal testing** (single-variant OSS)
+
+            **Build generated on:** ${{ steps.timestamp.outputs.time }}
+            **Run Number:** #${{ github.run_number }}
+
+            ### Build
+            - `void-stage-v${{ steps.version.outputs.app_version }}.apk` — full feature set (AI, widgets, Private Space, notes)
+
+            ## What's Changed
+            ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
