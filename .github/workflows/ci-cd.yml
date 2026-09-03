@@ -242,6 +242,7 @@ jobs:
       - name: Generate Changelog Since Last Stable Release
         id: changelog
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch --tags --force
           LAST_STABLE=$(git tag --list 'v[0-9]*' --sort=-creatordate | head -n 1)
           if [ -z "$LAST_STABLE" ]; then
