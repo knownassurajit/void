@@ -85,7 +85,7 @@ jobs:
 
       - name: Create Pre-release and Upload APK
         if: success()
-        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           files: |
             ${{ steps.rename.outputs.apk }}
