@@ -43,7 +43,6 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends unzip curl git
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -51,8 +50,6 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
-        with:
-          packages: 'platform-tools'
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
@@ -106,7 +103,6 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends unzip curl git
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -114,8 +110,6 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
-        with:
-          packages: 'platform-tools'
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
@@ -223,7 +217,6 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends unzip curl git
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -231,8 +224,6 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
-        with:
-          packages: 'platform-tools'
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
@@ -251,6 +242,7 @@ jobs:
       - name: Generate Changelog Since Last Stable Release
         id: changelog
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch --tags --force
           LAST_STABLE=$(git tag --list 'v[0-9]*' --sort=-creatordate | head -n 1)
           if [ -z "$LAST_STABLE" ]; then
@@ -282,7 +274,7 @@ jobs:
 
       - name: Post PR Comment
         if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         with:
           script: |
             const unitTests = "${{ steps.unit_tests.outcome }}";
@@ -353,7 +345,6 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends unzip curl git
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -375,14 +366,12 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
-        with:
-          packages: 'platform-tools'
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null || true
 
       - name: Install matching Android Build-Tools
-        run: sdkmanager "build-tools;35.0.0"
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
