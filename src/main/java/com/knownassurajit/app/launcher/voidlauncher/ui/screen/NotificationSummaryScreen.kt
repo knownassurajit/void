@@ -56,6 +56,8 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import kotlin.math.abs
 
 // ── ViewModel ──
@@ -213,27 +215,14 @@ fun NotificationSummaryScreen(
     val summaries by viewModel.summaries.collectAsState()
     val aiAvailable by viewModel.isAiAvailable.collectAsState()
 
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    ChildScreenBackHandler(onBack)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragEnd = {
-                        if (dragOffset.y < -180f && abs(dragOffset.y) > abs(dragOffset.x)) {
-                            onBack()
-                        }
-                        dragOffset = Offset.Zero
-                    },
-                    onDragCancel = { dragOffset = Offset.Zero },
-                    onDrag = { _, dragAmount ->
-                        dragOffset += dragAmount
-                    }
-                )
-            }
+            .screenBackSwipe(onBack)
     ) {
     Column(
         modifier = Modifier

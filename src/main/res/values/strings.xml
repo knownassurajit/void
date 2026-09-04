@@ -216,4 +216,23 @@
     <string name="screen_time_size">Screen time size</string>
     <string name="clock_section_weight">Clock / apps split</string>
     <string name="developer_credits">Developer credits</string>
+    <string name="settings_search_hint">Search settings</string>
+    <string name="settings_no_matches">No matching settings</string>
+    <string name="settings_group_look">Look</string>
+    <string name="settings_group_home">Home</string>
+    <string name="settings_group_app_library">App library</string>
+    <string name="settings_group_gestures_motion">Gestures &amp; motion</string>
+    <string name="settings_group_features">Features</string>
+    <string name="manage_default_home_settings">Manage default home app settings</string>
+    <string name="animation_speed">Animation speed</string>
+    <string name="animation_speed_subtitle">How quickly screens and motion play</string>
+    <string name="animation_speed_fast">Fast</string>
+    <string name="animation_speed_standard">Standard</string>
+    <string name="animation_speed_slow">Slow</string>
+    <string name="content_swipe_to_back">Swipe to go back</string>
+    <string name="content_swipe_to_back_subtitle">Swipe in the open direction to leave a screen</string>
+    <string name="private_space_placement">Private Space placement</string>
+    <string name="private_space_placement_subtitle">Where Private Space appears in the app library</string>
+    <string name="private_space_placement_bottom">Bottom</string>
+    <string name="private_space_placement_search_bar">Search bar</string>
 </resources>

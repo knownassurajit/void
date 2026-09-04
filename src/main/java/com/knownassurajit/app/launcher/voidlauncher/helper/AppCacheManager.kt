@@ -74,7 +74,7 @@ object AppCacheManager {
 
     suspend fun syncCache(context: Context) = withContext(Dispatchers.IO) {
         try {
-            val prefs = Prefs(context)
+            val prefs = Prefs.get(context)
             val freshApps: List<AppModel> = getAppsList(context, prefs, includeRegularApps = true, includeHiddenApps = false)
             _appCacheFlow.value = freshApps
 

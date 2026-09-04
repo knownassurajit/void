@@ -16,7 +16,7 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
-        Prefs(applicationContext).lockModeOn = true
+        Prefs.get(applicationContext).lockModeOn = true
         super.onServiceConnected()
     }
 

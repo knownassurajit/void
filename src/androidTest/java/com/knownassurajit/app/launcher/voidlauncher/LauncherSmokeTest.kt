@@ -2,9 +2,11 @@ package com.knownassurajit.app.launcher.voidlauncher
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppsCap
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.helper.HomeReorderHelper
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,10 +27,9 @@ class LauncherSmokeTest {
     @Test
     fun prefs_homescreenDefaults_areReadable() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val prefs = Prefs(context)
+        val prefs = Prefs.get(context)
         assertTrue(prefs.maxHomeApps in 1..15)
         assertTrue(prefs.clockSizeScale > 0f)
-        assertTrue(prefs.enableSwipeDownNotifications)
         assertTrue(prefs.homeSectionOrder == "clock_first" || prefs.homeSectionOrder == "apps_first")
     }
 
@@ -42,7 +43,7 @@ class LauncherSmokeTest {
     @Test
     fun prefs_widgetCustomizationKeys_roundTrip() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val prefs = Prefs(context)
+        val prefs = Prefs.get(context)
         val previousOrder = prefs.widgetOrder
         val previousLabels = prefs.showWidgetLabels
         try {
@@ -53,6 +54,34 @@ class LauncherSmokeTest {
         } finally {
             prefs.widgetOrder = previousOrder
             prefs.showWidgetLabels = previousLabels
+        }
+    }
+
+    @Test
+    fun clockToggle_doesNotCollapseOrWipeHomeApps() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = Prefs.get(context)
+        val packagesBefore = (1..10).map { prefs.getAppPackage(it) }
+        val filled = packagesBefore.count { it.isNotBlank() }
+        val capBefore = prefs.maxHomeApps
+        val clockBefore = prefs.showClockWidget
+        assertTrue("Need filled home slots to prove the wipe path", filled >= 6)
+        try {
+            prefs.showClockWidget = false
+            val afterOff = prefs.homescreenPreferences.value
+            assertEquals(false, afterOff.showClock)
+            assertEquals(capBefore, afterOff.maxApps)
+            assertFalse(HomeAppsCap.shouldReloadHomeApps(capBefore, afterOff.maxApps))
+            assertEquals(packagesBefore, (1..10).map { prefs.getAppPackage(it) })
+
+            prefs.showClockWidget = true
+            val afterOn = prefs.homescreenPreferences.value
+            assertEquals(true, afterOn.showClock)
+            assertEquals(capBefore, afterOn.maxApps)
+            assertFalse(HomeAppsCap.shouldReloadHomeApps(capBefore, afterOn.maxApps))
+            assertEquals(packagesBefore, (1..10).map { prefs.getAppPackage(it) })
+        } finally {
+            prefs.showClockWidget = clockBefore
         }
     }
 

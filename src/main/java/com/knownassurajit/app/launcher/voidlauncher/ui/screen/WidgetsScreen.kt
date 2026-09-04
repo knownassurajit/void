@@ -92,6 +92,8 @@ import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetBindHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetLayoutHelper
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -120,7 +122,7 @@ private sealed interface WidgetGrant {
 
 class WidgetsViewModel(application: Application) : AndroidViewModel(application) {
     private val ctx = application.applicationContext
-    private val prefs = Prefs(ctx)
+    private val prefs = Prefs.get(ctx)
 
     val appWidgetHost = AppWidgetHost(ctx, WIDGET_HOST_ID)
 
@@ -362,6 +364,7 @@ fun WidgetsScreen(
     viewModel: WidgetsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val widgetBindDenied = stringResource(R.string.widget_bind_denied)
     if (!FeatureAvailability.isWidgetsAvailable(context)) {
         FeatureUnavailableScreen(
             stringResource(R.string.widgets),
@@ -422,11 +425,14 @@ fun WidgetsScreen(
         onDispose { viewModel.appWidgetHost.stopListening() }
     }
 
+    ChildScreenBackHandler(onBack)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
+            .screenBackSwipe(onBack)
     ) {
         Row(
             modifier = Modifier
@@ -568,7 +574,7 @@ fun WidgetsScreen(
                     }
                     PinWidgetResult.Denied -> Toast.makeText(
                         context,
-                        context.getString(R.string.widget_bind_denied),
+                        widgetBindDenied,
                         Toast.LENGTH_LONG
                     ).show()
                 }

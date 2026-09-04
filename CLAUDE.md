@@ -291,6 +291,19 @@ Rules:
 - verify signing
 - verify flavor parity
 
+### Workflow layout
+
+Two workflow files, one concern each — do not let them overlap again:
+
+- `.github/workflows/ci-cd.yml` — the develop/master pipeline. Jobs: `test` (push to develop/master + PRs targeting master), `debug-release` (push to develop only — builds + pre-releases a debug APK), `pr-summary` (PRs targeting master — re-runs checks, posts summary + sticky PR comment), `stable-release` (push to master only — **the single** signed-release path: assembleRelease/bundleRelease, sign via `r0adkll/sign-android-release@v1`, GitHub stable release tagged `v$version`, `release/void/$version` rollback branch, optional Play Console internal-track publish).
+- `.github/workflows/stage.yml` — push to `stage` only, unchanged debug-build-to-pre-release flow, kept isolated from the develop/master pipeline.
+
+`test`/`debug-release`/`pr-summary`/`stable-release` run inside `container: image: eclipse-temurin:17-jdk-jammy`; each job apt-get installs `unzip curl git` before setting up the Android SDK via `android-actions/setup-android@v3`.
+
+Google Play publish (`stable-release` only) is gated on a `play_console_check` step that resolves `secrets.PLAY_CONSOLE_JSON` into a step output — never gate directly on `secrets.*` or an unset `env.*` inside the same step's own `if:`, both are no-ops or worse. Absent the secret, the publish step is a safe no-op.
+
+There must be exactly one job that creates a GitHub stable release and exactly one job that touches Google Play. If you find a second one, that's the bug this section exists to prevent — consolidate, don't add a third workflow.
+
 ---
 
 ## Git / Repo Hygiene

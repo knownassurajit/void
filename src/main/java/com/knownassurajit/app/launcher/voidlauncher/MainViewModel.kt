@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val appContext by lazy { application.applicationContext }
-    private val prefs = Prefs(appContext)
+    private val prefs = Prefs.get(appContext)
 
     val firstOpen = MutableLiveData<Boolean>()
     val refreshHome = MutableLiveData<Boolean>()

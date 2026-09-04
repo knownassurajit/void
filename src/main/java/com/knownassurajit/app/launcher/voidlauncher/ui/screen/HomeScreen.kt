@@ -56,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -90,6 +91,7 @@ import com.knownassurajit.app.launcher.voidlauncher.MainUiState
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppSlot
+import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppsCap
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
 import com.knownassurajit.app.launcher.voidlauncher.helper.HomeLayoutHelper
@@ -209,6 +211,7 @@ private fun openScreenTimeDestination(context: android.content.Context) {
 @Composable
 fun HomeScreen(
     state: MainUiState,
+    isCurrentDestination: Boolean = true,
     onOpenApps: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNotifications: () -> Unit,
@@ -221,7 +224,8 @@ fun HomeScreen(
     onHomeAppsChanged: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val density = LocalDensity.current
+    val prefs = remember { Prefs.get(context) }
     val haptic = LocalHapticFeedback.current
     val clockAlign = remember(state.clockHorizontalAlignment) { gravityToAlignment(state.clockHorizontalAlignment) }
     val appAlign = remember(state.appHorizontalAlignment) { gravityToAlignment(state.appHorizontalAlignment) }
@@ -239,8 +243,8 @@ fun HomeScreen(
     val isDraggingGlobalLatest = rememberUpdatedState(isDraggingGlobal)
     val swipeDownEnabledLatest = rememberUpdatedState(state.enableSwipeDownNotifications)
 
-    // Consume back press on home screen — prevents re-transition to self
-    BackHandler { /* Do nothing — home screen is the root */ }
+    // Consume back press only while home is the current destination.
+    BackHandler(enabled = isCurrentDestination) { /* home is the root */ }
 
     Box(
         modifier = Modifier
@@ -260,8 +264,12 @@ fun HomeScreen(
                     if (isDraggingGlobalLatest.value) {
                         return@awaitEachGesture
                     }
+                    val edge = with(density) { 24.dp.toPx() }
+                    val atSystemEdge = down.position.x < edge || down.position.x > size.width - edge
                     val slop = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis.toLong()) {
-                        awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() }
+                        awaitTouchSlopOrCancellation(down.id) { change, _ ->
+                            if (!atSystemEdge) change.consume()
+                        }
                     }
                     if (slop == null || isDraggingGlobalLatest.value) {
                         return@awaitEachGesture
@@ -270,19 +278,22 @@ fun HomeScreen(
                     drag(slop.id) { change ->
                         if (isDraggingGlobalLatest.value) return@drag
                         total += change.positionChange()
-                        change.consume()
+                        if (!atSystemEdge) change.consume()
                     }
                     if (isDraggingGlobalLatest.value) return@awaitEachGesture
                     val absX = abs(total.x)
                     val absY = abs(total.y)
+                    if (atSystemEdge && absX > absY) {
+                        return@awaitEachGesture
+                    }
                     if (absX > swipeThreshold || absY > swipeThreshold) {
                         if (absX > absY) {
                             if (state.enableGestures) {
                                 if (total.x > 0) {
-                                    dispatchSwipeAction("left", state.leftSwipeAction, context,
+                                    dispatchSwipeAction("left", state.leftSwipeAction, context, prefs,
                                         onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
                                 } else {
-                                    dispatchSwipeAction("right", state.rightSwipeAction, context,
+                                    dispatchSwipeAction("right", state.rightSwipeAction, context, prefs,
                                         onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
                                 }
                             }
@@ -800,7 +811,7 @@ private fun HomeAppPickerSheet(
     onHomeAppsChanged: () -> Unit
 ) {
     val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = remember { Prefs.get(context) }
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val allApps = remember { mutableStateListOf<AppModel>() }
@@ -817,29 +828,37 @@ private fun HomeAppPickerSheet(
         selectedApps.clear()
         selectedApps.addAll(currentApps)
     }
-    val filtered = remember(search, allApps.toList()) {
-        if (search.isBlank()) allApps.toList()
-        else allApps.filter { it.appLabel.contains(search, ignoreCase = true) }
+    val filtered by remember {
+        derivedStateOf {
+            if (search.isBlank()) allApps.toList()
+            else allApps.filter { it.appLabel.contains(search, ignoreCase = true) }
+        }
     }
 
     fun persistDense(ordered: List<HomeApp>) {
-        val next = ordered.take(maxApps.coerceIn(1, 10))
+        val cap = HomeAppsCap.resolve(
+            hasMaxKey = true,
+            maxValue = prefs.maxHomeApps,
+            hasLegacyKey = false,
+            legacyValue = HomeAppsCap.DEFAULT,
+            filledSlots = ordered.count { it.packageName.isNotBlank() }
+        ).coerceIn(1, HomeAppsCap.MAX_SLOTS)
+        val next = ordered.take(cap)
         selectedApps.clear()
         selectedApps.addAll(next)
-        next.forEachIndexed { idx, app ->
-            prefs.setAppAtLocation(
-                idx + 1,
-                app.label,
-                app.packageName,
-                app.activityClassName,
-                app.userString,
-                app.isShortcut,
-                app.shortcutId
-            )
-        }
-        for (slot in (next.size + 1)..maxApps.coerceIn(1, 10)) {
-            prefs.setAppAtLocation(slot, "", "", null, "", false, "")
-        }
+        prefs.replaceHomeApps(
+            next.map { app ->
+                HomeAppSlot(
+                    label = app.label,
+                    packageName = app.packageName,
+                    activityClassName = app.activityClassName,
+                    userString = app.userString,
+                    isShortcut = app.isShortcut,
+                    shortcutId = app.shortcutId
+                )
+            },
+            cap
+        )
         onHomeAppsChanged()
     }
 
@@ -999,12 +1018,12 @@ private fun dispatchSwipeAction(
     direction: String,
     action: String,
     context: android.content.Context,
+    prefs: Prefs,
     onSummary: () -> Unit,
     onWidgets: () -> Unit,
     onNotes: () -> Unit,
     onNotifications: () -> Unit
 ) {
-    val prefs = com.knownassurajit.app.launcher.voidlauncher.data.Prefs(context)
     when (action) {
         com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
             if (prefs.enableNotificationSummary) onSummary()
