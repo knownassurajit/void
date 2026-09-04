@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -76,10 +79,11 @@ import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
 fun AppDrawerScreen(
     onBack: () -> Unit,
     onAppClick: (AppModel) -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    privateSpacePlacement: String = Prefs.PrivateSpacePlacement.BOTTOM
 ) {
     val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = remember { Prefs.get(context) }
     val scope = rememberCoroutineScope()
 
     var searchQuery by remember { mutableStateOf("") }
@@ -164,28 +168,36 @@ fun AppDrawerScreen(
         }
     }
 
-    val filteredApps = remember(searchQuery, allApps) {
-        val list = allApps.toList().filterNot { PrivateSpaceHelper.isAddEntry(it) }
-        val collator = Collator.getInstance()
-        val sorted = list.sortedWith(compareBy(collator) { it.appLabel })
-        if (searchQuery.isBlank()) sorted
-        else sorted.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
+    val privateInSearchBar = privateSpacePlacement == Prefs.PrivateSpacePlacement.SEARCH_BAR
+    val filteredApps by remember {
+        derivedStateOf {
+            val list = allApps.toList().filterNot { PrivateSpaceHelper.isAddEntry(it) }
+            val collator = Collator.getInstance()
+            val sorted = list.sortedWith(compareBy(collator) { it.appLabel })
+            if (searchQuery.isBlank()) sorted
+            else sorted.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
+        }
     }
-
-    val filteredPrivateApps = remember(searchQuery, privateApps.toList()) {
-        val list = privateApps.toList()
-        if (searchQuery.isBlank()) list
-        else list.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
+    val filteredPrivateApps by remember {
+        derivedStateOf {
+            val list = privateApps.toList()
+            if (searchQuery.isBlank()) list
+            else list.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
+        }
     }
-
-    val showPrivateSpaceInSearch = remember(searchQuery, hasPrivateSpace) {
-        hasPrivateSpace && searchQuery.isNotBlank() &&
+    val showPrivateSpaceInSearch by remember {
+        derivedStateOf {
+            hasPrivateSpace && searchQuery.isNotBlank() &&
                 "private space".contains(searchQuery, ignoreCase = true)
+        }
+    }
+    val groupedApps by remember {
+        derivedStateOf {
+            filteredApps.groupBy { it.appLabel.firstOrNull()?.uppercase() ?: "#" }.toSortedMap()
+        }
     }
 
-    val groupedApps = remember(filteredApps) {
-        filteredApps.groupBy { it.appLabel.firstOrNull()?.uppercase() ?: "#" }.toSortedMap()
-    }
+    ChildScreenBackHandler(onBack)
 
     Box(
         modifier = Modifier
@@ -193,13 +205,26 @@ fun AppDrawerScreen(
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
             .imePadding()
+            .screenBackSwipe(onBack)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             AppDrawerSearchBar(
                 searchQuery = searchQuery,
                 onSearchQueryChange = { searchQuery = it },
                 focusRequester = focusRequester,
-                onOpenSettings = onOpenSettings
+                onOpenSettings = onOpenSettings,
+                showPrivateSpaceControls = privateInSearchBar && hasPrivateSpace && prefs.privateSpaceEnabled,
+                isPrivateSpaceLocked = isPrivateSpaceLocked,
+                onTogglePrivateSpace = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        PrivateSpaceHelper.togglePrivateSpace(context)
+                        isPrivateSpaceLocked = !isPrivateSpaceLocked
+                    }
+                },
+                onOpenPrivateSpaceSettings = {
+                    val addEntry = privateApps.firstOrNull { PrivateSpaceHelper.isAddEntry(it) }
+                    if (addEntry != null) onAppClick(addEntry)
+                }
             )
 
             LaunchedEffect(Unit) {
@@ -225,6 +250,7 @@ fun AppDrawerScreen(
                 filteredPrivateApps = filteredPrivateApps,
                 privateSpaceEnabled = prefs.privateSpaceEnabled,
                 appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
+                showBottomPrivateHeader = !privateInSearchBar,
                 onAppClick = onAppClick,
                 onTogglePrivateSpace = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
@@ -251,7 +277,11 @@ private fun AppDrawerSearchBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     focusRequester: FocusRequester,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    showPrivateSpaceControls: Boolean,
+    isPrivateSpaceLocked: Boolean,
+    onTogglePrivateSpace: () -> Unit,
+    onOpenPrivateSpaceSettings: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -286,6 +316,25 @@ private fun AppDrawerSearchBar(
                     color = MaterialTheme.colorScheme.onSurface
                 )
             )
+            if (showPrivateSpaceControls) {
+                IconButton(onClick = onTogglePrivateSpace) {
+                    Icon(
+                        imageVector = if (isPrivateSpaceLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
+                        contentDescription = stringResource(
+                            if (isPrivateSpaceLocked) R.string.unlock_private_space
+                            else R.string.lock_private_space
+                        ),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onOpenPrivateSpaceSettings) {
+                    Icon(
+                        imageVector = Icons.Outlined.Shield,
+                        contentDescription = stringResource(R.string.private_space_settings),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             IconButton(onClick = onOpenSettings) {
                 Icon(
                     imageVector = Icons.Outlined.Settings,
@@ -308,6 +357,7 @@ private fun ColumnScope.AppDrawerAppList(
     filteredPrivateApps: List<AppModel>,
     privateSpaceEnabled: Boolean,
     appDrawerTextSizeScale: Float,
+    showBottomPrivateHeader: Boolean,
     onAppClick: (AppModel) -> Unit,
     onTogglePrivateSpace: () -> Unit
 ) {
@@ -358,6 +408,7 @@ private fun ColumnScope.AppDrawerAppList(
         }
 
         if (showPrivateSection) {
+            if (showBottomPrivateHeader) {
             item(key = "private_divider") {
                 VoidSectionDivider()
             }
@@ -400,6 +451,7 @@ private fun ColumnScope.AppDrawerAppList(
                         }
                     }
                 }
+            }
             }
             if (!isPrivateSpaceLocked) {
                 itemsIndexed(

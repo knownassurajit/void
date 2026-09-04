@@ -14,7 +14,11 @@
 | App / clock alignment | gravity prefs | H/V gravity |
 | App spacing | `APP_SPACING_DP` | Spacing between labels |
 | Text scales | home/drawer scales | Typography |
-| Swipe down for notifications | `ENABLE_SWIPE_DOWN_NOTIFICATIONS` | Opens the in-app notification list (needs listener access) |
+| Max home apps | `MAX_HOME_APPS` (+ legacy `HOME_APPS_NUM`) | Unified by `HomeAppsCap`; missing keys use filled slots then 10 |
+| App font | `APP_FONT` | Bundled families via `VoidAppTheme` (default `google_sans`) |
+| Animation speed | `ANIMATION_SPEED` | `fast` / `standard` / `slow` |
+| Swipe to go back | `CONTENT_SWIPE_TO_BACK` | Child screens swipe opposite the enter axis |
+| Private Space placement | `PRIVATE_SPACE_PLACEMENT` | `bottom` or `search_bar` (API 35+) |
 
 ## Responsive reflow
 

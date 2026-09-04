@@ -12,6 +12,7 @@ import android.os.Process
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import android.app.usage.UsageStatsManager
+import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppsCap
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +42,7 @@ data class MainUiState(
     val showScreenTime: Boolean = true,
     val showHomeApps: Boolean = true,
     val showStatusBar: Boolean = false,
-    val homeAppsCount: Int = 4,
+    val homeAppsCount: Int = HomeAppsCap.DEFAULT,
     val leftSwipeAction: String = SwipeAction.NOTIFICATION_SUMMARY,
     val rightSwipeAction: String = SwipeAction.WIDGETS,
     val clockSectionWeight: Float = 0.35f,
@@ -54,9 +55,12 @@ data class MainUiState(
     val appSpacingDp: Float = 16f,
     val enableGestures: Boolean = true,
     val enableSwipeDownNotifications: Boolean = true,
-    val appFont: String = "inter",
+    val appFont: String = "google_sans",
     val use24HourClock: Boolean = false,
-    val showSeconds: Boolean = false
+    val showSeconds: Boolean = false,
+    val animationSpeed: String = Prefs.AnimationSpeed.STANDARD,
+    val contentSwipeToBack: Boolean = true,
+    val privateSpacePlacement: String = Prefs.PrivateSpacePlacement.BOTTOM
 )
 
 data class HomeApp(
@@ -78,7 +82,7 @@ data class HomeApp(
  */
 class MainUiViewModel(application: Application) : AndroidViewModel(application) {
     private val appContext = application.applicationContext
-    private val prefs = Prefs(appContext)
+    private val prefs = Prefs.get(appContext)
 
     private val _uiState = MutableStateFlow(
         MainUiState(
@@ -131,9 +135,11 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
 
         // Register battery receiver
         try {
-            appContext.registerReceiver(
+            androidx.core.content.ContextCompat.registerReceiver(
+                appContext,
                 batteryReceiver,
-                IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
             )
         } catch (_: Exception) {}
 
@@ -151,8 +157,11 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
 
         // Observe pref changes — fully reactive propagation
         viewModelScope.launch {
+            var lastMaxApps = -1
             prefs.homescreenPreferences.collect { hsPrefs ->
-                val apps = loadHomeApps(hsPrefs.maxApps)
+                val reloadApps = HomeAppsCap.shouldReloadHomeApps(lastMaxApps, hsPrefs.maxApps)
+                lastMaxApps = hsPrefs.maxApps
+                val apps = if (reloadApps) loadHomeApps(hsPrefs.maxApps) else _uiState.value.homeApps
                 _uiState.update {
                     it.copy(
                         clockHorizontalAlignment = hsPrefs.clockHorizontalAlignment,
@@ -180,7 +189,10 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
                         enableSwipeDownNotifications = hsPrefs.enableSwipeDownNotifications,
                         appFont = hsPrefs.appFont,
                         use24HourClock = hsPrefs.use24HourClock,
-                        showSeconds = hsPrefs.showSeconds
+                        showSeconds = hsPrefs.showSeconds,
+                        animationSpeed = hsPrefs.animationSpeed,
+                        contentSwipeToBack = hsPrefs.contentSwipeToBack,
+                        privateSpacePlacement = hsPrefs.privateSpacePlacement
                     )
                 }
                 // Re-format time immediately when format changes
@@ -253,6 +265,9 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
                 enableSwipeDownNotifications = prefs.enableSwipeDownNotifications,
                 appFont = prefs.appFont,
                 use24HourClock = prefs.use24HourClock,
+                animationSpeed = prefs.animationSpeed,
+                contentSwipeToBack = prefs.contentSwipeToBack,
+                privateSpacePlacement = prefs.privateSpacePlacement
             )
         }
     }

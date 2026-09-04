@@ -5,16 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.spring
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -32,8 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -49,6 +41,9 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotificationSummar
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotificationsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.SettingsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.WidgetsScreen
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeToBack
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalNavEnterAxis
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavMotion
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
 
 import androidx.lifecycle.lifecycleScope
@@ -145,7 +140,7 @@ class MainActivity : ComponentActivity() {
                 val notifications by NotificationService.notificationsState
                     .collectAsStateWithLifecycle(initialValue = emptyList())
                 val allowTopEdgeNotificationExpansion =
-                    uiState.showStatusBar && (currentBackStackEntry?.isRoute("HomeRoute") == true)
+                    uiState.showStatusBar && (currentBackStackEntry.routeName() == "HomeRoute")
 
                 LaunchedEffect(uiState.showStatusBar) {
                     val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
@@ -158,42 +153,86 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val motionMs = NavMotion.durationMs(uiState.animationSpeed)
+                val leftRoute = actionToRouteName(uiState.leftSwipeAction)
+                val rightRoute = actionToRouteName(uiState.rightSwipeAction)
+                val currentRouteName = currentBackStackEntry.routeName()
+                val currentAxis = NavMotion.axisForDestination(currentRouteName, leftRoute, rightRoute)
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(uiState.showStatusBar) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(pass = PointerEventPass.Initial)
-                                val isTopEdge = down.position.y < size.height * 0.1f
-                                var totalY = 0f
-                                var totalX = 0f
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    val change = event.changes.firstOrNull() ?: break
-                                    val deltaX = change.position.x - change.previousPosition.x
-                                    val deltaY = change.position.y - change.previousPosition.y
-                                    totalX += deltaX
-                                    totalY += deltaY
-                                    if (uiState.showStatusBar && isTopEdge && totalY > 120f) {
-                                        StatusBarPanelOpener.expandNotificationsPanel(this@MainActivity)
-                                        break
+                        .then(
+                            if (allowTopEdgeNotificationExpansion) {
+                                Modifier.pointerInput(statusBarHeightDp) {
+                                    val topEdgePx = statusBarHeightDp.toPx() * 1.5f
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(pass = PointerEventPass.Initial)
+                                        if (down.position.y >= topEdgePx) {
+                                            return@awaitEachGesture
+                                        }
+                                        var totalY = 0f
+                                        while (true) {
+                                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                                            val change = event.changes.firstOrNull() ?: break
+                                            totalY += change.position.y - change.previousPosition.y
+                                            if (totalY > 120f) {
+                                                StatusBarPanelOpener.expandNotificationsPanel(this@MainActivity)
+                                                break
+                                            }
+                                            if (!change.pressed) break
+                                        }
                                     }
-                                    if (!change.pressed) break
                                 }
+                            } else {
+                                Modifier
                             }
-                        }
+                        )
                 ) {
+                    CompositionLocalProvider(
+                        LocalNavEnterAxis provides currentAxis,
+                        LocalContentSwipeToBack provides uiState.contentSwipeToBack
+                    ) {
                     NavHost(
                         navController = navController,
                         startDestination = HomeRoute,
-                        enterTransition = { directionEnter(initialState, targetState, uiState) },
-                        exitTransition = { fadeOut(animationSpec = tween(160)) },
-                        popEnterTransition = { fadeIn(animationSpec = tween(160)) },
-                        popExitTransition = { directionExit(initialState, targetState, uiState) }
+                        enterTransition = {
+                            val axis = NavMotion.axisForDestination(
+                                targetState.routeName(),
+                                leftRoute,
+                                rightRoute
+                            )
+                            NavMotion.enter(axis, motionMs)
+                        },
+                        exitTransition = {
+                            val axis = NavMotion.axisForDestination(
+                                targetState.routeName(),
+                                leftRoute,
+                                rightRoute
+                            )
+                            NavMotion.exit(axis, motionMs)
+                        },
+                        popEnterTransition = {
+                            val axis = NavMotion.axisForDestination(
+                                initialState.routeName(),
+                                leftRoute,
+                                rightRoute
+                            )
+                            NavMotion.popEnter(axis, motionMs)
+                        },
+                        popExitTransition = {
+                            val axis = NavMotion.axisForDestination(
+                                initialState.routeName(),
+                                leftRoute,
+                                rightRoute
+                            )
+                            NavMotion.popExit(axis, motionMs)
+                        }
                     ) {
                         composable<HomeRoute> {
                             HomeScreen(
                                 state = uiState,
+                                isCurrentDestination = currentRouteName == "HomeRoute",
                                 onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
                                 onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
                                 onOpenNotifications = {
@@ -214,7 +253,8 @@ class MainActivity : ComponentActivity() {
                             onAppClick = { app ->
                                 mainViewModel.selectedApp(app, com.knownassurajit.app.launcher.voidlauncher.data.Constants.FLAG_LAUNCH_APP)
                             },
-                            onOpenSettings = { navController.navigate(SettingsRoute) }
+                            onOpenSettings = { navController.navigate(SettingsRoute) },
+                            privateSpacePlacement = uiState.privateSpacePlacement
                         )
                     }
                     composable<SettingsRoute> {
@@ -241,6 +281,7 @@ class MainActivity : ComponentActivity() {
                     }
                     composable<NotesRoute> {
                         NotesScreen(onBack = { navController.popBackStack() })
+                    }
                     }
                     }
                 }
@@ -284,56 +325,17 @@ class MainActivity : ComponentActivity() {
 
 }
 
-private fun navigateHome(navController: NavHostController) {
-    navController.navigate(HomeRoute) {
-        launchSingleTop = true
-        popUpTo(HomeRoute) { inclusive = false }
-    }
-}
-
-// ── Direction-aware transitions ──
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.directionEnter(
-    initialState: NavBackStackEntry,
-    targetState: NavBackStackEntry,
-    uiState: MainUiState
-): androidx.compose.animation.EnterTransition {
-    val leftRoute = actionToRouteName(uiState.leftSwipeAction)
-    val rightRoute = actionToRouteName(uiState.rightSwipeAction)
-
+private fun NavBackStackEntry?.routeName(): String {
+    val route = this?.destination?.route.orEmpty()
     return when {
-        targetState.isRoute("AppDrawerRoute") ->
-            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Up, tween(280)) + fadeIn(tween(220))
-        targetState.isRoute("NotificationPanelRoute") ->
-            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Down, tween(280)) + fadeIn(tween(220))
-        // We only evaluate swipe-driven horizontal transitions when the swipe action actually maps
-        // to a supported route. This avoids accidentally matching everything when the action is unsupported.
-        leftRoute != null && targetState.isRoute(leftRoute) ->
-            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(280)) + fadeIn(tween(220))
-        rightRoute != null && targetState.isRoute(rightRoute) ->
-            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(280)) + fadeIn(tween(220))
-        else -> fadeIn(animationSpec = tween(200))
-    }
-}
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.directionExit(
-    initialState: NavBackStackEntry,
-    targetState: NavBackStackEntry,
-    uiState: MainUiState
-): androidx.compose.animation.ExitTransition {
-    val leftRoute = actionToRouteName(uiState.leftSwipeAction)
-    val rightRoute = actionToRouteName(uiState.rightSwipeAction)
-
-    return when {
-        initialState.isRoute("AppDrawerRoute") ->
-            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Down, tween(260)) + fadeOut(tween(200))
-        initialState.isRoute("NotificationPanelRoute") ->
-            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Up, tween(260)) + fadeOut(tween(200))
-        leftRoute != null && initialState.isRoute(leftRoute) ->
-            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(260)) + fadeOut(tween(200))
-        rightRoute != null && initialState.isRoute(rightRoute) ->
-            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(260)) + fadeOut(tween(200))
-        else -> fadeOut(animationSpec = tween(200))
+        route.contains("AppDrawerRoute") -> "AppDrawerRoute"
+        route.contains("NotificationPanelRoute") -> "NotificationPanelRoute"
+        route.contains("NotificationSummaryRoute") -> "NotificationSummaryRoute"
+        route.contains("WidgetsRoute") -> "WidgetsRoute"
+        route.contains("NotesRoute") -> "NotesRoute"
+        route.contains("SettingsRoute") -> "SettingsRoute"
+        route.contains("HomeRoute") -> "HomeRoute"
+        else -> route.substringBefore("?").substringAfterLast('.')
     }
 }
 
@@ -346,9 +348,4 @@ private fun actionToRouteName(action: String): String? = when (action) {
     }
     com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> "NotesRoute"
     else -> null
-}
-
-private fun NavBackStackEntry.isRoute(name: String?): Boolean {
-    if (name.isNullOrBlank()) return false
-    return destination.route?.contains(name) == true
 }

@@ -34,7 +34,8 @@
 - **Deep Android 15 Integration**: Full support for Private Space, allowing you to access hidden and secure apps directly from the drawer.
 - **Digital Wellbeing**: Screen time and unlock counts are integrated directly into the home screen for at-a-glance awareness.
 - **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions.
-- **Modern UI**: Built with 100% Jetpack Compose and Material 3, providing smooth animations and dynamic theme support.
+- **Modern UI**: Built with 100% Jetpack Compose and Material 3. Bundled sans fonts (Google Sans default, Inter, Plus Jakarta Sans, Manrope, DM Sans) apply through `VoidAppTheme`.
+- **Searchable settings**: Grouped Look / Home / App library / Gestures & motion / Features / Permissions, with animation speed and content swipe-to-back.
 
 ---
 

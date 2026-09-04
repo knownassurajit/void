@@ -57,6 +57,8 @@ import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteItem
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteRepository
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -77,11 +79,14 @@ fun NotesScreen(onBack: () -> Unit) {
         notes.addAll(repo.getAllNotes())
     }
 
+    ChildScreenBackHandler(onBack)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
+            .screenBackSwipe(onBack, conflictSafe = true)
     ) {
         Column(
             modifier = Modifier

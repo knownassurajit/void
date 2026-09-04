@@ -1,5 +1,6 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 
 object VoidMotion {
@@ -8,4 +9,6 @@ object VoidMotion {
     const val slowMs = 400
 
     fun <T> standard() = tween<T>(durationMillis = standardMs)
+
+    fun <T> slideSpec(durationMs: Int): FiniteAnimationSpec<T> = tween(durationMillis = durationMs)
 }
