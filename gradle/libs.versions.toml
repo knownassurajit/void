@@ -48,7 +48,7 @@ kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-cor
 # Test
 junit = "junit:junit:4.13.2"
 androidx-junit = "androidx.test.ext:junit:1.2.1"
-espresso-core = "androidx.test.espresso:espresso-core:3.6.1"
+espresso-core = "androidx.test.espresso:espresso-core:3.7.0"
 compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 
