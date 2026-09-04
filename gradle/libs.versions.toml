@@ -1,5 +1,5 @@
 [versions]
-agp = "8.9.2"
+agp = "9.2.1"
 coreKtx = "1.16.0"
 kotlinStdlib = "2.4.10"
 lifecycleViewmodelKtx = "2.9.0"
