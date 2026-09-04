@@ -13,7 +13,7 @@ googleFonts = "1.10.6"
 profileinstaller = "1.4.1"
 mlkitSummarization = "1.0.0-beta1"
 mlkitPrompt = "1.0.0-beta2"
-coroutinesPlayServices = "1.10.2"
+coroutinesPlayServices = "1.11.0"
 
 [libraries]
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
