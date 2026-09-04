@@ -26,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -45,8 +44,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -56,50 +53,18 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.view.Gravity
-import androidx.compose.foundation.background
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.runtime.mutableIntStateOf
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteItem
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteRepository
-import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
-import com.knownassurajit.app.launcher.voidlauncher.ui.components.dismissDirection
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
-import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeAxis
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalPanelEdge
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
-
-/**
- * Whether a note row is deleted by a swipe from the start side to the end side (`true`), or from
- * the end side to the start side. Deleting is permanent, so it must never be the swipe that closes
- * Notes (toward the edge the panel came from): a row consumes the drag first, so closing Notes with
- * a finger over a note would delete the note. The panel from the left edge closes with a swipe left,
- * so there a note is deleted with a swipe right; everywhere else it is a swipe left, as before.
- * [rtl] is the layout direction, because "start" and "end" flip with it while the closing swipe is
- * physical (see [dismissDirection]).
- */
-internal fun noteDeleteFromStartToEnd(edge: PanelEdge, rtl: Boolean): Boolean {
-    val closing = dismissDirection(edge)
-    val closesWithASwipeLeft = closing.axis == SwipeAxis.Horizontal && closing.sign < 0
-    // A swipe right deletes only when a swipe left closes. Swiping right is start to end in LTR, end to start in RTL.
-    return closesWithASwipeLeft != rtl
-}
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun NotesScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val deleteFromStartToEnd = noteDeleteFromStartToEnd(
-        edge = LocalPanelEdge.current,
-        rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    )
-    val prefs = remember { Prefs.get(context) }
-    var notesTitleAlignment by remember { mutableIntStateOf(prefs.notesTitleAlignment) }
     val repo = remember { NoteRepository(context) }
     val notes = remember { mutableStateListOf<NoteItem>() }
     var newNoteText by remember { mutableStateOf("") }
@@ -114,42 +79,25 @@ fun NotesScreen(onBack: () -> Unit) {
         notes.addAll(repo.getAllNotes())
     }
 
+    ChildScreenBackHandler(onBack)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
-            .screenBackSwipe(onBack)
+            .screenBackSwipe(onBack, conflictSafe = true)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = when (notesTitleAlignment) {
-                    Gravity.CENTER_HORIZONTAL -> Arrangement.Center
-                    Gravity.END -> Arrangement.End
-                    else -> Arrangement.Start
-                }
-            ) {
-                Text(
-                    text = stringResource(R.string.notes_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.clickable {
-                        val next = when (notesTitleAlignment) {
-                            Gravity.START -> Gravity.CENTER_HORIZONTAL
-                            Gravity.CENTER_HORIZONTAL -> Gravity.END
-                            else -> Gravity.START
-                        }
-                        notesTitleAlignment = next
-                        prefs.notesTitleAlignment = next
-                    }
-                )
-            }
+            Text(
+                text = stringResource(R.string.notes_title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             VoidSectionDivider(modifier = Modifier.padding(vertical = VoidDimens.rowSpacing))
             OutlinedTextField(
                 value = newNoteText,
@@ -230,24 +178,20 @@ fun NotesScreen(onBack: () -> Unit) {
 
                         SwipeToDismissBox(
                             state = dismissState,
-                            enableDismissFromStartToEnd = deleteFromStartToEnd,
-                            enableDismissFromEndToStart = !deleteFromStartToEnd,
+                            enableDismissFromStartToEnd = false,
+                            enableDismissFromEndToStart = true,
                             backgroundContent = {
-                                val isDeleting = dismissState.targetValue != SwipeToDismissBoxValue.Settled
-                                val bgColor = if (isDeleting) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(alpha = 0.25f)
-                                val iconColor = if (isDeleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.error
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(bgColor, MaterialTheme.shapes.small)
-                                        .padding(horizontal = 16.dp),
-                                    contentAlignment = if (deleteFromStartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                                        .padding(horizontal = 8.dp),
+                                    contentAlignment = Alignment.CenterEnd
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Filled.Delete,
+                                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
                                         contentDescription = stringResource(R.string.swipe_to_delete),
-                                        tint = iconColor,
-                                        modifier = Modifier.size(24.dp)
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
                             }
@@ -256,10 +200,6 @@ fun NotesScreen(onBack: () -> Unit) {
                                 note = note,
                                 onToggle = {
                                     repo.toggleComplete(note.id)
-                                    refreshNotes()
-                                },
-                                onToggleStar = {
-                                    repo.toggleStarred(note.id)
                                     refreshNotes()
                                 }
                             )
@@ -273,11 +213,7 @@ fun NotesScreen(onBack: () -> Unit) {
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteRow(
-    note: NoteItem,
-    onToggle: () -> Unit,
-    onToggleStar: () -> Unit
-) {
+private fun NoteRow(note: NoteItem, onToggle: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { NoteRepository(context) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -346,8 +282,16 @@ private fun NoteRow(
                         alarmManager.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pending)
                     } catch (_: Exception) {}
 
-                    // Use Google Tasks as default reminder if available for starred tasks, calendar as secondary
-                    launchReminderApp(context, note, triggerTime)
+                    // Insert calendar event via intent (transparent to user)
+                    try {
+                        val calIntent = Intent(Intent.ACTION_INSERT).apply {
+                            data = android.provider.CalendarContract.Events.CONTENT_URI
+                            putExtra(android.provider.CalendarContract.Events.TITLE, note.text)
+                            putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, triggerTime)
+                            putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, triggerTime + 30 * 60 * 1000)
+                        }
+                        context.startActivity(calIntent)
+                    } catch (_: Exception) {}
 
                     showTimePicker = false
                 }) { Text(stringResource(R.string.set_reminder)) }
@@ -401,63 +345,6 @@ private fun NoteRow(
                 )
             }
         }
-
-        IconButton(
-            onClick = onToggleStar,
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                imageVector = if (note.isStarred) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = if (note.isStarred) "Starred" else "Star",
-                tint = if (note.isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(20.dp)
-            )
-        }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
-}
-
-private fun launchReminderApp(context: android.content.Context, note: NoteItem, triggerTime: Long) {
-    var launched = false
-    if (note.isStarred) {
-        val tasksPackages = listOf(
-            "com.google.android.apps.tasks",
-            "com.google.adnroid.app.tasks"
-        )
-        for (pkg in tasksPackages) {
-            try {
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    setPackage(pkg)
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, note.text)
-                    putExtra(Intent.EXTRA_TITLE, note.text)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                if (intent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(intent)
-                    launched = true
-                    break
-                }
-                val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
-                if (launchIntent != null) {
-                    context.startActivity(launchIntent)
-                    launched = true
-                    break
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    if (!launched) {
-        try {
-            val calIntent = Intent(Intent.ACTION_INSERT).apply {
-                data = android.provider.CalendarContract.Events.CONTENT_URI
-                putExtra(android.provider.CalendarContract.Events.TITLE, note.text)
-                putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, triggerTime)
-                putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, triggerTime + 30 * 60 * 1000)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            context.startActivity(calIntent)
-        } catch (_: Exception) {}
-    }
 }

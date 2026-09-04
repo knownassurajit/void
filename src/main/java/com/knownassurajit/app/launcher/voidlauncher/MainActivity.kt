@@ -6,9 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -26,12 +24,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.compose.currentStateAsState
 import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavController
-import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -40,7 +34,6 @@ import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.helper.NotificationService
 import com.knownassurajit.app.launcher.voidlauncher.helper.getUserHandleFromString
 import com.knownassurajit.app.launcher.voidlauncher.helper.openCalendar
-import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.homeSwipeGate
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.AppDrawerScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.HomeScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotesScreen
@@ -49,14 +42,9 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotificationsScree
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.SettingsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.WidgetsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeToBack
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalNavEnterAxis
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavMotion
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavPanel
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelOrigin
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.shouldPopPanel
 
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -151,9 +139,8 @@ class MainActivity : ComponentActivity() {
                 val currentBackStackEntry by navController.currentBackStackEntryAsState()
                 val notifications by NotificationService.notificationsState
                     .collectAsStateWithLifecycle(initialValue = emptyList())
-                val currentRoute = currentBackStackEntry.routeKind()
                 val allowTopEdgeNotificationExpansion =
-                    uiState.showStatusBar && (currentRoute == NavRouteKind.Home)
+                    uiState.showStatusBar && (currentBackStackEntry.routeName() == "HomeRoute")
 
                 LaunchedEffect(uiState.showStatusBar) {
                     val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
@@ -166,22 +153,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val motion = rememberVoidMotionScheme(uiState.animationSpeed)
-                val predictiveBackEdgeMarginPx = with(density) { VoidDimens.predictiveBackEdgeMargin.toPx() }
-
-                // Settings writes its preferences straight to Prefs, so Home reads them again whenever
-                // Settings is left: by its own back arrow, the Back key, TalkBack, a swipe or the
-                // system back gesture (which no longer passes through a callback of the screen).
-                LaunchedEffect(Unit) {
-                    var previousRoute: NavRouteKind? = null
-                    snapshotFlow { currentBackStackEntry.routeKind() }.collect { route ->
-                        if (NavRouteKind.settingsClosed(previousRoute, route)) viewModel.refreshFromPrefs()
-                        previousRoute = route
-                    }
-                }
-                val leftRoute = NavRouteKind.forSwipeAction(uiState.leftSwipeAction)
-                val rightRoute = NavRouteKind.forSwipeAction(uiState.rightSwipeAction)
-                fun edgeOf(route: NavRouteKind?) = PanelOrigin.resolve(route, leftRoute, rightRoute)
+                val motionMs = NavMotion.durationMs(uiState.animationSpeed)
+                val leftRoute = actionToRouteName(uiState.leftSwipeAction)
+                val rightRoute = actionToRouteName(uiState.rightSwipeAction)
+                val currentRouteName = currentBackStackEntry.routeName()
+                val currentAxis = NavMotion.axisForDestination(currentRouteName, leftRoute, rightRoute)
 
                 Box(
                     modifier = Modifier
@@ -214,104 +190,97 @@ class MainActivity : ComponentActivity() {
                         )
                 ) {
                     CompositionLocalProvider(
+                        LocalNavEnterAxis provides currentAxis,
                         LocalContentSwipeToBack provides uiState.contentSwipeToBack
                     ) {
-                    // All four transitions are keyed on the PANEL, the screen opening or closing:
-                    // targetState on a push, initialState on a pop. The screen under the panel
-                    // plays exit/popEnter with the panel's edge so both layers move together.
                     NavHost(
                         navController = navController,
                         startDestination = HomeRoute,
-                        enterTransition = { NavMotion.enter(edgeOf(targetState.routeKind()), motion) },
-                        exitTransition = { NavMotion.exit(edgeOf(targetState.routeKind()), motion) },
-                        popEnterTransition = { NavMotion.popEnter(edgeOf(initialState.routeKind()), motion) },
-                        popExitTransition = { NavMotion.popExit(edgeOf(initialState.routeKind()), motion) },
-                        // The system back gesture (Android 14+) plays the Material predictive-back
-                        // animation for every route, and so does a Back key press that lasts longer
-                        // than a frame (the platform starts the same predictive back for it, with
-                        // the left edge, and the lambdas cannot tell them apart). API 26-33 and
-                        // in-app pops (the back arrow, a swipe in a panel, TalkBack's Dismiss) play
-                        // the pop pair above.
-                        predictivePopEnterTransition = { NavMotion.predictivePopEnter(motion) },
-                        predictivePopExitTransition = { swipeEdge ->
-                            NavMotion.predictivePopExit(swipeEdge, motion, predictiveBackEdgeMarginPx)
+                        enterTransition = {
+                            val axis = NavMotion.axisForDestination(
+                                targetState.routeName(),
+                                leftRoute,
+                                rightRoute
+                            )
+                            NavMotion.enter(axis, motionMs)
+                        },
+                        exitTransition = {
+                            val axis = NavMotion.axisForDestination(
+                                targetState.routeName(),
+                                leftRoute,
+                                rightRoute
+                            )
+                            NavMotion.exit(axis, motionMs)
+                        },
+                        popEnterTransition = {
+                            val axis = NavMotion.axisForDestination(
+                                initialState.routeName(),
+                                leftRoute,
+                                rightRoute
+                            )
+                            NavMotion.popEnter(axis, motionMs)
+                        },
+                        popExitTransition = {
+                            val axis = NavMotion.axisForDestination(
+                                initialState.routeName(),
+                                leftRoute,
+                                rightRoute
+                            )
+                            NavMotion.popExit(axis, motionMs)
                         }
                     ) {
-                        composable<HomeRoute> { homeEntry ->
-                            // What the navigation controller says about this entry, read here and
-                            // not captured from the outer composition (the builder lambda of the graph
-                            // is not necessarily called again for a destination that is composed):
-                            // on top of the back stack, and resumed once no transition moves it any
-                            // more. A swipe that starts while a panel is still leaving would stack a
-                            // second panel on top.
-                            val topEntry by navController.currentBackStackEntryFlow.collectAsState(navController.currentBackStackEntry)
-                            val homeLifecycle by homeEntry.lifecycle.currentStateAsState()
+                        composable<HomeRoute> {
                             HomeScreen(
                                 state = uiState,
-                                swipeGate = homeSwipeGate(
-                                    isOnTop = topEntry?.id == homeEntry.id,
-                                    isResumed = homeLifecycle.isAtLeast(Lifecycle.State.RESUMED)
-                                ),
+                                isCurrentDestination = currentRouteName == "HomeRoute",
                                 onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
                                 onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
                                 onOpenNotifications = {
-                                    StatusBarPanelOpener.expandNotificationsPanel(this@MainActivity)
+                                    navController.navigate(NotificationPanelRoute) { launchSingleTop = true }
                                 },
                                 onOpenNotificationSummary = { navController.navigate(NotificationSummaryRoute) { launchSingleTop = true } },
                                 onOpenWidgets = { navController.navigate(WidgetsRoute) { launchSingleTop = true } },
                                 onOpenNotes = { navController.navigate(NotesRoute) { launchSingleTop = true } },
-                                onLaunchSwipeApp = { packageName, enterFrom ->
-                                    mainViewModel.launchSwipeApp(packageName, enterFrom)
-                                },
                                 onAppClick = { app -> launchHomeApp(app) },
                                 onClockClick = { mainViewModel.setDefaultClockApp() },
                                 onDateClick = { openCalendar(this@MainActivity) },
                                 onHomeAppsChanged = { viewModel.refreshFromPrefs() }
                             )
                         }
-                    composable<AppDrawerRoute> { backStackEntry ->
-                        NavPanel(edgeOf(NavRouteKind.AppDrawer)) {
-                            AppDrawerScreen(
-                                onBack = { navController.popPanel(backStackEntry) },
-                                onAppClick = { app ->
-                                    mainViewModel.selectedApp(app, com.knownassurajit.app.launcher.voidlauncher.data.Constants.FLAG_LAUNCH_APP)
-                                },
-                                onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
-                                privateSpacePlacement = uiState.privateSpacePlacement
-                            )
-                        }
+                    composable<AppDrawerRoute> {
+                        AppDrawerScreen(
+                            onBack = { navController.popBackStack() },
+                            onAppClick = { app ->
+                                mainViewModel.selectedApp(app, com.knownassurajit.app.launcher.voidlauncher.data.Constants.FLAG_LAUNCH_APP)
+                            },
+                            onOpenSettings = { navController.navigate(SettingsRoute) },
+                            privateSpacePlacement = uiState.privateSpacePlacement
+                        )
                     }
-                    composable<SettingsRoute> { backStackEntry ->
-                        NavPanel(edgeOf(NavRouteKind.Settings)) {
-                            SettingsScreen(onBack = { navController.popPanel(backStackEntry) })
-                        }
+                    composable<SettingsRoute> {
+                        SettingsScreen(onBack = {
+                            viewModel.refreshFromPrefs()
+                            navController.popBackStack()
+                        })
                     }
-                    composable<NotificationPanelRoute> { backStackEntry ->
-                        NavPanel(edgeOf(NavRouteKind.NotificationPanel)) {
-                            NotificationsScreen(
-                                notifications = notifications,
-                                onBack = { navController.popPanel(backStackEntry) }
-                            )
-                        }
+                    composable<NotificationPanelRoute> {
+                        NotificationsScreen(
+                            notifications = notifications,
+                            onBack = { navController.popBackStack() }
+                        )
                     }
-                    composable<NotificationSummaryRoute> { backStackEntry ->
-                        NavPanel(edgeOf(NavRouteKind.NotificationSummary)) {
-                            NotificationSummaryScreen(
-                                onBack = { navController.popPanel(backStackEntry) }
-                            )
-                        }
+                    composable<NotificationSummaryRoute> {
+                        NotificationSummaryScreen(
+                            onBack = { navController.popBackStack() }
+                        )
                     }
-                    composable<WidgetsRoute> { backStackEntry ->
-                        NavPanel(edgeOf(NavRouteKind.Widgets)) {
-                            WidgetsScreen(
-                                onBack = { navController.popPanel(backStackEntry) }
-                            )
-                        }
+                    composable<WidgetsRoute> {
+                        WidgetsScreen(
+                            onBack = { navController.popBackStack() }
+                        )
                     }
-                    composable<NotesRoute> { backStackEntry ->
-                        NavPanel(edgeOf(NavRouteKind.Notes)) {
-                            NotesScreen(onBack = { navController.popPanel(backStackEntry) })
-                        }
+                    composable<NotesRoute> {
+                        NotesScreen(onBack = { navController.popBackStack() })
                     }
                     }
                     }
@@ -356,28 +325,27 @@ class MainActivity : ComponentActivity() {
 
 }
 
-/**
- * Closes [panel], the screen the dismiss came from. The panel stays on screen and touchable while
- * its exit animation plays, so a second dismiss can arrive after the screen below it is already
- * the top entry; popping then would remove that screen too (or Home, leaving the `NavHost`
- * empty). It pops only while [panel] is the top entry and a screen is left under it.
- */
-private fun NavController.popPanel(panel: NavBackStackEntry) {
-    if (shouldPopPanel(panelIsTop = currentBackStackEntry == panel, hasEntryBelow = previousBackStackEntry != null)) {
-        popBackStack()
+private fun NavBackStackEntry?.routeName(): String {
+    val route = this?.destination?.route.orEmpty()
+    return when {
+        route.contains("AppDrawerRoute") -> "AppDrawerRoute"
+        route.contains("NotificationPanelRoute") -> "NotificationPanelRoute"
+        route.contains("NotificationSummaryRoute") -> "NotificationSummaryRoute"
+        route.contains("WidgetsRoute") -> "WidgetsRoute"
+        route.contains("NotesRoute") -> "NotesRoute"
+        route.contains("SettingsRoute") -> "SettingsRoute"
+        route.contains("HomeRoute") -> "HomeRoute"
+        else -> route.substringBefore("?").substringAfterLast('.')
     }
 }
 
-private fun NavBackStackEntry?.routeKind(): NavRouteKind? {
-    val destination = this?.destination ?: return null
-    return when {
-        destination.hasRoute<HomeRoute>() -> NavRouteKind.Home
-        destination.hasRoute<AppDrawerRoute>() -> NavRouteKind.AppDrawer
-        destination.hasRoute<SettingsRoute>() -> NavRouteKind.Settings
-        destination.hasRoute<NotificationPanelRoute>() -> NavRouteKind.NotificationPanel
-        destination.hasRoute<NotificationSummaryRoute>() -> NavRouteKind.NotificationSummary
-        destination.hasRoute<WidgetsRoute>() -> NavRouteKind.Widgets
-        destination.hasRoute<NotesRoute>() -> NavRouteKind.Notes
-        else -> null
+private fun actionToRouteName(action: String): String? = when (action) {
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
+        "NotificationSummaryRoute"
     }
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
+        "WidgetsRoute"
+    }
+    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> "NotesRoute"
+    else -> null
 }

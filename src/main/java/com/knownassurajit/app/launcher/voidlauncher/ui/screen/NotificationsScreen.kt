@@ -49,6 +49,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 
 @Composable
@@ -58,6 +59,8 @@ fun NotificationsScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val listenerEnabled = FeatureAvailability.isNotificationListenerEnabled(context)
+
+    ChildScreenBackHandler(onBack)
 
     Box(
         modifier = Modifier

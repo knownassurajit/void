@@ -56,6 +56,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import kotlin.math.abs
 
@@ -213,6 +214,8 @@ fun NotificationSummaryScreen(
 
     val summaries by viewModel.summaries.collectAsState()
     val aiAvailable by viewModel.isAiAvailable.collectAsState()
+
+    ChildScreenBackHandler(onBack)
 
     Box(
         modifier = Modifier

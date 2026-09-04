@@ -33,8 +33,8 @@
 - **Integrated Quick Notes**: Fast, text-based checklist for capturing thoughts instantly with priority ordering and reminders.
 - **Deep Android 15 Integration**: Full support for Private Space, allowing you to access hidden and secure apps directly from the drawer.
 - **Digital Wellbeing**: Screen time and unlock counts are integrated directly into the home screen for at-a-glance awareness.
-- **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions. Panels move the way you swipe: swipe right and the panel slides in from the left edge, swipe up and the drawer rises from the bottom, while Home follows your finger and moves the same way underneath. Letting go after 56 dp or a quick flick opens it, moving back cancels it, swipes that start right at a screen edge work, and an app set as a swipe action opens at once while Home carries the swipe on, pushed aside and dimmed (Android 11 and earlier also slide the app in from the same side). Motion uses Material 3 spring physics that the animation-speed setting scales. The system back gesture (Android 14+) shows the Material predictive-back preview on every screen, and a swipe inside a screen toward its edge also leaves it (56 dp or a quick flick). See [`docs/architecture/motion.md`](docs/architecture/motion.md).
-- **Modern UI**: Built with 100% Jetpack Compose and Material 3. Choose from 36 launcher fonts in a searchable picker: six bundled families that work offline (Google Sans default, DM Sans, Geist, Inter, Manrope, Plus Jakarta Sans), 29 Google Fonts families downloaded on demand by Google Play services (Poppins, Work Sans, Karla, Raleway, Inconsolata, Roboto, Source Serif 4, and more), and the system font. See [`docs/features/fonts.md`](docs/features/fonts.md).
+- **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions.
+- **Modern UI**: Built with 100% Jetpack Compose and Material 3. Bundled sans fonts (Google Sans default, Inter, Plus Jakarta Sans, Manrope, DM Sans) apply through `VoidAppTheme`.
 - **Searchable settings**: Grouped Look / Home / App library / Gestures & motion / Features / Permissions, with animation speed and content swipe-to-back.
 
 ---
@@ -46,11 +46,11 @@ Navigate your device with a simple, gesture-based mental model:
 ```mermaid
 graph TD
     A[Home Screen] -- Swipe Up --> B[App Drawer]
+    A -- Long Press --> C[Settings]
     A -- Swipe Left --> D[Custom Action: Notes/Widgets]
     A -- Swipe Right --> E[Custom Action: Summary/Notes]
     A -- Double Tap --> F[Lock Screen]
-    B -- Settings icon --> C[Settings]
-    C -- Back --> B
+    C -- Back --> A
     B -- Click App --> G[Launch App]
     B -- Back --> A
 ```
@@ -103,14 +103,6 @@ Output APKs land under `build/outputs/apk/debug/` or `build/outputs/apk/release/
 
 See [`docs/`](docs/) for architecture, features, settings, testing guides, and bug fix notes.
 
-### Known limitations
-
-- **Downloadable fonts need Google Play services.** The 29 Google Fonts families are fetched by the Play services font provider, not by VOID's own code. Without it, or offline before the first download, those families are unavailable and the picker says so; the six bundled families and the system font always work. A saved downloadable font renders in the default font until its download has finished in the current session.
-- **Swipes inside a screen only close it from regions that do not scroll or slide.** A swipe toward a screen's edge closes it from headers, gaps and empty areas, but the drawer, the notification list and Settings lists scroll instead, and a note row slides to delete. The system back gesture (a preview of the screen underneath on Android 14+), the Back key and TalkBack's back or Dismiss action are the reliable ways out of scrolling screens. See [`docs/architecture/motion.md`](docs/architecture/motion.md).
-- **The launch animation of a swipe app depends on the Android version.** On Android 12 and later the app's own entrance animation is system-owned and a third-party launcher cannot choose its direction (the public API has no way to; a custom window animation is ignored for a launch in a new task), so an app opened by a swipe uses the system's own animation there; VOID starts the launch the moment you let go and Home keeps moving in the direction of the swipe, pushed aside and dimmed, until the app takes over. Android 11 and earlier slide the app in from the side of the swipe. See [`docs/architecture/motion.md`](docs/architecture/motion.md).
-- **Edge-origin swipes depend on the system.** A swipe that starts right at a screen edge reaches VOID because Home asks the system to leave those strips to it (`systemGestureExclusion`). Android grants this for the home activity (VOID as the default launcher) and may still relax it, and some OEM gesture implementations ignore it; a swipe the system keeps arrives cancelled and does nothing, while a swipe starting a little further in always works. The panel itself appears on release, not under the finger: Home follows the finger and the panel springs in after the commit. See [`docs/architecture/motion.md`](docs/architecture/motion.md).
-- Six requested names (Brogman, Volkga, Disttopian, Stanza, Vangura Sans, Noria) are commercial or personal-use fonts and are not offered; see [`docs/features/fonts.md`](docs/features/fonts.md) for alternatives.
-
 > **Note:** The former `integrated` / `disintegrated` product flavors were removed. VOID ships as one OSS build with runtime capability gates. See [`docs/architecture/flavor-decision.md`](docs/architecture/flavor-decision.md).
 
 ---
@@ -153,7 +145,7 @@ VOID is a heavily restructured and modernized fork of **Olauncher**. We credit t
 
 - **License**: This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html).
 - **Original Base**: [Olauncher](https://github.com/tanujnotes/olauncher) by Tanuj.
-- **Typography**: all six bundled families are under the SIL Open Font License 1.1, with the copyright notice kept in each font file: Google Sans (Copyright 2025 The Google Sans Project Authors), DM Sans (Copyright 2014 The DM Sans Project Authors, https://github.com/googlefonts/dm-fonts), Geist (Copyright 2024 The Geist Project Authors, https://github.com/vercel/geist-font), Inter (Copyright 2016 The Inter Project Authors), Manrope (Copyright 2019 The Manrope Project Authors, https://github.com/sharanda/manrope), and Plus Jakarta Sans (Copyright 2020 The Plus Jakarta Sans Project Authors, https://github.com/tokotype/PlusJakartaSans). The bundled Google Sans is a Latin/Cyrillic variable subset of the Google Fonts release and Geist is the unmodified upstream variable font (see [`docs/features/fonts.md`](docs/features/fonts.md); licence texts in [`docs/licenses/fonts/`](docs/licenses/fonts/)). The downloadable families come from Google Fonts, are licensed under the OFL by their authors, and are delivered by Google Play services; they are not part of the APK.
+- **Typography**: Inter (RSMS) and Google Sans.
 - **Icons**: Material Symbols (Google).
 
 ---

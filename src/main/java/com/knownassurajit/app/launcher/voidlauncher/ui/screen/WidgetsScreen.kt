@@ -7,7 +7,6 @@ import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.os.Build
-import android.util.Log
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -89,22 +88,17 @@ import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.WidgetInfo
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
-import com.knownassurajit.app.launcher.voidlauncher.helper.ListenerCount
-import com.knownassurajit.app.launcher.voidlauncher.helper.ListeningLease
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetBindHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetLayoutHelper
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 private const val WIDGET_HOST_ID = 1024
-private const val TAG = "WidgetsViewModel"
-
-/** Shared by every [WidgetsViewModel]: the host id is registered once per process. */
-private val hostListeners = ListenerCount()
 
 data class PendingWidgetBinding(
     val widget: WidgetInfo,
@@ -132,21 +126,6 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
 
     val appWidgetHost = AppWidgetHost(ctx, WIDGET_HOST_ID)
 
-    // Every Widgets screen builds its own host, but Android keeps one registration per host id.
-    // Screens overlap (the closing one stays until its exit animation ends), so a screen must not
-    // stop what a newer one started.
-    private val hostListening = ListeningLease(
-        count = hostListeners,
-        start = {
-            Log.d(TAG, "widget_host_listening state=start")
-            appWidgetHost.startListening()
-        },
-        stop = {
-            Log.d(TAG, "widget_host_listening state=stop")
-            appWidgetHost.stopListening()
-        }
-    )
-
     private val _allWidgets = MutableStateFlow<List<WidgetInfo>>(emptyList())
     val allWidgets: StateFlow<List<WidgetInfo>> = _allWidgets.asStateFlow()
 
@@ -161,13 +140,9 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
 
     init { loadWidgets() }
 
-    fun startListening() = hostListening.acquire()
-
-    fun stopListening() = hostListening.release()
-
     override fun onCleared() {
         super.onCleared()
-        hostListening.release()
+        appWidgetHost.stopListening()
     }
 
     private fun loadWidgets() {
@@ -446,9 +421,11 @@ fun WidgetsScreen(
     }
 
     DisposableEffect(Unit) {
-        viewModel.startListening()
-        onDispose { viewModel.stopListening() }
+        viewModel.appWidgetHost.startListening()
+        onDispose { viewModel.appWidgetHost.stopListening() }
     }
+
+    ChildScreenBackHandler(onBack)
 
     Column(
         modifier = Modifier

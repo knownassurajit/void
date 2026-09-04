@@ -130,7 +130,6 @@ class Prefs private constructor(context: Context) {
     private val PRIVATE_SPACE_PLACEMENT = "PRIVATE_SPACE_PLACEMENT"
     private val ANIMATION_SPEED = "ANIMATION_SPEED"
     private val CONTENT_SWIPE_TO_BACK = "CONTENT_SWIPE_TO_BACK"
-    private val NOTES_TITLE_ALIGNMENT = "NOTES_TITLE_ALIGNMENT"
 
     private val APP_NAME_1 = "APP_NAME_1"
     private val APP_NAME_2 = "APP_NAME_2"
@@ -1314,10 +1313,6 @@ class Prefs private constructor(context: Context) {
     var enableNotes: Boolean
         get() = prefs.getBoolean(ENABLE_NOTES, true)
         set(value) = prefs.edit { putBoolean(ENABLE_NOTES, value).apply() }
-
-    var notesTitleAlignment: Int
-        get() = prefs.getInt(NOTES_TITLE_ALIGNMENT, Gravity.START)
-        set(value) = prefs.edit { putInt(NOTES_TITLE_ALIGNMENT, value).apply() }
 
     var leftSwipeAppPackage: String
         get() = prefs.getString(APP_PACKAGE_SWIPE_LEFT, "").toString()
