@@ -1,0 +1,35 @@
+---
+description: "Project identity and operating intent for void"
+alwaysApply: true
+---
+
+# void
+
+Follow `CLAUDE.md` as the project SOP. ECC supplies harness workflows; do not contradict CLAUDE.md.
+
+Minimalist Android launcher (Void). Package: com.knownassurajit.app.launcher.voidlauncher. ApplicationId: com.voidlauncher.app.
+
+Follow CLAUDE.md. src/main is the sole runtime source set; do not revive legacy app/ code.
+Use FeatureAvailability for capability gates. Compose Navigation with type-safe @Serializable routes.
+Load the material-design skill for M3. Keep diffs small, explicit, and reviewable.
+
+## Stack
+
+Kotlin · Compose · Material 3 · single-activity launcher · minSdk 26 / compileSdk 36 · JDK 17.
+
+## Verify
+
+`./gradlew assembleDebug | assembleRelease | testDebugUnitTest | lintDebug | connectedDebugAndroidTest`
+
+## ECC workflow
+
+1. Plan non-trivial work with the planner agent / plan skill.
+2. Implement with tests first (`tdd-workflow`).
+3. Review with `code-reviewer` and `security-reviewer` before merge-level changes.
+4. Keep secrets out of prompts and commits. Prefer small, reviewable diffs.
+
+## ECC install notes
+
+- Language rules are glob-scoped; only matching files should pull them in.
+- After install, `.cursor/rules` were converted to Cursor `globs`/`alwaysApply`. `ecc doctor` may report drift; do not `ecc repair` those rule files just to clear the warning.
+- Cursor hooks live in `.cursor/hooks.json` and must resolve scripts under `.cursor/scripts/hooks/`.
