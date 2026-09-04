@@ -8,6 +8,9 @@
 - [ ] Home: long-press empty space opens app picker; chip X removes immediately
 - [ ] Settings: swipe-down notifications toggle; grant notification listener if prompted
 - [ ] Swipe down opens in-app notification list when toggle is on; list matches shade after listener grant
-- [ ] Notes: add; swipe left shows red arrow and deletes; complete/reminder
+- [ ] Home: pin 6–10 apps; toggle clock/date in Settings and return — list count stays
+- [ ] Settings search filters groups; back swipe leaves Settings
+- [ ] Assigned left/right swipe panels enter from the opposite edge and pop on the same axis
+- [ ] Notes: add; swipe left shows red arrow and deletes; complete/reminder; screen back swipe does not steal delete
 - [ ] Settings: clock size, section weight, section order, show apps
 - [ ] Lint + unit tests green

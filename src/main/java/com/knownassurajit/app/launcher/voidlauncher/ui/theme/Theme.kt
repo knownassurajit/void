@@ -58,7 +58,7 @@ private val VoidExpressiveShapes = Shapes(
 
 @Composable
 fun VoidAppTheme(
-    appFont: String = "inter",
+    appFont: String = DEFAULT_APP_FONT,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {

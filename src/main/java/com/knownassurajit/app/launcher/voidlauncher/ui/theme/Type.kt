@@ -5,12 +5,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
 import com.knownassurajit.app.launcher.voidlauncher.R
 
-// ── Bundled font families (always available offline) ──
+const val DEFAULT_APP_FONT = "google_sans"
 
 val GoogleSansFamily = FontFamily(
     Font(R.font.google_sans_regular, FontWeight.Normal),
@@ -24,17 +22,35 @@ val InterFamily = FontFamily(
     Font(R.font.inter_bold, FontWeight.Bold)
 )
 
-// ── All available font families ──
+val PlusJakartaSansFamily = FontFamily(
+    Font(R.font.plus_jakarta_sans_regular, FontWeight.Normal),
+    Font(R.font.plus_jakarta_sans_medium, FontWeight.Medium),
+    Font(R.font.plus_jakarta_sans_bold, FontWeight.Bold)
+)
 
-/** Map of font key → (display name, FontFamily). */
+val ManropeFamily = FontFamily(
+    Font(R.font.manrope_regular, FontWeight.Normal),
+    Font(R.font.manrope_medium, FontWeight.Medium),
+    Font(R.font.manrope_bold, FontWeight.Bold)
+)
+
+val DmSansFamily = FontFamily(
+    Font(R.font.dm_sans_regular, FontWeight.Normal),
+    Font(R.font.dm_sans_medium, FontWeight.Medium),
+    Font(R.font.dm_sans_bold, FontWeight.Bold)
+)
+
 val availableFonts: List<Triple<String, String, FontFamily>> = listOf(
+    Triple("google_sans", "Google Sans", GoogleSansFamily),
     Triple("inter", "Inter", InterFamily),
-    Triple("system", "System", FontFamily.Default),
-    Triple("google_sans", "Google Sans", GoogleSansFamily)
+    Triple("plus_jakarta", "Plus Jakarta Sans", PlusJakartaSansFamily),
+    Triple("manrope", "Manrope", ManropeFamily),
+    Triple("dm_sans", "DM Sans", DmSansFamily),
+    Triple("system", "System", FontFamily.Default)
 )
 
 fun resolveFontFamily(appFont: String): FontFamily {
-    return availableFonts.firstOrNull { it.first == appFont }?.third ?: InterFamily
+    return availableFonts.firstOrNull { it.first == appFont }?.third ?: GoogleSansFamily
 }
 
 // MD3 Expressive — 1.25× line-height rule, Regular + Medium weights only

@@ -18,7 +18,7 @@ android {
         val major = 0
         val minor = 0
         val patch = 0
-        val build = 10
+        val build = 11
         
         versionCode = major * 1_000_000 + minor * 10_000 + patch * 100 + build
         versionName = "$major.$minor.$patch.$build"

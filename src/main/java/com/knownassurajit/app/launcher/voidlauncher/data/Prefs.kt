@@ -35,7 +35,10 @@ data class HomescreenPreferences(
     val enableSwipeDownNotifications: Boolean,
     val appFont: String,
     val use24HourClock: Boolean,
-    val showSeconds: Boolean
+    val showSeconds: Boolean,
+    val privateSpacePlacement: String,
+    val animationSpeed: String,
+    val contentSwipeToBack: Boolean
 )
 
 data class HomeAppSlot(
@@ -47,7 +50,19 @@ data class HomeAppSlot(
     val shortcutId: String = ""
 )
 
-class Prefs(context: Context) {
+class Prefs private constructor(context: Context) {
+    companion object {
+        @Volatile
+        private var instance: Prefs? = null
+
+        fun get(context: Context): Prefs {
+            instance?.let { return it }
+            return synchronized(this) {
+                instance ?: Prefs(context.applicationContext).also { instance = it }
+            }
+        }
+    }
+
     private val PREFS_FILENAME = "com.knownassurajit.app.launcher.voidlauncher"
     private val OLD_PREFS_FILENAME = "com.knownassurajit.app.launcher.voidlauncher"
 
@@ -112,6 +127,9 @@ class Prefs(context: Context) {
     private val APP_SPACING_DP = "APP_SPACING_DP"
     private val APP_FONT = "APP_FONT"
     private val USE_24_HOUR_CLOCK = "USE_24_HOUR_CLOCK"
+    private val PRIVATE_SPACE_PLACEMENT = "PRIVATE_SPACE_PLACEMENT"
+    private val ANIMATION_SPEED = "ANIMATION_SPEED"
+    private val CONTENT_SWIPE_TO_BACK = "CONTENT_SWIPE_TO_BACK"
 
     private val APP_NAME_1 = "APP_NAME_1"
     private val APP_NAME_2 = "APP_NAME_2"
@@ -223,7 +241,10 @@ class Prefs(context: Context) {
         ENABLE_GESTURES,
         ENABLE_SWIPE_DOWN_NOTIFICATIONS,
         APP_FONT,
-        USE_24_HOUR_CLOCK
+        USE_24_HOUR_CLOCK,
+        PRIVATE_SPACE_PLACEMENT,
+        ANIMATION_SPEED,
+        CONTENT_SWIPE_TO_BACK
     )
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -255,10 +276,7 @@ class Prefs(context: Context) {
         }
         prefs = newPrefs
 
-        // Migrate homeAppsNum → maxHomeApps if MAX_HOME_APPS was never set
-        if (!prefs.contains(MAX_HOME_APPS) && prefs.contains(HOME_APPS_NUM)) {
-            prefs.edit { putInt(MAX_HOME_APPS, prefs.getInt(HOME_APPS_NUM, 4)) }
-        }
+        ensureMaxHomeAppsResolved()
 
         _homescreenPreferences = MutableStateFlow(readHomescreenPreferences())
         homescreenPreferences = _homescreenPreferences.asStateFlow()
@@ -270,7 +288,7 @@ class Prefs(context: Context) {
     }
 
     private fun readHomescreenPreferences(): HomescreenPreferences {
-        return HomescreenPreferences(
+        val result = HomescreenPreferences(
             appHorizontalAlignment = prefs.getInt(HOME_ALIGNMENT, Gravity.START),
             appVerticalAlignment = prefs.getInt(
                 HOME_VERTICAL_ALIGNMENT,
@@ -282,7 +300,7 @@ class Prefs(context: Context) {
             showDate = prefs.getBoolean(SHOW_DATE_WIDGET, prefs.getInt(DATE_TIME_VISIBILITY, Constants.DateTime.ON) != Constants.DateTime.OFF),
             showScreenTime = prefs.getBoolean(SHOW_SCREEN_TIME_WIDGET, true),
             showHomeApps = prefs.getBoolean(SHOW_HOME_APPS, true),
-            maxApps = prefs.getInt(MAX_HOME_APPS, prefs.getInt(HOME_APPS_NUM, 4)),
+            maxApps = resolvedMaxHomeApps(),
             clockSectionWeight = prefs.getFloat(CLOCK_SECTION_WEIGHT, 0.35f),
             clockSizeScale = prefs.getFloat(CLOCK_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f),
             dateSizeScale = prefs.getFloat(DATE_SIZE_SCALE, 1.0f).coerceIn(0.5f, 1.5f),
@@ -297,10 +315,43 @@ class Prefs(context: Context) {
             rightSwipeAction = prefs.getString(RIGHT_SWIPE_ACTION, SwipeAction.WIDGETS) ?: SwipeAction.WIDGETS,
             enableGestures = prefs.getBoolean(ENABLE_GESTURES, true),
             enableSwipeDownNotifications = prefs.getBoolean(ENABLE_SWIPE_DOWN_NOTIFICATIONS, true),
-            appFont = prefs.getString(APP_FONT, "inter") ?: "inter",
+            appFont = prefs.getString(APP_FONT, "google_sans") ?: "google_sans",
             use24HourClock = prefs.getBoolean(USE_24_HOUR_CLOCK, false),
-            showSeconds = prefs.getBoolean(SHOW_CLOCK_SECONDS, false)
+            showSeconds = prefs.getBoolean(SHOW_CLOCK_SECONDS, false),
+            privateSpacePlacement = prefs.getString(PRIVATE_SPACE_PLACEMENT, PrivateSpacePlacement.BOTTOM)
+                ?: PrivateSpacePlacement.BOTTOM,
+            animationSpeed = prefs.getString(ANIMATION_SPEED, AnimationSpeed.STANDARD)
+                ?: AnimationSpeed.STANDARD,
+            contentSwipeToBack = prefs.getBoolean(CONTENT_SWIPE_TO_BACK, true)
         )
+        return result
+    }
+
+    private fun countFilledHomeSlots(): Int {
+        return HomeAppsCap.countFilledSlots { getAppPackage(it) }
+    }
+
+    private fun resolvedMaxHomeApps(): Int {
+        return HomeAppsCap.resolve(
+            hasMaxKey = prefs.contains(MAX_HOME_APPS),
+            maxValue = prefs.getInt(MAX_HOME_APPS, HomeAppsCap.DEFAULT),
+            hasLegacyKey = prefs.contains(HOME_APPS_NUM),
+            legacyValue = prefs.getInt(HOME_APPS_NUM, HomeAppsCap.DEFAULT),
+            filledSlots = countFilledHomeSlots()
+        )
+    }
+
+    private fun persistResolvedMaxHomeApps(value: Int) {
+        val cap = value.coerceIn(0, HomeAppsCap.MAX_SLOTS)
+        prefs.edit {
+            putInt(MAX_HOME_APPS, cap)
+            putInt(HOME_APPS_NUM, cap)
+        }
+    }
+
+    private fun ensureMaxHomeAppsResolved() {
+        if (prefs.contains(MAX_HOME_APPS)) return
+        persistResolvedMaxHomeApps(resolvedMaxHomeApps())
     }
 
     fun resetHomescreenDefaults() {
@@ -353,12 +404,12 @@ class Prefs(context: Context) {
         set(value) = prefs.edit { putBoolean(KEYBOARD_MESSAGE, value).apply() }
 
 
-    /** @deprecated Use maxHomeApps instead. Reads from MAX_HOME_APPS with fallback. */
+    /** @deprecated Use maxHomeApps instead. Reads from the unified resolver. */
     var homeAppsNum: Int
-        get() = prefs.getInt(MAX_HOME_APPS, prefs.getInt(HOME_APPS_NUM, 4))
+        get() = resolvedMaxHomeApps()
         set(value) {
-            prefs.edit { putInt(MAX_HOME_APPS, value) }
-            prefs.edit { putInt(HOME_APPS_NUM, value) }
+            persistResolvedMaxHomeApps(value)
+            emitHomescreenPrefs()
         }
 
     var homeAlignment: Int
@@ -448,7 +499,7 @@ class Prefs(context: Context) {
         set(value) = prefs.edit { putFloat(APP_DRAWER_TEXT_SIZE_SCALE, value).apply() }
 
     var appFont: String
-        get() = prefs.getString(APP_FONT, "inter") ?: "inter"
+        get() = prefs.getString(APP_FONT, "google_sans") ?: "google_sans"
         set(value) {
             prefs.edit { putString(APP_FONT, value).apply() }
             emitHomescreenPrefs()
@@ -1145,8 +1196,42 @@ class Prefs(context: Context) {
         set(value) = prefs.edit { putStringSet("WIDGET_ALLOCATED_IDS", value).apply() }
         
     var maxHomeApps: Int
-        get() = prefs.getInt(MAX_HOME_APPS, 10)
-        set(value) = prefs.edit { putInt(MAX_HOME_APPS, value).apply() }
+        get() = resolvedMaxHomeApps()
+        set(value) {
+            persistResolvedMaxHomeApps(value)
+            emitHomescreenPrefs()
+        }
+
+    var privateSpacePlacement: String
+        get() = prefs.getString(PRIVATE_SPACE_PLACEMENT, PrivateSpacePlacement.BOTTOM)
+            ?: PrivateSpacePlacement.BOTTOM
+        set(value) {
+            val next = if (value == PrivateSpacePlacement.SEARCH_BAR) {
+                PrivateSpacePlacement.SEARCH_BAR
+            } else {
+                PrivateSpacePlacement.BOTTOM
+            }
+            prefs.edit { putString(PRIVATE_SPACE_PLACEMENT, next).apply() }
+            emitHomescreenPrefs()
+        }
+
+    var animationSpeed: String
+        get() = prefs.getString(ANIMATION_SPEED, AnimationSpeed.STANDARD) ?: AnimationSpeed.STANDARD
+        set(value) {
+            val next = when (value) {
+                AnimationSpeed.FAST, AnimationSpeed.SLOW -> value
+                else -> AnimationSpeed.STANDARD
+            }
+            prefs.edit { putString(ANIMATION_SPEED, next).apply() }
+            emitHomescreenPrefs()
+        }
+
+    var contentSwipeToBack: Boolean
+        get() = prefs.getBoolean(CONTENT_SWIPE_TO_BACK, true)
+        set(value) {
+            prefs.edit { putBoolean(CONTENT_SWIPE_TO_BACK, value).apply() }
+            emitHomescreenPrefs()
+        }
 
     var showAlphabetCategories: Boolean
         get() = prefs.getBoolean(SHOW_ALPHABET_CATEGORIES, true)
@@ -1161,6 +1246,17 @@ class Prefs(context: Context) {
         const val APP = "app"
         const val ACCESSIBILITY = "accessibility"
         const val NONE = "none"
+    }
+
+    object PrivateSpacePlacement {
+        const val BOTTOM = "bottom"
+        const val SEARCH_BAR = "search_bar"
+    }
+
+    object AnimationSpeed {
+        const val FAST = "fast"
+        const val STANDARD = "standard"
+        const val SLOW = "slow"
     }
 
     var clockSizeScale: Float

@@ -9,7 +9,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -41,6 +40,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.SpaceBar
@@ -61,10 +61,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -81,6 +82,7 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -88,32 +90,35 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
-import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.availableFonts
 import kotlinx.coroutines.launch
+
+val LocalSettingsPrefs = staticCompositionLocalOf<Prefs> { error("LocalSettingsPrefs missing") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = remember { Prefs.get(context) }
 
     var maxHomeApps by remember { mutableIntStateOf(prefs.maxHomeApps) }
     var showClock by remember { mutableStateOf(prefs.showClockWidget) }
@@ -150,161 +155,502 @@ fun SettingsScreen(onBack: () -> Unit) {
     var enableSummary by remember { mutableStateOf(prefs.enableNotificationSummary) }
     var enableWidgets by remember { mutableStateOf(prefs.enableWidgets) }
     var enableNotes by remember { mutableStateOf(prefs.enableNotes) }
+    var animationSpeed by remember { mutableStateOf(prefs.animationSpeed) }
+    var contentSwipeToBack by remember { mutableStateOf(prefs.contentSwipeToBack) }
+    var privateSpacePlacement by remember { mutableStateOf(prefs.privateSpacePlacement) }
+    var searchQuery by remember { mutableStateOf("") }
 
     val isPrivateSpaceConfigured = remember {
         PrivateSpaceHelper.getPrivateSpaceProfile(context) != null
     }
+    val privateSpaceAvailable = FeatureAvailability.isPrivateSpaceAvailable(context)
 
     if (showDeveloperInfo) {
         DeveloperInfoDialog(onDismiss = { showDeveloperInfo = false })
     }
 
-    Box(modifier = Modifier.padding(top = LocalFixedStatusBarHeight.current).navigationBarsPadding()) {
-        Scaffold(
-            contentWindowInsets = WindowInsets(0.dp),
-            snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SettingsHeader(
-                    onShowCredits = { showDeveloperInfo = true },
-                    onOpenSystemSettings = {
-                        try {
-                            context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
-                        } catch (_: Exception) {}
-                    }
-                )
+    ChildScreenBackHandler(onBack)
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                SettingActionItem(
-                    title = stringResource(R.string.change_default_launcher),
-                    subtitle = "Manage default home app settings",
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    onClick = {
-                        try {
-                            val intent = Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            val intent = Intent(android.provider.Settings.ACTION_SETTINGS)
-                            context.startActivity(intent)
+    CompositionLocalProvider(LocalSettingsPrefs provides prefs) {
+        Box(
+            modifier = Modifier
+                .padding(top = LocalFixedStatusBarHeight.current)
+                .navigationBarsPadding()
+                .screenBackSwipe(onBack)
+        ) {
+            Scaffold(
+                contentWindowInsets = WindowInsets(0.dp),
+                snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+            ) { paddingValues ->
+                val search = EvaluateSettingsSearch(searchQuery, privateSpaceAvailable)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SettingsHeader(
+                        onShowCredits = { showDeveloperInfo = true },
+                        onOpenSystemSettings = {
+                            try {
+                                context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
+                            } catch (_: Exception) {}
                         }
+                    )
+
+                    SettingsSearchField(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it }
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (search.defaultLauncher) {
+                        SettingActionItem(
+                            title = stringResource(R.string.change_default_launcher),
+                            subtitle = stringResource(R.string.manage_default_home_settings),
+                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                            onClick = {
+                                try {
+                                    val intent = Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    val intent = Intent(android.provider.Settings.ACTION_SETTINGS)
+                                    context.startActivity(intent)
+                                }
+                            }
+                        )
+                    }
+
+                    if (search.lookHeader) {
+                        SettingsGroupHeader(stringResource(R.string.settings_group_look))
+                    }
+                    if (search.aesthetics) {
+                        AestheticsSection(
+                            appFont = appFont,
+                            onFontChanged = { appFont = it }
+                        )
+                    }
+                    if (search.appearance) {
+                        AppearanceSection(
+                            showStatusBar = showStatusBar,
+                            onShowStatusBarChange = { showStatusBar = it },
+                            autoShowKeyboard = autoShowKeyboard,
+                            onAutoShowKeyboardChange = { autoShowKeyboard = it }
+                        )
+                    }
+                    if (search.clock) {
+                        ClockAndDateSection(
+                            showClock = showClock,
+                            onShowClockChange = { showClock = it },
+                            showDate = showDate,
+                            onShowDateChange = { showDate = it },
+                            showScreenTime = showScreenTime,
+                            onShowScreenTimeChange = { showScreenTime = it },
+                            use24HourClock = use24HourClock,
+                            onUse24HourClockChange = { use24HourClock = it },
+                            showSeconds = showSeconds,
+                            onShowSecondsChange = { showSeconds = it },
+                            clockHorizontalAlignment = clockHorizontalAlignment,
+                            onClockHorizontalAlignmentChange = { clockHorizontalAlignment = it },
+                            clockVerticalAlignment = clockVerticalAlignment,
+                            onClockVerticalAlignmentChange = { clockVerticalAlignment = it },
+                            clockSectionWeight = clockSectionWeight,
+                            onClockSectionWeightChange = { clockSectionWeight = it },
+                            clockSizeScale = clockSizeScale,
+                            onClockSizeScaleChange = { clockSizeScale = it },
+                            dateSizeScale = dateSizeScale,
+                            onDateSizeScaleChange = { dateSizeScale = it },
+                            screenTimeSizeScale = screenTimeSizeScale,
+                            onScreenTimeSizeScaleChange = { screenTimeSizeScale = it },
+                            showHomeApps = showHomeApps,
+                            onShowHomeAppsChange = { showHomeApps = it },
+                            homeSectionOrder = homeSectionOrder,
+                            onHomeSectionOrderChange = { homeSectionOrder = it },
+                            snackbarHostState = snackbarHostState
+                        )
+                    }
+
+                    if (search.homeHeader) {
+                        SettingsGroupHeader(stringResource(R.string.settings_group_home))
+                    }
+                    if (search.homeApps) {
+                        HomeAppsSection(
+                            maxHomeApps = maxHomeApps,
+                            onMaxHomeAppsChange = { maxHomeApps = it },
+                            appHorizontalAlignment = appHorizontalAlignment,
+                            onAppHorizontalAlignmentChange = { appHorizontalAlignment = it },
+                            appVerticalAlignment = appVerticalAlignment,
+                            onAppVerticalAlignmentChange = { appVerticalAlignment = it },
+                            appSpacing = appSpacing,
+                            onAppSpacingChange = { appSpacing = it }
+                        )
+                    }
+                    if (search.textSize) {
+                        TextSizeSection(
+                            homeTextSize = homeTextSize,
+                            onHomeTextSizeChange = { homeTextSize = it },
+                            drawerTextSize = drawerTextSize,
+                            onDrawerTextSizeChange = { drawerTextSize = it }
+                        )
+                    }
+
+                    if (search.appLibraryHeader) {
+                        SettingsGroupHeader(stringResource(R.string.settings_group_app_library))
+                    }
+                    if (search.appLibrary) {
+                        AppLibrarySection(
+                            showAlphabetCategories = showAlphabetCategories,
+                            onShowAlphabetCategoriesChange = { showAlphabetCategories = it },
+                            privateSpaceEnabled = privateSpaceEnabled,
+                            onPrivateSpaceEnabledChange = { privateSpaceEnabled = it },
+                            privateSpacePlacement = privateSpacePlacement,
+                            onPrivateSpacePlacementChange = { privateSpacePlacement = it },
+                            isPrivateSpaceConfigured = isPrivateSpaceConfigured,
+                            privateSpaceAvailable = privateSpaceAvailable,
+                            snackbarHostState = snackbarHostState
+                        )
+                    }
+
+                    if (search.gesturesHeader) {
+                        SettingsGroupHeader(stringResource(R.string.settings_group_gestures_motion))
+                    }
+                    if (search.gestures) {
+                        GesturesSection(
+                            enableGestures = enableGestures,
+                            onEnableGesturesChange = { enableGestures = it },
+                            enableSwipeDownNotifications = enableSwipeDownNotifications,
+                            onEnableSwipeDownNotificationsChange = { enableSwipeDownNotifications = it },
+                            enableSummary = enableSummary,
+                            enableWidgets = enableWidgets,
+                            enableNotes = enableNotes,
+                            leftSwipeAction = leftSwipeAction,
+                            onLeftSwipeActionChange = {
+                                leftSwipeAction = it
+                                if (it == SwipeAction.APP) showAppPicker = "left"
+                            },
+                            rightSwipeAction = rightSwipeAction,
+                            onRightSwipeActionChange = {
+                                rightSwipeAction = it
+                                if (it == SwipeAction.APP) showAppPicker = "right"
+                            },
+                            animationSpeed = animationSpeed,
+                            onAnimationSpeedChange = { animationSpeed = it },
+                            contentSwipeToBack = contentSwipeToBack,
+                            onContentSwipeToBackChange = { contentSwipeToBack = it },
+                            snackbarHostState = snackbarHostState
+                        )
+                    }
+
+                    if (search.featuresHeader) {
+                        SettingsGroupHeader(stringResource(R.string.settings_group_features))
+                    }
+                    if (search.features) {
+                        FeaturesSection(
+                            enableSummary = enableSummary,
+                            onEnableSummaryChange = { enableSummary = it },
+                            enableWidgets = enableWidgets,
+                            onEnableWidgetsChange = { enableWidgets = it },
+                            enableNotes = enableNotes,
+                            onEnableNotesChange = { enableNotes = it },
+                            snackbarHostState = snackbarHostState
+                        )
+                    }
+
+                    if (search.permissionsHeader) {
+                        SettingsGroupHeader(stringResource(R.string.permissions))
+                    }
+                    if (search.permissions) {
+                        PermissionsSection()
+                    }
+
+                    if (!search.anyVisible) {
+                        Text(
+                            text = stringResource(R.string.settings_no_matches),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+
+            if (showAppPicker != null) {
+                SettingsAppPickerSheet(
+                    onDismiss = { showAppPicker = null },
+                    onAppSelected = { pkg ->
+                        if (showAppPicker == "left") prefs.leftSwipeAppPackage = pkg
+                        if (showAppPicker == "right") prefs.rightSwipeAppPackage = pkg
+                        showAppPicker = null
                     }
                 )
-
-                AestheticsSection(
-                    appFont = appFont,
-                    onFontChanged = { appFont = it }
-                )
-
-                ClockAndDateSection(
-                    showClock = showClock,
-                    onShowClockChange = { showClock = it },
-                    showDate = showDate,
-                    onShowDateChange = { showDate = it },
-                    showScreenTime = showScreenTime,
-                    onShowScreenTimeChange = { showScreenTime = it },
-                    use24HourClock = use24HourClock,
-                    onUse24HourClockChange = { use24HourClock = it },
-                    showSeconds = showSeconds,
-                    onShowSecondsChange = { showSeconds = it },
-                    clockHorizontalAlignment = clockHorizontalAlignment,
-                    onClockHorizontalAlignmentChange = { clockHorizontalAlignment = it },
-                    clockVerticalAlignment = clockVerticalAlignment,
-                    onClockVerticalAlignmentChange = { clockVerticalAlignment = it },
-                    clockSectionWeight = clockSectionWeight,
-                    onClockSectionWeightChange = { clockSectionWeight = it },
-                    clockSizeScale = clockSizeScale,
-                    onClockSizeScaleChange = { clockSizeScale = it },
-                    dateSizeScale = dateSizeScale,
-                    onDateSizeScaleChange = { dateSizeScale = it },
-                    screenTimeSizeScale = screenTimeSizeScale,
-                    onScreenTimeSizeScaleChange = { screenTimeSizeScale = it },
-                    showHomeApps = showHomeApps,
-                    onShowHomeAppsChange = { showHomeApps = it },
-                    homeSectionOrder = homeSectionOrder,
-                    onHomeSectionOrderChange = { homeSectionOrder = it },
-                    snackbarHostState = snackbarHostState
-                )
-
-                HomeAppsSection(
-                    maxHomeApps = maxHomeApps,
-                    onMaxHomeAppsChange = { maxHomeApps = it },
-                    appHorizontalAlignment = appHorizontalAlignment,
-                    onAppHorizontalAlignmentChange = { appHorizontalAlignment = it },
-                    appVerticalAlignment = appVerticalAlignment,
-                    onAppVerticalAlignmentChange = { appVerticalAlignment = it },
-                    appSpacing = appSpacing,
-                    onAppSpacingChange = { appSpacing = it }
-                )
-
-                TextSizeSection(
-                    homeTextSize = homeTextSize,
-                    onHomeTextSizeChange = { homeTextSize = it },
-                    drawerTextSize = drawerTextSize,
-                    onDrawerTextSizeChange = { drawerTextSize = it }
-                )
-
-                AppLibrarySection(
-                    showAlphabetCategories = showAlphabetCategories,
-                    onShowAlphabetCategoriesChange = { showAlphabetCategories = it },
-                    privateSpaceEnabled = privateSpaceEnabled,
-                    onPrivateSpaceEnabledChange = { privateSpaceEnabled = it },
-                    isPrivateSpaceConfigured = isPrivateSpaceConfigured,
-                    snackbarHostState = snackbarHostState
-                )
-
-                AppearanceSection(
-                    showStatusBar = showStatusBar,
-                    onShowStatusBarChange = { showStatusBar = it },
-                    autoShowKeyboard = autoShowKeyboard,
-                    onAutoShowKeyboardChange = { autoShowKeyboard = it }
-                )
-
-                GesturesSection(
-                    enableGestures = enableGestures,
-                    onEnableGesturesChange = { enableGestures = it },
-                    enableSwipeDownNotifications = enableSwipeDownNotifications,
-                    onEnableSwipeDownNotificationsChange = { enableSwipeDownNotifications = it },
-                    enableSummary = enableSummary,
-                    onEnableSummaryChange = { enableSummary = it },
-                    enableWidgets = enableWidgets,
-                    onEnableWidgetsChange = { enableWidgets = it },
-                    enableNotes = enableNotes,
-                    onEnableNotesChange = { enableNotes = it },
-                    leftSwipeAction = leftSwipeAction,
-                    onLeftSwipeActionChange = {
-                        leftSwipeAction = it
-                        if (it == SwipeAction.APP) showAppPicker = "left"
-                    },
-                    rightSwipeAction = rightSwipeAction,
-                    onRightSwipeActionChange = {
-                        rightSwipeAction = it
-                        if (it == SwipeAction.APP) showAppPicker = "right"
-                    },
-                    snackbarHostState = snackbarHostState
-                )
-
-                PermissionsSection()
-
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+}
 
-        if (showAppPicker != null) {
-            SettingsAppPickerSheet(
-                onDismiss = { showAppPicker = null },
-                onAppSelected = { pkg ->
-                    if (showAppPicker == "left") prefs.leftSwipeAppPackage = pkg
-                    if (showAppPicker == "right") prefs.rightSwipeAppPackage = pkg
-                    showAppPicker = null
-                }
+private data class SettingsSearchFlags(
+    val defaultLauncher: Boolean,
+    val aesthetics: Boolean,
+    val appearance: Boolean,
+    val clock: Boolean,
+    val homeApps: Boolean,
+    val textSize: Boolean,
+    val appLibrary: Boolean,
+    val gestures: Boolean,
+    val features: Boolean,
+    val permissions: Boolean
+) {
+    val lookHeader: Boolean get() = aesthetics || appearance || clock
+    val homeHeader: Boolean get() = homeApps || textSize
+    val appLibraryHeader: Boolean get() = appLibrary
+    val gesturesHeader: Boolean get() = gestures
+    val featuresHeader: Boolean get() = features
+    val permissionsHeader: Boolean get() = permissions
+    val anyVisible: Boolean
+        get() = defaultLauncher || lookHeader || homeHeader || appLibraryHeader ||
+            gesturesHeader || featuresHeader || permissionsHeader
+}
+
+@Composable
+private fun EvaluateSettingsSearch(
+    query: String,
+    privateSpaceAvailable: Boolean
+): SettingsSearchFlags {
+    val lookGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.settings_group_look)))
+    val homeGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.settings_group_home)))
+    val appLibraryGroup = matchesSettingsQuery(
+        query,
+        listOf(stringResource(R.string.settings_group_app_library))
+    )
+    val gesturesGroup = matchesSettingsQuery(
+        query,
+        listOf(stringResource(R.string.settings_group_gestures_motion))
+    )
+    val featuresGroup = matchesSettingsQuery(
+        query,
+        listOf(stringResource(R.string.settings_group_features))
+    )
+    val permissionsGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.permissions)))
+
+    val aestheticsTerms = listOf("Aesthetics", "Launcher Font") + availableFonts.map { it.second }
+    val appearanceTerms = listOf(
+        stringResource(R.string.appearance),
+        stringResource(R.string.notification_bar),
+        "Show system status icons",
+        stringResource(R.string.auto_show_keyboard),
+        "Pop up keyboard on search"
+    )
+    val clockTerms = listOf(
+        "Clock & Date",
+        "Show Clock",
+        "Top-level time display",
+        stringResource(R.string.show_date_time),
+        "Current date under the clock",
+        stringResource(R.string.screen_time),
+        "Device usage metrics",
+        "Show Home Apps",
+        "Display pinned apps on the home screen",
+        "24-Hour Format",
+        "Use military time notation",
+        "Show Seconds",
+        "Display seconds on the home screen clock",
+        "Clock Horizontal Alignment",
+        "Clock Vertical Alignment",
+        "Left, Center, or Right",
+        "Top, Middle, or Bottom",
+        stringResource(R.string.left),
+        stringResource(R.string.center),
+        stringResource(R.string.right),
+        stringResource(R.string.top),
+        stringResource(R.string.middle),
+        stringResource(R.string.bottom),
+        stringResource(R.string.clock_size),
+        "Time only",
+        stringResource(R.string.date_size),
+        "Date line only",
+        stringResource(R.string.screen_time_size),
+        "Screen time line only",
+        stringResource(R.string.clock_section_weight),
+        "Home Section Order",
+        stringResource(R.string.clock_first),
+        stringResource(R.string.apps_first)
+    )
+    val homeAppsTerms = listOf(
+        "Home Apps",
+        "Max apps on Home Screen",
+        "Limit applications shown",
+        "Apps Horizontal Alignment",
+        "Apps Vertical Alignment",
+        "App Spacing",
+        "Space between app labels"
+    )
+    val textSizeTerms = listOf(
+        "Text Size",
+        stringResource(R.string.text_size),
+        stringResource(R.string.home_text_size),
+        "Scale font on home",
+        stringResource(R.string.app_drawer_text_size),
+        "Scale font in drawer"
+    )
+    val appLibraryTerms = buildList {
+        add("App Library")
+        add("Show Alphabet Categories")
+        add("Group by starting letter")
+        add("Enable Private Space")
+        add("Unlock OS hidden profiles")
+        add("Not configured in system settings")
+        add(stringResource(R.string.private_space))
+        if (privateSpaceAvailable) {
+            add(stringResource(R.string.private_space_placement))
+            add(stringResource(R.string.private_space_placement_subtitle))
+            add(stringResource(R.string.private_space_placement_bottom))
+            add(stringResource(R.string.private_space_placement_search_bar))
+        }
+    }
+    val gesturesTerms = listOf(
+        stringResource(R.string.gestures),
+        "Enable Gestures",
+        "Activate screen swipes",
+        stringResource(R.string.swipe_down_notifications),
+        stringResource(R.string.swipe_down_notifications_subtitle),
+        stringResource(R.string.left_swipe_action),
+        "Assign left swipe behavior",
+        stringResource(R.string.right_swipe_action),
+        "Assign right swipe behavior",
+        stringResource(R.string.animation_speed),
+        stringResource(R.string.animation_speed_subtitle),
+        stringResource(R.string.animation_speed_fast),
+        stringResource(R.string.animation_speed_standard),
+        stringResource(R.string.animation_speed_slow),
+        stringResource(R.string.content_swipe_to_back),
+        stringResource(R.string.content_swipe_to_back_subtitle),
+        "Notification Summary",
+        "Widgets",
+        "Notes",
+        "System Dropdown",
+        "Open App",
+        "Accessibility Action",
+        "None"
+    )
+    val featuresTerms = listOf(
+        stringResource(R.string.swipe_action_notification_summary),
+        stringResource(R.string.swipe_action_widgets),
+        stringResource(R.string.swipe_action_notes)
+    )
+    val permissionsTerms = listOf(
+        stringResource(R.string.permissions),
+        stringResource(R.string.permissions_intro),
+        stringResource(R.string.perm_notification_listener),
+        stringResource(R.string.perm_notification_listener_body),
+        stringResource(R.string.perm_usage_access),
+        stringResource(R.string.perm_usage_access_body),
+        stringResource(R.string.perm_accessibility),
+        stringResource(R.string.perm_accessibility_body),
+        stringResource(R.string.perm_default_home),
+        stringResource(R.string.perm_default_home_body),
+        stringResource(R.string.perm_query_apps),
+        stringResource(R.string.perm_query_apps_body),
+        stringResource(R.string.perm_widgets),
+        stringResource(R.string.perm_widgets_body),
+        stringResource(R.string.perm_private_space),
+        stringResource(R.string.perm_private_space_body)
+    )
+
+    return SettingsSearchFlags(
+        defaultLauncher = matchesSettingsQuery(
+            query,
+            listOf(
+                stringResource(R.string.change_default_launcher),
+                stringResource(R.string.manage_default_home_settings)
+            )
+        ),
+        aesthetics = lookGroup || matchesSettingsQuery(query, aestheticsTerms),
+        appearance = lookGroup || matchesSettingsQuery(query, appearanceTerms),
+        clock = lookGroup || matchesSettingsQuery(query, clockTerms),
+        homeApps = homeGroup || matchesSettingsQuery(query, homeAppsTerms),
+        textSize = homeGroup || matchesSettingsQuery(query, textSizeTerms),
+        appLibrary = appLibraryGroup || matchesSettingsQuery(query, appLibraryTerms),
+        gestures = gesturesGroup || matchesSettingsQuery(query, gesturesTerms),
+        features = featuresGroup || matchesSettingsQuery(query, featuresTerms),
+        permissions = permissionsGroup || matchesSettingsQuery(query, permissionsTerms)
+    )
+}
+
+private fun matchesSettingsQuery(query: String, terms: List<String>): Boolean {
+    val needle = query.trim()
+    if (needle.isEmpty()) return true
+    return terms.any { it.contains(needle, ignoreCase = true) }
+}
+
+@Composable
+private fun SettingsSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text(stringResource(R.string.settings_search_hint)) },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = stringResource(R.string.search)
+            )
+        },
+        singleLine = true,
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.outline,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    )
+}
+
+@Composable
+private fun SettingsGroupHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        letterSpacing = 1.5.sp,
+        modifier = Modifier.padding(
+            top = VoidDimens.sectionSpacing,
+            bottom = VoidDimens.compactSpacing
+        )
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SettingChoiceChips(
+    selected: String,
+    options: List<Pair<String, String>>,
+    onSelected: (String) -> Unit
+) {
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        options.forEach { (value, label) ->
+            FilterChip(
+                selected = selected == value,
+                onClick = { onSelected(value) },
+                label = { Text(label) }
             )
         }
     }
@@ -409,8 +755,7 @@ private fun AestheticsSection(
     appFont: String,
     onFontChanged: (String) -> Unit
 ) {
-    val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = LocalSettingsPrefs.current
     var showFontPicker by remember { mutableStateOf(false) }
     val currentFontName = availableFonts.firstOrNull { it.first == appFont }?.second ?: "Inter"
 
@@ -474,6 +819,7 @@ private fun AestheticsSection(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ClockAndDateSection(
     showClock: Boolean,
@@ -505,7 +851,7 @@ private fun ClockAndDateSection(
     snackbarHostState: SnackbarHostState
 ) {
     val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = LocalSettingsPrefs.current
     val scope = rememberCoroutineScope()
 
     SettingsSectionHeader("Clock & Date")
@@ -660,8 +1006,7 @@ private fun HomeAppsSection(
     appSpacing: Float,
     onAppSpacingChange: (Float) -> Unit
 ) {
-    val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = LocalSettingsPrefs.current
 
     SettingsSectionHeader("Home Apps")
     SettingCounterItem(
@@ -709,8 +1054,7 @@ private fun TextSizeSection(
     drawerTextSize: Float,
     onDrawerTextSizeChange: (Float) -> Unit
 ) {
-    val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = LocalSettingsPrefs.current
 
     SettingsSectionHeader("Text Size")
     SettingSliderItem(
@@ -737,11 +1081,13 @@ private fun AppLibrarySection(
     onShowAlphabetCategoriesChange: (Boolean) -> Unit,
     privateSpaceEnabled: Boolean,
     onPrivateSpaceEnabledChange: (Boolean) -> Unit,
+    privateSpacePlacement: String,
+    onPrivateSpacePlacementChange: (String) -> Unit,
     isPrivateSpaceConfigured: Boolean,
+    privateSpaceAvailable: Boolean,
     snackbarHostState: SnackbarHostState
 ) {
-    val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = LocalSettingsPrefs.current
     val scope = rememberCoroutineScope()
 
     SettingsSectionHeader("App Library")
@@ -768,6 +1114,30 @@ private fun AppLibrarySection(
         },
         tooltipText = "Private Space isolates sensitive apps behind a separate authentication layer. Must be configured in system settings first."
     )
+    if (privateSpaceAvailable) {
+        Text(
+            text = stringResource(R.string.private_space_placement),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
+        )
+        Text(
+            text = stringResource(R.string.private_space_placement_subtitle),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
+        )
+        SettingChoiceChips(
+            selected = privateSpacePlacement,
+            options = listOf(
+                Prefs.PrivateSpacePlacement.BOTTOM to stringResource(R.string.private_space_placement_bottom),
+                Prefs.PrivateSpacePlacement.SEARCH_BAR to stringResource(R.string.private_space_placement_search_bar)
+            ),
+            onSelected = {
+                onPrivateSpacePlacementChange(it)
+                prefs.privateSpacePlacement = it
+            }
+        )
+    }
 }
 
 @Composable
@@ -777,8 +1147,7 @@ private fun AppearanceSection(
     autoShowKeyboard: Boolean,
     onAutoShowKeyboardChange: (Boolean) -> Unit
 ) {
-    val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = LocalSettingsPrefs.current
 
     SettingsSectionHeader(stringResource(R.string.appearance))
     SettingToggleItem(
@@ -806,24 +1175,55 @@ private fun GesturesSection(
     enableSwipeDownNotifications: Boolean,
     onEnableSwipeDownNotificationsChange: (Boolean) -> Unit,
     enableSummary: Boolean,
-    onEnableSummaryChange: (Boolean) -> Unit,
     enableWidgets: Boolean,
-    onEnableWidgetsChange: (Boolean) -> Unit,
     enableNotes: Boolean,
-    onEnableNotesChange: (Boolean) -> Unit,
     leftSwipeAction: String,
     onLeftSwipeActionChange: (String) -> Unit,
     rightSwipeAction: String,
     onRightSwipeActionChange: (String) -> Unit,
+    animationSpeed: String,
+    onAnimationSpeedChange: (String) -> Unit,
+    contentSwipeToBack: Boolean,
+    onContentSwipeToBackChange: (Boolean) -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
     val context = LocalContext.current
-    val prefs = remember { Prefs(context) }
+    val prefs = LocalSettingsPrefs.current
     val scope = rememberCoroutineScope()
     val grantNotificationAccess = stringResource(R.string.grant_notification_access)
     val couldNotOpenNotificationSettings = stringResource(R.string.could_not_open_notification_settings)
 
     SettingsSectionHeader(stringResource(R.string.gestures))
+    Text(
+        text = stringResource(R.string.animation_speed),
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
+    )
+    Text(
+        text = stringResource(R.string.animation_speed_subtitle),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
+    )
+    SettingChoiceChips(
+        selected = animationSpeed,
+        options = listOf(
+            Prefs.AnimationSpeed.FAST to stringResource(R.string.animation_speed_fast),
+            Prefs.AnimationSpeed.STANDARD to stringResource(R.string.animation_speed_standard),
+            Prefs.AnimationSpeed.SLOW to stringResource(R.string.animation_speed_slow)
+        ),
+        onSelected = {
+            onAnimationSpeedChange(it)
+            prefs.animationSpeed = it
+        }
+    )
+    SettingToggleItem(
+        title = stringResource(R.string.content_swipe_to_back),
+        subtitle = stringResource(R.string.content_swipe_to_back_subtitle),
+        icon = { Icon(Icons.Default.Swipe, contentDescription = null) },
+        checked = contentSwipeToBack,
+        onCheckedChange = { onContentSwipeToBackChange(it); prefs.contentSwipeToBack = it }
+    )
     SettingToggleItem(
         title = "Enable Gestures",
         subtitle = "Activate screen swipes",
@@ -854,65 +1254,6 @@ private fun GesturesSection(
         }
     )
     if (enableGestures) {
-        @OptIn(ExperimentalLayoutApi::class)
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            FilterChip(
-                selected = enableSummary,
-                onClick = {
-                    val newState = !enableSummary
-                    if (newState) {
-                        try {
-                            val enabledListeners = android.provider.Settings.Secure.getString(
-                                context.contentResolver, "enabled_notification_listeners"
-                            ) ?: ""
-                            val hasPermission = enabledListeners.contains(context.packageName)
-                            if (!hasPermission) {
-                                try {
-                                    context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                                    scope.launch { snackbarHostState.showSnackbar("Grant notification access to enable summaries") }
-                                } catch (_: Exception) {
-                                    scope.launch { snackbarHostState.showSnackbar("Could not open notification settings") }
-                                }
-                                return@FilterChip
-                            }
-                        } catch (e: Exception) {
-                            scope.launch { snackbarHostState.showSnackbar("Error checking notification access") }
-                            return@FilterChip
-                        }
-                    }
-                    onEnableSummaryChange(newState); prefs.enableNotificationSummary = newState
-                },
-                label = { Text(stringResource(R.string.swipe_action_notification_summary)) },
-                leadingIcon = if (enableSummary) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
-            )
-
-            FilterChip(
-                selected = enableWidgets,
-                onClick = {
-                    val newState = !enableWidgets
-                    onEnableWidgetsChange(newState); prefs.enableWidgets = newState
-                },
-                label = { Text(stringResource(R.string.swipe_action_widgets)) },
-                leadingIcon = if (enableWidgets) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
-            )
-
-            FilterChip(
-                selected = enableNotes,
-                onClick = {
-                    val newState = !enableNotes
-                    onEnableNotesChange(newState); prefs.enableNotes = newState
-                },
-                label = { Text(stringResource(R.string.swipe_action_notes)) },
-                leadingIcon = if (enableNotes) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
-            )
-        }
-
         SwipeActionSelector(
             label = stringResource(R.string.left_swipe_action),
             subtitle = "Assign left swipe behavior",
@@ -938,6 +1279,80 @@ private fun GesturesSection(
         ) {
             onRightSwipeActionChange(it); prefs.rightSwipeAction = it
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FeaturesSection(
+    enableSummary: Boolean,
+    onEnableSummaryChange: (Boolean) -> Unit,
+    enableWidgets: Boolean,
+    onEnableWidgetsChange: (Boolean) -> Unit,
+    enableNotes: Boolean,
+    onEnableNotesChange: (Boolean) -> Unit,
+    snackbarHostState: SnackbarHostState
+) {
+    val context = LocalContext.current
+    val prefs = LocalSettingsPrefs.current
+    val scope = rememberCoroutineScope()
+
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        FilterChip(
+            selected = enableSummary,
+            onClick = {
+                val newState = !enableSummary
+                if (newState) {
+                    try {
+                        val enabledListeners = android.provider.Settings.Secure.getString(
+                            context.contentResolver, "enabled_notification_listeners"
+                        ) ?: ""
+                        val hasPermission = enabledListeners.contains(context.packageName)
+                        if (!hasPermission) {
+                            try {
+                                context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                scope.launch { snackbarHostState.showSnackbar("Grant notification access to enable summaries") }
+                            } catch (_: Exception) {
+                                scope.launch { snackbarHostState.showSnackbar("Could not open notification settings") }
+                            }
+                            return@FilterChip
+                        }
+                    } catch (_: Exception) {
+                        scope.launch { snackbarHostState.showSnackbar("Error checking notification access") }
+                        return@FilterChip
+                    }
+                }
+                onEnableSummaryChange(newState); prefs.enableNotificationSummary = newState
+            },
+            label = { Text(stringResource(R.string.swipe_action_notification_summary)) },
+            leadingIcon = if (enableSummary) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
+        )
+
+        FilterChip(
+            selected = enableWidgets,
+            onClick = {
+                val newState = !enableWidgets
+                onEnableWidgetsChange(newState); prefs.enableWidgets = newState
+            },
+            label = { Text(stringResource(R.string.swipe_action_widgets)) },
+            leadingIcon = if (enableWidgets) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
+        )
+
+        FilterChip(
+            selected = enableNotes,
+            onClick = {
+                val newState = !enableNotes
+                onEnableNotesChange(newState); prefs.enableNotes = newState
+            },
+            label = { Text(stringResource(R.string.swipe_action_notes)) },
+            leadingIcon = if (enableNotes) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
+        )
     }
 }
 

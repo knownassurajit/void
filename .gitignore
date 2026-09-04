@@ -73,3 +73,8 @@ fastlane/test_output
 !settings.gradle*
 !proguard-rules.pro
 !gradle.properties
+
+# ECC / Cursor local logs
+.cursor/*.log
+.cursor/ecc-install-state.json
+.ecc/
