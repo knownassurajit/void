@@ -44,7 +44,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends unzip curl git
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
@@ -104,7 +104,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends unzip curl git
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
@@ -218,7 +218,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends unzip curl git
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
@@ -345,7 +345,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends unzip curl git
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
@@ -568,7 +568,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/dependency-review-action@da3b6d89b7ff0e7b01db34e8fa88de4ec57b3fef
         with:
           fail-on-severity: high
