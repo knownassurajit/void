@@ -15,7 +15,7 @@
 | App spacing | `APP_SPACING_DP` | Spacing between labels |
 | Text scales | home/drawer scales | Typography |
 | Max home apps | `MAX_HOME_APPS` (+ legacy `HOME_APPS_NUM`) | Unified by `HomeAppsCap`; missing keys use filled slots then 10 |
-| App font | `APP_FONT` | Bundled families via `VoidAppTheme` (default `google_sans`) |
+| App font | `APP_FONT` | Catalog id (`FontCatalog`): bundled, Google Fonts (downloaded by Play services), or `system`; default `google_sans`. An unknown id or a downloadable family that is unavailable renders with the default and the pref is not rewritten. See `docs/features/fonts.md` |
 | Animation speed | `ANIMATION_SPEED` | `fast` / `standard` / `slow` |
 | Swipe to go back | `CONTENT_SWIPE_TO_BACK` | Child screens swipe opposite the enter axis |
 | Private Space placement | `PRIVATE_SPACE_PLACEMENT` | `bottom` or `search_bar` (API 35+) |

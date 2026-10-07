@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.view.Gravity
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,8 +23,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -40,7 +39,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QueryStats
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.SpaceBar
@@ -64,8 +62,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -83,6 +79,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -93,9 +90,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -103,13 +102,24 @@ import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
+import com.knownassurajit.app.launcher.voidlauncher.data.font.FontAvailability
+import com.knownassurajit.app.launcher.voidlauncher.data.font.FontCatalog
+import com.knownassurajit.app.launcher.voidlauncher.data.font.FontCoverage
+import com.knownassurajit.app.launcher.voidlauncher.data.font.fontAvailability
+import com.knownassurajit.app.launcher.voidlauncher.data.font.stateOf
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.helper.FontRepository
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.FontPicker
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSearchField
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeToBack
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavAxis
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavMotion
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.availableFonts
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.rememberFontResolution
 import kotlinx.coroutines.launch
 
 val LocalSettingsPrefs = staticCompositionLocalOf<Prefs> { error("LocalSettingsPrefs missing") }
@@ -147,6 +157,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var showAppPicker by remember { mutableStateOf<String?>(null) }
     var showDeveloperInfo by remember { mutableStateOf(false) }
     var appFont by remember { mutableStateOf(prefs.appFont) }
+    var showFontPicker by remember { mutableStateOf(false) }
     var use24HourClock by remember { mutableStateOf(prefs.use24HourClock) }
     var showSeconds by remember { mutableStateOf(prefs.showClockSeconds) }
 
@@ -176,9 +187,15 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .padding(top = LocalFixedStatusBarHeight.current)
                 .navigationBarsPadding()
-                .screenBackSwipe(onBack)
+                .screenBackSwipe(onBack, enabled = LocalContentSwipeToBack.current && !showFontPicker)
         ) {
             Scaffold(
+                // The picker overlay covers Settings: hide it from TalkBack and from keyboard focus while it is open.
+                modifier = if (showFontPicker) {
+                    Modifier.clearAndSetSemantics {}.focusProperties { canFocus = false }
+                } else {
+                    Modifier
+                },
                 contentWindowInsets = WindowInsets(0.dp),
                 snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
             ) { paddingValues ->
@@ -200,9 +217,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                         }
                     )
 
-                    SettingsSearchField(
+                    VoidSearchField(
                         query = searchQuery,
-                        onQueryChange = { searchQuery = it }
+                        onQueryChange = { searchQuery = it },
+                        hint = stringResource(R.string.settings_search_hint),
+                        leadingIconDescription = stringResource(R.string.search)
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -230,7 +249,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     if (search.aesthetics) {
                         AestheticsSection(
                             appFont = appFont,
-                            onFontChanged = { appFont = it }
+                            onOpenFontPicker = { showFontPicker = true }
                         )
                     }
                     if (search.appearance) {
@@ -379,6 +398,24 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
+            val motionMs = NavMotion.durationMs(animationSpeed)
+            AnimatedVisibility(
+                visible = showFontPicker,
+                modifier = Modifier.fillMaxSize(),
+                enter = NavMotion.enter(NavAxis.Fade, motionMs),
+                exit = NavMotion.exit(NavAxis.Fade, motionMs)
+            ) {
+                FontPicker(
+                    selectedId = FontCatalog.displayedId(appFont),
+                    onFontSelected = { id ->
+                        prefs.appFont = id
+                        appFont = id
+                        showFontPicker = false
+                    },
+                    onDismiss = { showFontPicker = false }
+                )
+            }
+
             if (showAppPicker != null) {
                 SettingsAppPickerSheet(
                     onDismiss = { showAppPicker = null },
@@ -437,7 +474,7 @@ private fun EvaluateSettingsSearch(
     )
     val permissionsGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.permissions)))
 
-    val aestheticsTerms = listOf("Aesthetics", "Launcher Font") + availableFonts.map { it.second }
+    val aestheticsTerms = listOf("Aesthetics", "Launcher Font") + FontCatalog.searchTerms
     val appearanceTerms = listOf(
         stringResource(R.string.appearance),
         stringResource(R.string.notification_bar),
@@ -588,36 +625,6 @@ private fun matchesSettingsQuery(query: String, terms: List<String>): Boolean {
 }
 
 @Composable
-private fun SettingsSearchField(
-    query: String,
-    onQueryChange: (String) -> Unit
-) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text(stringResource(R.string.settings_search_hint)) },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = stringResource(R.string.search)
-            )
-        },
-        singleLine = true,
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.outline,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        textStyle = MaterialTheme.typography.bodyMedium.copy(
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    )
-}
-
-@Composable
 private fun SettingsGroupHeader(title: String) {
     Text(
         text = title.uppercase(),
@@ -753,70 +760,30 @@ private fun SettingsHeader(
 @Composable
 private fun AestheticsSection(
     appFont: String,
-    onFontChanged: (String) -> Unit
+    onOpenFontPicker: () -> Unit
 ) {
-    val prefs = LocalSettingsPrefs.current
-    var showFontPicker by remember { mutableStateOf(false) }
-    val currentFontName = availableFonts.firstOrNull { it.first == appFont }?.second ?: "Inter"
+    val context = LocalContext.current
+    val resolution = rememberFontResolution(appFont)
+    val repository = remember(context) { FontRepository.get(context) }
+    val states by repository.states.collectAsState()
+    val saved = FontCatalog.find(appFont)
+    // A saved downloadable font that is not usable yet says why: still loading, failed, or no provider.
+    val currentFontName = when (fontAvailability(resolution.reason, states.stateOf(appFont, FontCoverage.Full))) {
+        FontAvailability.Available -> resolution.spec.displayName
+        FontAvailability.Loading -> stringResource(R.string.font_subtitle_loading, saved?.displayName.orEmpty())
+        FontAvailability.NotDownloaded ->
+            stringResource(R.string.font_subtitle_not_downloaded, saved?.displayName.orEmpty())
+        FontAvailability.NeedsPlayServices ->
+            stringResource(R.string.font_subtitle_needs_play_services, saved?.displayName.orEmpty())
+    }
 
     SettingsSectionHeader("Aesthetics")
     SettingActionItem(
         title = "Launcher Font",
         subtitle = currentFontName,
         icon = { Icon(Icons.Default.FontDownload, contentDescription = null) },
-        onClick = { showFontPicker = true }
+        onClick = onOpenFontPicker
     )
-
-    if (showFontPicker) {
-        AlertDialog(
-            onDismissRequest = { showFontPicker = false },
-            title = { Text(stringResource(R.string.select_font)) },
-            text = {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    items(availableFonts) { (key, displayName, family) ->
-                        val isSelected = appFont == key
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onFontChanged(key)
-                                    prefs.appFont = key
-                                    showFontPicker = false
-                                }
-                                .padding(vertical = 10.dp, horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = {
-                                    onFontChanged(key)
-                                    prefs.appFont = key
-                                    showFontPicker = false
-                                }
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = displayName,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontFamily = family
-                                ),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                            if (key == "system") {
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = "System",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {}
-        )
-    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

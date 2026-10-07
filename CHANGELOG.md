@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+- 30 more launcher fonts and a searchable picker (search, Sans/Serif/Mono/Display filters, Bundled / Google Fonts / System groups): Geist is bundled (unmodified OFL variable font, `docs/licenses/fonts/geist-OFL.txt`) and 29 Google Fonts families (Poppins, Work Sans, Karla, Dongle, Raleway, Inconsolata, Comfortaa, Antic, Actor, Agdasima, Hanken Grotesk, Basic, Cabin, Cantarell, Hind, Jost, Krub, Lato, Nunito, Epilogue, Open Sans, Sintony, Fjalla One, Rethink Sans, Alumni Sans, Sofia Sans, Source Serif 4, Antonio, Roboto) download on demand through Google Play services, gated by `FeatureAvailability.isGoogleFontsProviderAvailable`
+- A downloadable font is only applied (and the pref only saved) after its download succeeded, a failure keeps the picker open with a message that fits the cause (connection, Play services, font gone), and the saved font is retried on the next start of the launcher; the picker shows each family's weight names and approximate download size (Dongle is about 8.9 MB)
+- The whole app retypesets with the chosen family: per-family line-height scale for tall faces and no positive letter spacing for monospaced ones (`docs/features/fonts.md`)
+- Brogman, Volkga, Disttopian, Stanza, Vangura Sans, and Noria are commercial or personal-use fonts and are not offered; `docs/features/fonts.md` lists the reasons and Google Fonts alternatives
+
+### Changed
+- Settings and the font picker share one `VoidSearchField`; the picker opens scrolled to the selected font, fades in and out with the animation-speed setting, and is announced and navigable by TalkBack (pane title, headings, one radio group)
+- The Launcher Font subtitle says why a saved downloadable font is not in use yet (loading, not downloaded, or needs Google Play services)
+- `googleFonts` version in `libs.versions.toml` aligned to 1.11.2, the version that already resolved through the Compose BOM
+- Privacy policy discloses that downloadable fonts are fetched by Google Play services
+
 ### Fixed
 - Default font now actually loads: the Google Sans assets were HTML placeholder files (the platform font was used silently); VOID now ships a real OFL Google Sans variable subset and unit tests reject non-font files in `res/font` (`docs/bugs/google-sans-html-assets.md`)
 - Google Fonts provider certificates (`font_certs.xml`) replaced with the official valid values and pinned by a unit test, so downloadable fonts can verify the Google Play services provider

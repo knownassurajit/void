@@ -6,6 +6,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.ResourceFont
 import androidx.compose.ui.unit.Density
 import com.knownassurajit.app.launcher.voidlauncher.R
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.GoogleSansFamily
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

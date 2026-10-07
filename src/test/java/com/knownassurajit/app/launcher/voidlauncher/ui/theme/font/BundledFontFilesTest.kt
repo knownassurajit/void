@@ -1,9 +1,15 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme.font
 
+import androidx.compose.ui.text.font.FontListFontFamily
+import androidx.compose.ui.text.font.ResourceFont
+import com.knownassurajit.app.launcher.voidlauncher.R
+import com.knownassurajit.app.launcher.voidlauncher.data.font.FontCatalog
+import com.knownassurajit.app.launcher.voidlauncher.data.font.FontSource
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.TABULAR_FIGURES_FEATURE
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.googleSansFonts
 import java.io.File
 import java.nio.ByteBuffer
+import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -57,6 +63,43 @@ class BundledFontFilesTest {
     }
 
     @Test
+    fun everyBundledCatalogFont_isBackedByRealFilesInResFont() {
+        val bundled = FontCatalog.all.filter { it.source == FontSource.Bundled }
+        assertTrue(bundled.isNotEmpty())
+        bundled.forEach { spec ->
+            val family = FontFamilies.familyFor(spec) as? FontListFontFamily
+                ?: error("${spec.id} must be a font list family")
+            family.fonts.forEach { font ->
+                val resId = (font as? ResourceFont ?: error("${spec.id}: expected a resource font")).resId
+                val name = R.font::class.java.fields.single { it.getInt(null) == resId }.name
+                val file = File(ProjectResources.resDir(), "font/$name.ttf")
+                assertTrue("${spec.id}: font/$name.ttf is missing", file.isFile)
+                assertTrue("${spec.id}: font/$name.ttf is not an sfnt font", hasSfntMagic(file.readHeader()))
+            }
+        }
+    }
+
+    @Test
+    fun geistAsset_isTheUnmodifiedUpstreamVariableFont() {
+        val file = File(ProjectResources.resDir(), "font/geist_variable.ttf")
+        assertTrue("geist_variable.ttf is missing", file.isFile)
+        assertEquals(
+            "geist_variable.ttf must stay byte-identical to upstream (docs/features/fonts.md)",
+            GEIST_SHA256,
+            sha256(file.readBytes())
+        )
+    }
+
+    @Test
+    fun geistAsset_exposesOnlyTheWeightAxisCoveringTheCatalogWeights() {
+        val axes = variationAxes(File(ProjectResources.resDir(), "font/geist_variable.ttf").readBytes())
+        assertEquals(listOf("wght"), axes.map { it.tag })
+        val spec = requireNotNull(FontCatalog.find("geist"))
+        assertTrue(axes.single().min <= spec.weights.min().toFloat())
+        assertTrue(axes.single().max >= spec.weights.max().toFloat())
+    }
+
+    @Test
     fun htmlPlaceholder_isRejected() {
         assertFalse(hasSfntMagic("<!DOCTYPE html>".toByteArray(Charsets.UTF_8)))
         assertFalse(hasSfntMagic("<html lang=\"en\">".toByteArray(Charsets.UTF_8)))
@@ -81,6 +124,9 @@ class BundledFontFilesTest {
             .listFiles { file -> file.isFile && file.extension.lowercase() in FONT_EXTENSIONS }
             .orEmpty()
             .sortedBy { it.name }
+
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(separator = "") { "%02x".format(it) }
 
     private fun File.readHeader(): ByteArray = inputStream().use { it.readNBytes(MAGIC_LENGTH) }
 
@@ -151,6 +197,7 @@ class BundledFontFilesTest {
         const val FEATURE_RECORD_SIZE = 6
         const val FEATURE_LOOKUP_COUNT_OFFSET = 2
         const val FIXED_16_16 = 65536f
+        const val GEIST_SHA256 = "73894e0448cae90a92b6c2f8732b7bb9acb7b94c418bff559dad4a18e1de9659"
         val FONT_EXTENSIONS = setOf("ttf", "otf", "ttc")
         val SFNT_MAGICS: List<ByteArray> = listOf(
             byteArrayOf(0x00, 0x01, 0x00, 0x00),

@@ -7,8 +7,11 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.knownassurajit.app.launcher.voidlauncher.data.font.FontCatalog
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.rememberFontResolution
 
 private val VoidDarkColorScheme = darkColorScheme(
     primary = VoidPrimary,
@@ -58,7 +61,7 @@ private val VoidExpressiveShapes = Shapes(
 
 @Composable
 fun VoidAppTheme(
-    appFont: String = DEFAULT_APP_FONT,
+    appFont: String = FontCatalog.DEFAULT_ID,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -69,9 +72,12 @@ fun VoidAppTheme(
         else -> VoidDarkColorScheme
     }
 
+    val font = rememberFontResolution(appFont).spec
+    val typography = remember(font) { getTypography(font) }
+
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = getTypography(appFont),
+        typography = typography,
         shapes = VoidExpressiveShapes,
         content = content
     )

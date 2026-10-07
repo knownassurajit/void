@@ -9,6 +9,8 @@ object VoidDimens {
     val compactSpacing = 4.dp
     val widgetPreviewWidth = 72.dp
     val widgetPreviewHeight = 48.dp
+    val fontStateIconSize = 24.dp
+    val fontProgressStrokeWidth = 2.dp
 }
 
 object VoidAlpha {

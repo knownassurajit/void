@@ -15,7 +15,7 @@
 ## Fix
 
 - Removed the three HTML assets and `res/font/google_sans.xml`.
-- Added one real asset, `res/font/google_sans_variable.ttf` (SIL OFL 1.1): upstream variable Google Sans with `GRAD` and `opsz` pinned and the `wght` axis kept, subset to Latin, Latin Extended-A/B, Cyrillic and common punctuation/currency. `Type.kt` declares weights 400/500/700 from that single file with `FontVariation.weight`. Provenance, hashes, and the exact recipe: `docs/features/fonts.md`. OFL text: `docs/licenses/fonts/google-sans-OFL.txt`.
+- Added one real asset, `res/font/google_sans_variable.ttf` (SIL OFL 1.1): upstream variable Google Sans with `GRAD` and `opsz` pinned and the `wght` axis kept, subset to Latin, Latin Extended-A/B, Cyrillic and common punctuation/currency. `ui/theme/font/FontFamilies.kt` declares weights 400/500/700 from that single file with `FontVariation.weight`. Provenance, hashes, and the exact recipe: `docs/features/fonts.md`. OFL text: `docs/licenses/fonts/google-sans-OFL.txt`.
 - Replaced `font_certs.xml` verbatim with the official file (Apache-2.0 header kept).
 - Deleted the unused text styles, their now-orphaned `text_colors_default` selector, and the `AppTheme` `android:fontFamily` item instead of repointing them.
 
