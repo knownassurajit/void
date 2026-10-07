@@ -13,6 +13,7 @@ VOID ships one OSS variant. Features degrade when a grant is missing.
 | `BIND_NOTIFICATION_LISTENER_SERVICE` | Special | In-app notification list and summary |
 | `BIND_ACCESSIBILITY_SERVICE` | Special | Optional double-tap to lock |
 | `BIND_DEVICE_ADMIN` | Special | Lock via device admin fallback |
-| `ACCESS_HIDDEN_PROFILES`, `MODIFY_QUIET_MODE`, `INTERACT_ACROSS_PROFILES`, `MANAGE_USERS` | Special (API 35+) | Private Space |
+| `ACCESS_HIDDEN_PROFILES` | Install (API 35+) | Private Space: sees the hidden profile; needs VOID to be the default home app |
+| `MODIFY_QUIET_MODE`, `INTERACT_ACROSS_PROFILES`, `MANAGE_USERS` | Declared, not granted | Private Space: signature-level, not granted to third-party apps. Lock/unlock works because VOID is the foreground default launcher, not because of these |
 
 Settings → Permissions deep-links notification listener, usage access, accessibility, and default-home screens.

@@ -11,6 +11,7 @@
 - `HomeReorderHelper` — multi-slot cascade and `moveItem`
 - `AiSummarizer` — tier mapping
 - `FeatureAvailability` — private space API gate (robolectric/light)
+- `PrivateSpaceUi` — settings action visibility, add-entry heuristic, `outcomeFor` (an unlock request that returns false is never `UNLOCKED`)
 - Widget id / order parse helpers where extracted
 
 Add a regression test for every bug fix affecting pure logic.

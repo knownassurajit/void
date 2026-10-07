@@ -202,6 +202,7 @@
     <string name="unlock_private_space">Unlock Private Space</string>
     <string name="lock_private_space">Lock Private Space</string>
     <string name="private_space_settings">Private Space settings</string>
+    <string name="private_space_toggle_failed">Couldn\'t change Private Space. Make sure VOID is your default home app.</string>
     <string name="add_widget">Add widget</string>
     <string name="home_apps_picker_title">Home screen apps</string>
     <string name="search_apps_to_add">Search apps to add…</string>

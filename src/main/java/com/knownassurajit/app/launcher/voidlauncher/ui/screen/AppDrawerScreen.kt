@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
-import android.os.UserManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,17 +63,21 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBac
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.Collator
 import kotlin.math.abs
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.knownassurajit.app.launcher.voidlauncher.helper.AppCacheManager
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceUi
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
-import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.helper.ToggleOutcome
+import com.knownassurajit.app.launcher.voidlauncher.helper.showToast
 
 @Composable
 fun AppDrawerScreen(
@@ -95,77 +98,84 @@ fun AppDrawerScreen(
     val showAlphabetCategories = remember { prefs.showAlphabetCategories }
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
-        try {
-            if (FeatureAvailability.isPrivateSpaceAvailable(context) &&
-                prefs.privateSpaceEnabled &&
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
-            ) {
-                val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
-                hasPrivateSpace = profile != null
-                if (profile != null) {
-                    isPrivateSpaceLocked = PrivateSpaceHelper.isQuietModeEnabled(context)
-                    scope.launch {
-                        try {
-                            val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                            privateApps.clear()
-                            privateApps.addAll(pApps)
-                        } catch (_: Exception) {
-                            privateApps.clear()
-                        }
-                    }
+    val privateSpaceActive = PrivateSpaceHelper.isEnabled(context, prefs)
+    var refreshJob by remember { mutableStateOf<Job?>(null) }
+    var toggleJob by remember { mutableStateOf<Job?>(null) }
+
+    // The system's quiet mode is the only source of truth for the lock state: every trigger (open,
+    // resume, broadcast, finished toggle) funnels through here and nothing else writes it. A newer
+    // refresh cancels the older one, and state is written only after the last suspension point, so
+    // a cancelled or overlapping load can never leave a stale or half-applied result behind.
+    val refreshPrivateSpace: () -> Unit = remember {
+        {
+            refreshJob?.cancel()
+            refreshJob = scope.launch {
+                val locked = if (PrivateSpaceHelper.isEnabled(context, prefs)) {
+                    PrivateSpaceHelper.queryLocked(context)
+                } else {
+                    null
                 }
-            } else {
-                hasPrivateSpace = false
+                val apps = if (locked == false) {
+                    PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+                } else {
+                    emptyList()
+                }
+                hasPrivateSpace = locked != null
+                isPrivateSpaceLocked = locked ?: true
+                privateApps.clear()
+                privateApps.addAll(apps)
             }
-        } catch (_: Exception) {
-            hasPrivateSpace = false
-            privateApps.clear()
         }
     }
 
-    DisposableEffect(Unit) {
-        if (false) {
-            onDispose {}
-        } else {
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(ctx: Context?, intent: Intent?) {
-                    if (!prefs.privateSpaceEnabled) return
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                        val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
-                        if (profile != null) {
-                            val um = context.getSystemService(Context.USER_SERVICE) as UserManager
-                            isPrivateSpaceLocked = um.isQuietModeEnabled(profile)
-                            if (!isPrivateSpaceLocked) {
-                                scope.launch {
-                                    val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                                    privateApps.clear()
-                                    privateApps.addAll(pApps)
-                                }
-                            } else {
-                                privateApps.clear()
-                            }
-                        } else {
-                            isPrivateSpaceLocked = true
-                            privateApps.clear()
-                            hasPrivateSpace = false
-                        }
+    // A lock/unlock request only asks the system; it never decides what the UI shows. An unlock
+    // that needs credentials returns without changing anything (the system prompt is the feedback),
+    // so the outcome is used only to report a refused request, then the real state is re-read.
+    val onTogglePrivateSpace: () -> Unit = remember {
+        {
+            if (toggleJob?.isActive != true) {
+                toggleJob = scope.launch {
+                    val outcome = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        PrivateSpaceHelper.togglePrivateSpace(context)
+                    } else {
+                        ToggleOutcome.FAILED
                     }
+                    if (outcome == ToggleOutcome.FAILED) {
+                        context.showToast(R.string.private_space_toggle_failed)
+                    }
+                    refreshPrivateSpace()
                 }
             }
-            val filter = IntentFilter().apply {
-                addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
-                addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
-                addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
-                if (Build.VERSION.SDK_INT >= 35) {
-                    addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
-                    addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
-                }
+        }
+    }
+
+    LaunchedEffect(Unit) { refreshPrivateSpace() }
+
+    // Profile broadcasts are deferred while the process is cached, so also re-query on resume.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refreshPrivateSpace() }
+
+    DisposableEffect(privateSpaceActive) {
+        // Nothing is registered below API 35 or when the feature is off, so there is nothing to
+        // unregister either.
+        if (!privateSpaceActive || Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return@DisposableEffect onDispose {}
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                refreshPrivateSpace()
             }
-            androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
-            onDispose {
-                context.unregisterReceiver(receiver)
-            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PROFILE_AVAILABLE)
+            addAction(Intent.ACTION_PROFILE_UNAVAILABLE)
+            addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
+            addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
+            addAction(Intent.ACTION_PROFILE_ADDED)
+            addAction(Intent.ACTION_PROFILE_REMOVED)
+        }
+        androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+        onDispose {
+            runCatching { context.unregisterReceiver(receiver) }
         }
     }
 
@@ -220,12 +230,7 @@ fun AppDrawerScreen(
                 onOpenSettings = onOpenSettings,
                 showPrivateSpaceControls = privateInSearchBar && hasPrivateSpace && prefs.privateSpaceEnabled,
                 isPrivateSpaceLocked = isPrivateSpaceLocked,
-                onTogglePrivateSpace = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                        PrivateSpaceHelper.togglePrivateSpace(context)
-                        isPrivateSpaceLocked = !isPrivateSpaceLocked
-                    }
-                },
+                onTogglePrivateSpace = onTogglePrivateSpace,
                 hasPrivateSpaceSettings = privateSettingsEntry != null,
                 onOpenPrivateSpaceSettings = {
                     privateSettingsEntry?.let(onAppClick)
@@ -258,21 +263,7 @@ fun AppDrawerScreen(
                 appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
                 showBottomPrivateHeader = !privateInSearchBar,
                 onAppClick = onAppClick,
-                onTogglePrivateSpace = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                        PrivateSpaceHelper.togglePrivateSpace(context)
-                        isPrivateSpaceLocked = !isPrivateSpaceLocked
-                        if (!isPrivateSpaceLocked) {
-                            scope.launch {
-                                val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                                privateApps.clear()
-                                privateApps.addAll(pApps)
-                            }
-                        } else {
-                            privateApps.clear()
-                        }
-                    }
-                }
+                onTogglePrivateSpace = onTogglePrivateSpace
             )
         }
     }

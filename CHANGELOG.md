@@ -4,6 +4,8 @@
 
 ### Fixed
 - Private Space settings icon (bottom header and search-bar placements) shows only when the space is unlocked and a settings entry is available; it no longer disappears while searching
+- Private Space locked/unlocked state now comes from the system's quiet mode instead of the lock/unlock request: an unlock that needs credentials (or is cancelled) no longer shows "unlocked", the state refreshes on the profile broadcasts and on resume, and a refused request shows a message
+- Private Space lock/unlock request runs off the main thread and the receiver is only registered (and unregistered) when the feature is available and enabled
 
 ## 0.0.0.11 - 2026-09-04
 

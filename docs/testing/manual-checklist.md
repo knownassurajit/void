@@ -15,4 +15,5 @@
 - [ ] Settings: clock size, section weight, section order, show apps
 - [ ] Private Space: cold-open the drawer while locked shows the lock toggle but no settings icon (bottom header and search-bar placement)
 - [ ] Private Space: after unlock the settings icon shows only if a settings entry exists, and stays visible while typing a query
+- [ ] Private Space (emulator with PIN, VOID as home): unlock shows the credential prompt and stays locked until authenticated or after cancel; lock/unlock from system UI is reflected on returning to the drawer
 - [ ] Lint + unit tests green
