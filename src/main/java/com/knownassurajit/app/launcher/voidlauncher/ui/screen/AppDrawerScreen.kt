@@ -71,6 +71,7 @@ import kotlin.math.abs
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.knownassurajit.app.launcher.voidlauncher.helper.AppCacheManager
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
+import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceUi
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
@@ -185,6 +186,10 @@ fun AppDrawerScreen(
             else list.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
         }
     }
+    // Derived from the unfiltered list so a search query never hides the settings action.
+    val privateSettingsEntry by remember {
+        derivedStateOf { privateApps.firstOrNull { PrivateSpaceHelper.isAddEntry(it) } }
+    }
     val showPrivateSpaceInSearch by remember {
         derivedStateOf {
             hasPrivateSpace && searchQuery.isNotBlank() &&
@@ -221,9 +226,9 @@ fun AppDrawerScreen(
                         isPrivateSpaceLocked = !isPrivateSpaceLocked
                     }
                 },
+                hasPrivateSpaceSettings = privateSettingsEntry != null,
                 onOpenPrivateSpaceSettings = {
-                    val addEntry = privateApps.firstOrNull { PrivateSpaceHelper.isAddEntry(it) }
-                    if (addEntry != null) onAppClick(addEntry)
+                    privateSettingsEntry?.let(onAppClick)
                 }
             )
 
@@ -248,6 +253,7 @@ fun AppDrawerScreen(
                 isPrivateSpaceLocked = isPrivateSpaceLocked,
                 hasPrivateSpace = hasPrivateSpace,
                 filteredPrivateApps = filteredPrivateApps,
+                settingsEntry = privateSettingsEntry,
                 privateSpaceEnabled = prefs.privateSpaceEnabled,
                 appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
                 showBottomPrivateHeader = !privateInSearchBar,
@@ -281,6 +287,7 @@ private fun AppDrawerSearchBar(
     showPrivateSpaceControls: Boolean,
     isPrivateSpaceLocked: Boolean,
     onTogglePrivateSpace: () -> Unit,
+    hasPrivateSpaceSettings: Boolean,
     onOpenPrivateSpaceSettings: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -327,12 +334,14 @@ private fun AppDrawerSearchBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = onOpenPrivateSpaceSettings) {
-                    Icon(
-                        imageVector = Icons.Outlined.Shield,
-                        contentDescription = stringResource(R.string.private_space_settings),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (PrivateSpaceUi.settingsActionVisible(isPrivateSpaceLocked, hasPrivateSpaceSettings)) {
+                    IconButton(onClick = onOpenPrivateSpaceSettings) {
+                        Icon(
+                            imageVector = Icons.Outlined.Shield,
+                            contentDescription = stringResource(R.string.private_space_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             IconButton(onClick = onOpenSettings) {
@@ -355,13 +364,13 @@ private fun ColumnScope.AppDrawerAppList(
     isPrivateSpaceLocked: Boolean,
     hasPrivateSpace: Boolean,
     filteredPrivateApps: List<AppModel>,
+    settingsEntry: AppModel?,
     privateSpaceEnabled: Boolean,
     appDrawerTextSizeScale: Float,
     showBottomPrivateHeader: Boolean,
     onAppClick: (AppModel) -> Unit,
     onTogglePrivateSpace: () -> Unit
 ) {
-    val addEntry = filteredPrivateApps.firstOrNull { PrivateSpaceHelper.isAddEntry(it) }
     val privateOnly = filteredPrivateApps.filterNot { PrivateSpaceHelper.isAddEntry(it) }
     val showPrivateSection = privateSpaceEnabled && hasPrivateSpace
 
@@ -441,8 +450,8 @@ private fun ColumnScope.AppDrawerAppList(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (addEntry != null) {
-                        IconButton(onClick = { onAppClick(addEntry) }) {
+                    if (PrivateSpaceUi.settingsActionVisible(isPrivateSpaceLocked, settingsEntry != null)) {
+                        IconButton(onClick = { settingsEntry?.let(onAppClick) }) {
                             Icon(
                                 imageVector = Icons.Outlined.Settings,
                                 contentDescription = stringResource(R.string.private_space_settings),

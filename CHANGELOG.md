@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Private Space settings icon (bottom header and search-bar placements) shows only when the space is unlocked and a settings entry is available; it no longer disappears while searching
+
 ## 0.0.0.11 - 2026-09-04
 
 ### Fixed

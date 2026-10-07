@@ -13,4 +13,6 @@
 - [ ] Assigned left/right swipe panels enter from the opposite edge and pop on the same axis
 - [ ] Notes: add; swipe left shows red arrow and deletes; complete/reminder; screen back swipe does not steal delete
 - [ ] Settings: clock size, section weight, section order, show apps
+- [ ] Private Space: cold-open the drawer while locked shows the lock toggle but no settings icon (bottom header and search-bar placement)
+- [ ] Private Space: after unlock the settings icon shows only if a settings entry exists, and stays visible while typing a query
 - [ ] Lint + unit tests green

@@ -14,18 +14,8 @@ import java.text.Collator
 object PrivateSpaceHelper {
     private const val TAG = "PrivateSpaceHelper"
 
-    fun isAddEntry(app: AppModel): Boolean {
-        val label = app.appLabel.trim()
-        if (label.equals("Add", ignoreCase = true) ||
-            label.equals("Add apps", ignoreCase = true) ||
-            label.equals("Add app", ignoreCase = true)
-        ) {
-            return true
-        }
-        val cls = (app as? AppModel.App)?.activityClassName.orEmpty()
-        return cls.contains("PrivateSpace", ignoreCase = true) &&
-            (cls.contains("Add", ignoreCase = true) || cls.contains("Install", ignoreCase = true))
-    }
+    fun isAddEntry(app: AppModel): Boolean =
+        PrivateSpaceUi.isAddEntryLabel(app.appLabel, (app as? AppModel.App)?.activityClassName)
 
     fun isPrivateSpaceSupported(context: Context): Boolean {
         return try {
