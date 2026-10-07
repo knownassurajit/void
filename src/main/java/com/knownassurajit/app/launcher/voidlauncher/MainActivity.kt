@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -42,9 +44,12 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotificationsScree
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.SettingsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.WidgetsScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeToBack
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalNavEnterAxis
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavMotion
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavPanel
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelOrigin
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
 
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -139,8 +144,9 @@ class MainActivity : ComponentActivity() {
                 val currentBackStackEntry by navController.currentBackStackEntryAsState()
                 val notifications by NotificationService.notificationsState
                     .collectAsStateWithLifecycle(initialValue = emptyList())
+                val currentRoute = currentBackStackEntry.routeKind()
                 val allowTopEdgeNotificationExpansion =
-                    uiState.showStatusBar && (currentBackStackEntry.routeName() == "HomeRoute")
+                    uiState.showStatusBar && (currentRoute == NavRouteKind.Home)
 
                 LaunchedEffect(uiState.showStatusBar) {
                     val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
@@ -153,11 +159,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val motionMs = NavMotion.durationMs(uiState.animationSpeed)
-                val leftRoute = actionToRouteName(uiState.leftSwipeAction)
-                val rightRoute = actionToRouteName(uiState.rightSwipeAction)
-                val currentRouteName = currentBackStackEntry.routeName()
-                val currentAxis = NavMotion.axisForDestination(currentRouteName, leftRoute, rightRoute)
+                val motion = rememberVoidMotionScheme(uiState.animationSpeed)
+                val leftRoute = NavRouteKind.forSwipeAction(uiState.leftSwipeAction)
+                val rightRoute = NavRouteKind.forSwipeAction(uiState.rightSwipeAction)
+                fun edgeOf(route: NavRouteKind?) = PanelOrigin.resolve(route, leftRoute, rightRoute)
 
                 Box(
                     modifier = Modifier
@@ -190,49 +195,23 @@ class MainActivity : ComponentActivity() {
                         )
                 ) {
                     CompositionLocalProvider(
-                        LocalNavEnterAxis provides currentAxis,
                         LocalContentSwipeToBack provides uiState.contentSwipeToBack
                     ) {
+                    // All four transitions are keyed on the PANEL, the screen opening or closing:
+                    // targetState on a push, initialState on a pop. The screen under the panel
+                    // plays exit/popEnter with the panel's edge so both layers move together.
                     NavHost(
                         navController = navController,
                         startDestination = HomeRoute,
-                        enterTransition = {
-                            val axis = NavMotion.axisForDestination(
-                                targetState.routeName(),
-                                leftRoute,
-                                rightRoute
-                            )
-                            NavMotion.enter(axis, motionMs)
-                        },
-                        exitTransition = {
-                            val axis = NavMotion.axisForDestination(
-                                targetState.routeName(),
-                                leftRoute,
-                                rightRoute
-                            )
-                            NavMotion.exit(axis, motionMs)
-                        },
-                        popEnterTransition = {
-                            val axis = NavMotion.axisForDestination(
-                                initialState.routeName(),
-                                leftRoute,
-                                rightRoute
-                            )
-                            NavMotion.popEnter(axis, motionMs)
-                        },
-                        popExitTransition = {
-                            val axis = NavMotion.axisForDestination(
-                                initialState.routeName(),
-                                leftRoute,
-                                rightRoute
-                            )
-                            NavMotion.popExit(axis, motionMs)
-                        }
+                        enterTransition = { NavMotion.enter(edgeOf(targetState.routeKind()), motion) },
+                        exitTransition = { NavMotion.exit(edgeOf(targetState.routeKind()), motion) },
+                        popEnterTransition = { NavMotion.popEnter(edgeOf(initialState.routeKind()), motion) },
+                        popExitTransition = { NavMotion.popExit(edgeOf(initialState.routeKind()), motion) }
                     ) {
                         composable<HomeRoute> {
                             HomeScreen(
                                 state = uiState,
-                                isCurrentDestination = currentRouteName == "HomeRoute",
+                                isCurrentDestination = currentRoute == NavRouteKind.Home,
                                 onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
                                 onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
                                 onOpenNotifications = {
@@ -248,39 +227,51 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     composable<AppDrawerRoute> {
-                        AppDrawerScreen(
-                            onBack = { navController.popBackStack() },
-                            onAppClick = { app ->
-                                mainViewModel.selectedApp(app, com.knownassurajit.app.launcher.voidlauncher.data.Constants.FLAG_LAUNCH_APP)
-                            },
-                            onOpenSettings = { navController.navigate(SettingsRoute) },
-                            privateSpacePlacement = uiState.privateSpacePlacement
-                        )
+                        NavPanel(edgeOf(NavRouteKind.AppDrawer)) {
+                            AppDrawerScreen(
+                                onBack = { navController.popPanel() },
+                                onAppClick = { app ->
+                                    mainViewModel.selectedApp(app, com.knownassurajit.app.launcher.voidlauncher.data.Constants.FLAG_LAUNCH_APP)
+                                },
+                                onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
+                                privateSpacePlacement = uiState.privateSpacePlacement
+                            )
+                        }
                     }
                     composable<SettingsRoute> {
-                        SettingsScreen(onBack = {
-                            viewModel.refreshFromPrefs()
-                            navController.popBackStack()
-                        })
+                        NavPanel(edgeOf(NavRouteKind.Settings)) {
+                            SettingsScreen(onBack = {
+                                viewModel.refreshFromPrefs()
+                                navController.popPanel()
+                            })
+                        }
                     }
                     composable<NotificationPanelRoute> {
-                        NotificationsScreen(
-                            notifications = notifications,
-                            onBack = { navController.popBackStack() }
-                        )
+                        NavPanel(edgeOf(NavRouteKind.NotificationPanel)) {
+                            NotificationsScreen(
+                                notifications = notifications,
+                                onBack = { navController.popPanel() }
+                            )
+                        }
                     }
                     composable<NotificationSummaryRoute> {
-                        NotificationSummaryScreen(
-                            onBack = { navController.popBackStack() }
-                        )
+                        NavPanel(edgeOf(NavRouteKind.NotificationSummary)) {
+                            NotificationSummaryScreen(
+                                onBack = { navController.popPanel() }
+                            )
+                        }
                     }
                     composable<WidgetsRoute> {
-                        WidgetsScreen(
-                            onBack = { navController.popBackStack() }
-                        )
+                        NavPanel(edgeOf(NavRouteKind.Widgets)) {
+                            WidgetsScreen(
+                                onBack = { navController.popPanel() }
+                            )
+                        }
                     }
                     composable<NotesRoute> {
-                        NotesScreen(onBack = { navController.popBackStack() })
+                        NavPanel(edgeOf(NavRouteKind.Notes)) {
+                            NotesScreen(onBack = { navController.popPanel() })
+                        }
                     }
                     }
                     }
@@ -325,27 +316,25 @@ class MainActivity : ComponentActivity() {
 
 }
 
-private fun NavBackStackEntry?.routeName(): String {
-    val route = this?.destination?.route.orEmpty()
-    return when {
-        route.contains("AppDrawerRoute") -> "AppDrawerRoute"
-        route.contains("NotificationPanelRoute") -> "NotificationPanelRoute"
-        route.contains("NotificationSummaryRoute") -> "NotificationSummaryRoute"
-        route.contains("WidgetsRoute") -> "WidgetsRoute"
-        route.contains("NotesRoute") -> "NotesRoute"
-        route.contains("SettingsRoute") -> "SettingsRoute"
-        route.contains("HomeRoute") -> "HomeRoute"
-        else -> route.substringBefore("?").substringAfterLast('.')
-    }
+/**
+ * Closes the open panel. The panel stays on screen and touchable while its exit animation plays, so
+ * a second dismiss can arrive after Home is already the top entry; popping then would remove Home
+ * and leave the `NavHost` empty. With only Home left this does nothing.
+ */
+private fun NavController.popPanel() {
+    if (previousBackStackEntry != null) popBackStack()
 }
 
-private fun actionToRouteName(action: String): String? = when (action) {
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
-        "NotificationSummaryRoute"
+private fun NavBackStackEntry?.routeKind(): NavRouteKind? {
+    val destination = this?.destination ?: return null
+    return when {
+        destination.hasRoute<HomeRoute>() -> NavRouteKind.Home
+        destination.hasRoute<AppDrawerRoute>() -> NavRouteKind.AppDrawer
+        destination.hasRoute<SettingsRoute>() -> NavRouteKind.Settings
+        destination.hasRoute<NotificationPanelRoute>() -> NavRouteKind.NotificationPanel
+        destination.hasRoute<NotificationSummaryRoute>() -> NavRouteKind.NotificationSummary
+        destination.hasRoute<WidgetsRoute>() -> NavRouteKind.Widgets
+        destination.hasRoute<NotesRoute>() -> NavRouteKind.Notes
+        else -> null
     }
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
-        "WidgetsRoute"
-    }
-    com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> "NotesRoute"
-    else -> null
 }

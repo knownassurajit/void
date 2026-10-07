@@ -33,7 +33,7 @@
 - **Integrated Quick Notes**: Fast, text-based checklist for capturing thoughts instantly with priority ordering and reminders.
 - **Deep Android 15 Integration**: Full support for Private Space, allowing you to access hidden and secure apps directly from the drawer.
 - **Digital Wellbeing**: Screen time and unlock counts are integrated directly into the home screen for at-a-glance awareness.
-- **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions.
+- **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions. Panels move the way you swipe: swipe right and the panel slides in from the left edge, swipe up and the drawer rises from the bottom, while Home moves the same way underneath. Motion uses Material 3 spring physics that the animation-speed setting scales. See [`docs/architecture/motion.md`](docs/architecture/motion.md).
 - **Modern UI**: Built with 100% Jetpack Compose and Material 3. Choose from 36 launcher fonts in a searchable picker: six bundled families that work offline (Google Sans default, DM Sans, Geist, Inter, Manrope, Plus Jakarta Sans), 29 Google Fonts families downloaded on demand by Google Play services (Poppins, Work Sans, Karla, Raleway, Inconsolata, Roboto, Source Serif 4, and more), and the system font. See [`docs/features/fonts.md`](docs/features/fonts.md).
 - **Searchable settings**: Grouped Look / Home / App library / Gestures & motion / Features / Permissions, with animation speed and content swipe-to-back.
 
@@ -46,11 +46,11 @@ Navigate your device with a simple, gesture-based mental model:
 ```mermaid
 graph TD
     A[Home Screen] -- Swipe Up --> B[App Drawer]
-    A -- Long Press --> C[Settings]
     A -- Swipe Left --> D[Custom Action: Notes/Widgets]
     A -- Swipe Right --> E[Custom Action: Summary/Notes]
     A -- Double Tap --> F[Lock Screen]
-    C -- Back --> A
+    B -- Settings icon --> C[Settings]
+    C -- Back --> B
     B -- Click App --> G[Launch App]
     B -- Back --> A
 ```

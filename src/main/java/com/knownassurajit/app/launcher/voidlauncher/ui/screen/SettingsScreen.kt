@@ -116,10 +116,11 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSearchFiel
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeToBack
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavAxis
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavMotion
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.rememberFontResolution
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
 import kotlinx.coroutines.launch
 
 val LocalSettingsPrefs = staticCompositionLocalOf<Prefs> { error("LocalSettingsPrefs missing") }
@@ -398,12 +399,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            val motionMs = NavMotion.durationMs(animationSpeed)
+            val motion = rememberVoidMotionScheme(animationSpeed)
             AnimatedVisibility(
                 visible = showFontPicker,
                 modifier = Modifier.fillMaxSize(),
-                enter = NavMotion.enter(NavAxis.Fade, motionMs),
-                exit = NavMotion.exit(NavAxis.Fade, motionMs)
+                enter = NavMotion.enter(PanelEdge.None, motion),
+                exit = NavMotion.popExit(PanelEdge.None, motion)
             ) {
                 FontPicker(
                     selectedId = FontCatalog.displayedId(appFont),

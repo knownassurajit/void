@@ -7,7 +7,10 @@
 ## Coverage targets
 
 - `HomeAppsCap` — missing `MAX_HOME_APPS` plus filled slots must not collapse to 4
-- `NavMotion` — drawer Up, notifications Down, assigned swipe panels Start/End
+- `NavTravelTest` — for every `PanelEdge` the panel enters from that edge and the covered screen moves the same physical way as the panel during a push (regression for Home sliding against the incoming panel), the four offsets `NavMotion` slides with (`enterStart`, `exitEnd`, `popEnterStart`, `popExitEnd`), a pop is the push played backwards, parallax fractions, `None` has no translation
+- `NavMotionTest` — `PanelOrigin.resolve` (drawer Bottom, notifications Top, Settings None, left/right assigned panels Left/Right, a panel on both sides takes Left, an unknown route has no edge), swipe action to route, the parts and the spring of each transition for every edge and animation speed
+- `VoidMotionTest` — Material 3 standard spring tokens, animation-speed factor and `stiffness / f^2` scaling with damping unchanged, visibility thresholds
+- `ScreenBackSwipeTest` — the close direction of a panel is the finger moving toward its origin edge, `conflictSafe` mapping
 - `HomeReorderHelper` — multi-slot cascade and `moveItem`
 - `AiSummarizer` — tier mapping
 - `FeatureAvailability` — private space API gate (robolectric/light)

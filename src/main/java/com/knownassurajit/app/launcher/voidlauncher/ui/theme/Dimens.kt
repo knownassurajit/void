@@ -17,4 +17,7 @@ object VoidAlpha {
     const val disabled = 0.38f
     const val muted = 0.60f
     const val divider = 0.12f
+
+    /** Opacity of the screen under an open panel: one minus the Material 3 scrim of 0.32. */
+    const val coveredByPanel = 0.68f
 }

@@ -2,7 +2,7 @@
 
 | Folder | Contents |
 |--------|----------|
-| [architecture/](architecture/) | Flavor decision, data flow, process boundaries |
+| [architecture/](architecture/) | Flavor decision, data flow, process boundaries, motion |
 | [features/](features/) | Private Space, widgets, AI summary, notes, fonts |
 | [settings/](settings/) | Homescreen layout customization, permissions |
 | [testing/](testing/) | Unit, e2e, manual checklist |

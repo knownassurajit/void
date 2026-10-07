@@ -12,26 +12,48 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeToBack
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalNavEnterAxis
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavAxis
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalPanelEdge
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import kotlin.math.abs
+
+/**
+ * The finger moves toward the edge the panel came from: left for a panel from the left edge, up for
+ * one from the top, and so on. A panel with no edge ([PanelEdge.None]) closes with a swipe down.
+ */
+internal fun isBackSwipe(edge: PanelEdge, dx: Float, dy: Float, threshold: Float): Boolean {
+    val absX = abs(dx)
+    val absY = abs(dy)
+    return when (edge) {
+        PanelEdge.Left -> dx < -threshold && absX > absY
+        PanelEdge.Right -> dx > threshold && absX > absY
+        PanelEdge.Top -> dy < -threshold && absY > absX
+        PanelEdge.Bottom, PanelEdge.None -> dy > threshold && absY > absX
+    }
+}
+
+/**
+ * A panel from the left edge competes with horizontal row swipes; [conflictSafe] closes it with a
+ * swipe up instead.
+ */
+internal fun backSwipeEdge(edge: PanelEdge, conflictSafe: Boolean): PanelEdge =
+    if (conflictSafe && edge == PanelEdge.Left) PanelEdge.Top else edge
 
 @Composable
 fun Modifier.screenBackSwipe(
     onBack: () -> Unit,
     enabled: Boolean = LocalContentSwipeToBack.current,
-    axis: NavAxis = LocalNavEnterAxis.current,
+    edge: PanelEdge = LocalPanelEdge.current,
     conflictSafe: Boolean = false
 ): Modifier {
     val density = LocalDensity.current
-    val effective = if (conflictSafe && axis == NavAxis.Start) NavAxis.Down else axis
+    val effective = backSwipeEdge(edge, conflictSafe)
     return this.pointerInput(enabled, effective, onBack) {
         if (!enabled) return@pointerInput
-        val edge = with(density) { 24.dp.toPx() }
+        val systemEdgePx = with(density) { 24.dp.toPx() }
         val threshold = 120f
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-            val atSystemEdge = down.position.x < edge || down.position.x > size.width - edge
+            val atSystemEdge = down.position.x < systemEdgePx || down.position.x > size.width - systemEdgePx
             val slop = awaitTouchSlopOrCancellation(down.id) { change, _ ->
                 change.consume()
             } ?: return@awaitEachGesture
@@ -43,14 +65,7 @@ fun Modifier.screenBackSwipe(
             val absX = abs(total.x)
             val absY = abs(total.y)
             if (atSystemEdge && absX > absY) return@awaitEachGesture
-            val matched = when (effective) {
-                NavAxis.Up -> total.y > threshold && absY > absX
-                NavAxis.Down -> total.y < -threshold && absY > absX
-                NavAxis.Start -> total.x < -threshold && absX > absY
-                NavAxis.End -> total.x > threshold && absX > absY
-                NavAxis.Fade -> total.y > threshold && absY > absX
-            }
-            if (matched) onBack()
+            if (isBackSwipe(effective, total.x, total.y, threshold)) onBack()
         }
     }
 }

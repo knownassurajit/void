@@ -10,7 +10,13 @@
 - [ ] Swipe down opens in-app notification list when toggle is on; list matches shade after listener grant
 - [ ] Home: pin 6–10 apps; toggle clock/date in Settings and return — list count stays
 - [ ] Settings search filters groups; back swipe leaves Settings
-- [ ] Assigned left/right swipe panels enter from the opposite edge and pop on the same axis
+- [ ] Assigned left/right swipe panels move the way you swipe: a swipe that moves right brings the left-assigned panel in from the left edge, a swipe that moves left brings the right-assigned panel in from the right edge; closing moves the finger back toward that edge and the panel leaves the same way. Exception: Notes assigned to the left swipe closes with a swipe up (so it does not fight swipe-to-delete on a note row), and still leaves toward the left edge
+- [ ] Home must not glitch: while a panel (left, right, drawer, notification list) opens or closes, Home moves the same way as the panel, a shorter distance and dimmed, with no flash, no jump back and no moment where both screens cross; no Home text shows through the panel
+- [ ] Settings (opened from the settings icon in the drawer header, the only way in) scales up and fades in while the drawer scales up slightly and fades out; closing reverses it; opening Settings twice quickly from the drawer does not stack a second Settings screen
+- [ ] Dismiss a panel twice while it is still leaving (swipe the drawer down twice in quick succession, or tap a back arrow twice): Home stays and the launcher never goes blank
+- [ ] Open the drawer and dismiss it at once, before it has finished opening: it reverses without a jump; Home may settle a little before the drawer has left (known limit)
+- [ ] Animation speed Fast / Standard / Slow: panel springs settle noticeably quicker on Fast and slower on Slow, with no overshoot at the screen edge on any speed; Android's Remove animations makes every panel switch instantly
+- [ ] Emulator only (not the physical device): in an RTL language (Arabic) a swipe that moves right still brings the left-assigned panel in from the left edge
 - [ ] Notes: add; swipe left shows red arrow and deletes; complete/reminder; screen back swipe does not steal delete
 - [ ] Settings: clock size, section weight, section order, show apps
 - [ ] Private Space: cold-open the drawer while locked shows the lock toggle but no settings icon (bottom header and search-bar placement)
@@ -20,7 +26,7 @@
 - [ ] Release build (`assembleRelease`, R8 + shrinkResources): the default font still renders as Google Sans
 - [ ] Home clock with Google Sans: with centre or end clock alignment and seconds on, the time, date, and screen-time text keep a steady width as digits change (tabular figures), e.g. 11:11:11 vs 00:00:00
 - [ ] Settings > Launcher Font opens a full-screen picker with a search field, All/Sans/Serif/Mono/Display chips, and Bundled / Google Fonts / System groups with sticky headers; the subtitle shows the current family
-- [ ] Picker: system Back closes only the picker; a swipe-back gesture with the picker open does not leave Settings (and works again after it closes); the picker fades in and out, quicker on the fast animation speed and slower on the slow one; it opens scrolled so the selected font is visible, and typing a search or tapping a chip returns the list to the top
+- [ ] Picker: system Back closes only the picker; a swipe-back gesture with the picker open does not leave Settings (and works again after it closes); the picker scales up and fades in and scales down and fades out, quicker on the fast animation speed and slower on the slow one; it opens scrolled so the selected font is visible, and typing a search or tapping a chip returns the list to the top
 - [ ] Picker with TalkBack: opening announces "Select font" and moves focus into the picker; heading navigation jumps between Bundled, Google Fonts, and System; each row reads both its choice and its state ("Not selected, Not downloaded yet", "Selected, Downloading", "Download failed. Select to retry."); the Settings content under the overlay cannot be focused by TalkBack or by Tab and D-pad on a hardware keyboard (a control nested inside another focusable row might still be reachable with a keyboard: note it)
 - [ ] Picker: searching "sans" and filtering by Mono/Serif/Display behaves as expected; a search with no match shows "No fonts match your search"
 - [ ] Bundled fonts (Google Sans, DM Sans, Geist, Inter, Manrope, Plus Jakarta Sans) and System apply as soon as they are tapped; Geist shows distinct Regular, Medium, and Bold
