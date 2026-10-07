@@ -16,4 +16,7 @@
 - [ ] Private Space: cold-open the drawer while locked shows the lock toggle but no settings icon (bottom header and search-bar placement)
 - [ ] Private Space: after unlock the settings icon shows only if a settings entry exists, and stays visible while typing a query
 - [ ] Private Space (emulator with PIN, VOID as home): unlock shows the credential prompt and stays locked until authenticated or after cancel; lock/unlock from system UI is reflected on returning to the drawer
+- [ ] Settings > App font: the default (Google Sans) renders the Google Sans letterforms on a non-Pixel device or emulator, Regular/Medium/Bold look distinct, and Latin-Extended and Cyrillic app labels render in the same face
+- [ ] Release build (`assembleRelease`, R8 + shrinkResources): the default font still renders as Google Sans
+- [ ] Home clock with Google Sans: with centre or end clock alignment and seconds on, the time, date, and screen-time text keep a steady width as digits change (tabular figures), e.g. 11:11:11 vs 00:00:00
 - [ ] Lint + unit tests green

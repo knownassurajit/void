@@ -99,6 +99,7 @@ import com.knownassurajit.app.launcher.voidlauncher.helper.HomeReorderHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.withTabularFigures
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.activity.compose.BackHandler
@@ -437,7 +438,7 @@ private fun ColumnScope.HomeClockSection(
                             state.clockSizeScale *
                             (if (state.showSeconds) 0.7f else 1.0f),
                         letterSpacing = (-1.5).sp
-                    ),
+                    ).withTabularFigures(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onBackground,
@@ -460,7 +461,7 @@ private fun ColumnScope.HomeClockSection(
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 2.sp,
                         fontSize = MaterialTheme.typography.bodySmall.fontSize * state.dateSizeScale
-                    ),
+                    ).withTabularFigures(),
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.87f),
                     textAlign = clockTextAlign,
                     modifier = Modifier.clickable {
@@ -482,7 +483,7 @@ private fun ColumnScope.HomeClockSection(
                         fontWeight = FontWeight.Normal,
                         letterSpacing = 1.5.sp,
                         fontSize = 11.sp * state.screenTimeSizeScale
-                    ),
+                    ).withTabularFigures(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                     textAlign = clockTextAlign,
                     modifier = Modifier

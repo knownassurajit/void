@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Fixed
+- Default font now actually loads: the Google Sans assets were HTML placeholder files (the platform font was used silently); VOID now ships a real OFL Google Sans variable subset and unit tests reject non-font files in `res/font` (`docs/bugs/google-sans-html-assets.md`)
+- Google Fonts provider certificates (`font_certs.xml`) replaced with the official valid values and pinned by a unit test, so downloadable fonts can verify the Google Play services provider
+- Home clock, date, and screen-time text use tabular figures, so Google Sans' proportional digits no longer make the clock change width every minute or second (the bundled font keeps its `tnum` feature)
+- Removed the unused legacy `Text*` XML text styles and the window `android:fontFamily` item that referenced the broken assets
 - Private Space settings icon (bottom header and search-bar placements) shows only when the space is unlocked and a settings entry is available; it no longer disappears while searching
 - Private Space locked/unlocked state now comes from the system's quiet mode instead of the lock/unlock request: an unlock that needs credentials (or is cancelled) no longer shows "unlocked", the state refreshes on the profile broadcasts and on resume, and a refused request shows a message
 - Private Space lock/unlock request runs off the main thread and the receiver is only registered (and unregistered) when the feature is available and enabled

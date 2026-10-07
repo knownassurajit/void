@@ -1,20 +1,38 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.knownassurajit.app.launcher.voidlauncher.R
 
 const val DEFAULT_APP_FONT = "google_sans"
 
+// Google Sans (SIL OFL 1.1) ships as one variable file: GRAD and opsz are pinned, wght (400..700) is kept.
+// Provenance and the exact subsetting recipe live in docs/features/fonts.md.
 val GoogleSansFamily = FontFamily(
-    Font(R.font.google_sans_regular, FontWeight.Normal),
-    Font(R.font.google_sans_medium, FontWeight.Medium),
-    Font(R.font.google_sans_bold, FontWeight.Bold)
+    googleSansFont(FontWeight.Normal),
+    googleSansFont(FontWeight.Medium),
+    googleSansFont(FontWeight.Bold)
 )
+
+// The stable Font(resId, ...) overload passes empty variation settings; the axis must be set explicitly.
+@OptIn(ExperimentalTextApi::class)
+private fun googleSansFont(weight: FontWeight): Font = Font(
+    resId = R.font.google_sans_variable,
+    weight = weight,
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight))
+)
+
+// Google Sans digits are proportional by default; the subset keeps its `tnum` feature (docs/features/fonts.md).
+internal const val TABULAR_FIGURES_FEATURE = "tnum"
+
+/** Fixed-width digits for text that changes while it is on screen (clock, date, screen time), so it does not jitter. */
+fun TextStyle.withTabularFigures(): TextStyle = copy(fontFeatureSettings = TABULAR_FIGURES_FEATURE)
 
 val InterFamily = FontFamily(
     Font(R.font.inter_regular, FontWeight.Normal),

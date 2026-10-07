@@ -145,7 +145,7 @@ VOID is a heavily restructured and modernized fork of **Olauncher**. We credit t
 
 - **License**: This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html).
 - **Original Base**: [Olauncher](https://github.com/tanujnotes/olauncher) by Tanuj.
-- **Typography**: Inter (RSMS) and Google Sans.
+- **Typography**: Inter (RSMS) and Google Sans, both under the SIL Open Font License 1.1. The bundled Google Sans is a Latin/Cyrillic variable subset of the Google Fonts release (see [`docs/features/fonts.md`](docs/features/fonts.md); licence text in [`docs/licenses/fonts/google-sans-OFL.txt`](docs/licenses/fonts/google-sans-OFL.txt)).
 - **Icons**: Material Symbols (Google).
 
 ---
