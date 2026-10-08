@@ -264,7 +264,7 @@
     <string name="animation_speed_standard">Standard</string>
     <string name="animation_speed_slow">Slow</string>
     <string name="content_swipe_to_back">Swipe to go back</string>
-    <string name="content_swipe_to_back_subtitle">Swipe in the open direction to leave a screen</string>
+    <string name="content_swipe_to_back_subtitle">Swipe toward the edge a screen came from to leave it</string>
     <string name="private_space_placement">Private Space placement</string>
     <string name="private_space_placement_subtitle">Where Private Space appears in the app library</string>
     <string name="private_space_placement_bottom">Bottom</string>

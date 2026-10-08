@@ -110,7 +110,6 @@ import com.knownassurajit.app.launcher.voidlauncher.data.font.stateOf
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
 import com.knownassurajit.app.launcher.voidlauncher.helper.FontRepository
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
-import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.FontPicker
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSearchField
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
@@ -181,14 +180,16 @@ fun SettingsScreen(onBack: () -> Unit) {
         DeveloperInfoDialog(onDismiss = { showDeveloperInfo = false })
     }
 
-    ChildScreenBackHandler(onBack)
-
     CompositionLocalProvider(LocalSettingsPrefs provides prefs) {
         Box(
             modifier = Modifier
                 .padding(top = LocalFixedStatusBarHeight.current)
                 .navigationBarsPadding()
-                .screenBackSwipe(onBack, enabled = LocalContentSwipeToBack.current && !showFontPicker)
+                .screenBackSwipe(
+                    // With the picker open, Dismiss (TalkBack) closes the picker, not Settings.
+                    onBack = { if (showFontPicker) showFontPicker = false else onBack() },
+                    enabled = LocalContentSwipeToBack.current && !showFontPicker
+                )
         ) {
             Scaffold(
                 // The picker overlay covers Settings: hide it from TalkBack and from keyboard focus while it is open.

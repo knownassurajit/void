@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -44,6 +45,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,14 +60,37 @@ import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteItem
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteRepository
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
-import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.dismissDirection
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeAxis
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalPanelEdge
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
+
+/**
+ * Whether a note row is deleted by a swipe from the start side to the end side (`true`), or from
+ * the end side to the start side. Deleting is permanent, so it must never be the swipe that closes
+ * Notes (toward the edge the panel came from): a row consumes the drag first, so closing Notes with
+ * a finger over a note would delete the note. The panel from the left edge closes with a swipe left,
+ * so there a note is deleted with a swipe right; everywhere else it is a swipe left, as before.
+ * [rtl] is the layout direction, because "start" and "end" flip with it while the closing swipe is
+ * physical (see [dismissDirection]).
+ */
+internal fun noteDeleteFromStartToEnd(edge: PanelEdge, rtl: Boolean): Boolean {
+    val closing = dismissDirection(edge)
+    val closesWithASwipeLeft = closing.axis == SwipeAxis.Horizontal && closing.sign < 0
+    // A swipe right deletes only when a swipe left closes. Swiping right is start to end in LTR, end to start in RTL.
+    return closesWithASwipeLeft != rtl
+}
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun NotesScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val deleteFromStartToEnd = noteDeleteFromStartToEnd(
+        edge = LocalPanelEdge.current,
+        rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    )
     val repo = remember { NoteRepository(context) }
     val notes = remember { mutableStateListOf<NoteItem>() }
     var newNoteText by remember { mutableStateOf("") }
@@ -79,14 +105,12 @@ fun NotesScreen(onBack: () -> Unit) {
         notes.addAll(repo.getAllNotes())
     }
 
-    ChildScreenBackHandler(onBack)
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
-            .screenBackSwipe(onBack, conflictSafe = true)
+            .screenBackSwipe(onBack)
     ) {
         Column(
             modifier = Modifier
@@ -178,17 +202,21 @@ fun NotesScreen(onBack: () -> Unit) {
 
                         SwipeToDismissBox(
                             state = dismissState,
-                            enableDismissFromStartToEnd = false,
-                            enableDismissFromEndToStart = true,
+                            enableDismissFromStartToEnd = deleteFromStartToEnd,
+                            enableDismissFromEndToStart = !deleteFromStartToEnd,
                             backgroundContent = {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .padding(horizontal = 8.dp),
-                                    contentAlignment = Alignment.CenterEnd
+                                    contentAlignment = if (deleteFromStartToEnd) Alignment.CenterStart else Alignment.CenterEnd
                                 ) {
                                     Icon(
-                                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
+                                        imageVector = if (deleteFromStartToEnd) {
+                                            Icons.AutoMirrored.Outlined.KeyboardArrowRight
+                                        } else {
+                                            Icons.AutoMirrored.Outlined.KeyboardArrowLeft
+                                        },
                                         contentDescription = stringResource(R.string.swipe_to_delete),
                                         tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(28.dp)

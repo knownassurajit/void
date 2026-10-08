@@ -1,6 +1,6 @@
 # Motion
 
-How Home and its panels (drawer, notification list, summary, widgets, notes, Settings) move. The code is in `ui/theme`: `Motion.kt` (spring tokens), `NavTravel.kt` (pure travel geometry), `NavMotion.kt` (the `NavHost` transitions and `NavPanel`).
+How Home and its panels (drawer, notification list, summary, widgets, notes, Settings) move. The code is in `ui/theme`: `Motion.kt` (spring tokens), `NavTravel.kt` (pure travel geometry), `NavMotion.kt` (the `NavHost` transitions and `NavPanel`), `PredictiveBackMath.kt` (the system back animation); and in `ui/gesture` and `ui/components`: `SwipeMath.kt` (pure swipe arithmetic) and `ScreenBackSwipe.kt` (the in-content back swipe).
 
 ## What the user sees
 
@@ -27,10 +27,7 @@ This is the reading of the request "the next screen follows the gesture directio
 
 A panel assigned to both swipe actions takes the left edge (the left action wins). The notification list always enters from the top, even when a horizontal swipe opens it.
 
-Two panels close differently from the table:
-
-- Notes (`conflictSafe`) assigned to the left swipe closes with a swipe **up**, not left, because a horizontal swipe on a note row deletes it. The panel still leaves toward the left edge. Notes on the right swipe closes with a swipe right.
-- Settings is reachable only from the drawer today (`HomeScreen.onOpenSettings` is declared and wired but never called), so the screen under Settings is always the drawer, never Home.
+Settings is reachable only from the drawer today (`HomeScreen.onOpenSettings` is declared and wired but never called), so the screen under Settings is always the drawer, never Home. Every other panel closes as the table says; Notes has no exception: it closes like any panel from its edge. What changed is the note row. A row is a swipe-to-dismiss box that deletes the note for good and consumes the drag first, so a swipe that closes Notes with a finger over a note would delete it. The delete swipe therefore goes the other way from the close swipe (`noteDeleteFromStartToEnd` in `NotesScreen.kt`): Notes on the left swipe closes with a swipe left, so there a note is deleted with a swipe right; on the right swipe it closes with a swipe right and a note is deleted with a swipe left. Start and end flip in right-to-left layouts, the close swipe does not, and the function takes that into account.
 
 `NavTravel.path(edge, layer, direction, size)` gives the start and end offset of a layer (`Panel` or `Covered`) in pixels, and `NavMotion` passes exactly those values to `slideIn` and `slideOut` through `enterStart` (panel, push, start), `exitEnd` (covered, push, end), `popEnterStart` (covered, pop, start) and `popExitEnd` (panel, pop, end):
 
@@ -62,6 +59,60 @@ All four transitions are keyed on the **panel**. In `NavHost` 2.10.0 the transit
 
 Routes are matched with `NavDestination.hasRoute<T>()` against the type-safe `@Serializable` routes, not by route-name strings. Opening Settings from the drawer uses `launchSingleTop`.
 
+## Going back
+
+There are several ways to leave a panel, and they take different paths:
+
+| Way | Plays | Owned by |
+|---|---|---|
+| System back gesture (swipe from a screen edge, Android 14+) | the **predictive back** animation, following the finger | `NavHost` (`predictivePopEnterTransition`, `predictivePopExitTransition`) |
+| Back key or 3-button navigation, Android 14+ | the **predictive back** animation too, not following anything: see below | `NavHost` |
+| Back key or 3-button navigation, API 26-33 | the plain pop: the push played backwards (`popEnter`, `popExit`) | `NavHost` |
+| The back arrow of a screen, a swipe inside the panel, TalkBack's Dismiss action | the plain pop, started at once (the swipe: once it is recognised) | `popPanel`, `screenBackSwipe`, `dismissAction` in `ScreenBackSwipe.kt` |
+| TalkBack's back action | the same as the Back key when it injects a key press that lasts longer than a frame; the plain pop when the key down and up arrive in the same frame | `NavHost` |
+
+**The Back key is not a plain pop on Android 14 and later.** The platform treats a Back key press like a gesture for an app that registered an `OnBackAnimationCallback` (the manifest sets `enableOnBackInvokedCallback`, and `navigationevent` 1.1.2 registers one on API 34+, `OnBackInvokedInput`): on key down it calls `onBackStarted` with an event that has no progress and the **left** edge (`ViewRootImpl.doOnBackKeyEvent`, in the Android 14 and 16 sources; Android 16 reports `EDGE_NONE` only where its `predictiveBackSwipeEdgeNone` flag is on), and on key up `onBackInvoked`. `NavHost` takes that for a predictive back, so a press that lasts longer than a frame (a hardware key, an on-screen Back button) plays the predictive pair, and the leaving screen shifts right by up to `W / 20 - 8 dp` whichever edge the panel came from. Only a key whose down and up arrive in one frame (`adb shell input keyevent KEYCODE_BACK`, often TalkBack's injected back) skips the preview and plays the plain pop. The `predictivePop*` lambdas receive only the swipe edge, and a key press carries no touch position and no progress, so they cannot tell a press from a swipe from the left edge. If the plain reverse for the Back key were a product requirement, it cannot be had with this `NavHost` configuration.
+
+API 26-33 have no predictive preview at all (every way back plays the plain pop).
+
+**No screen registers a back handler of its own to leave itself.** The old `ChildScreenBackHandler` was composed after `NavHost`, so it was asked first (back handlers are last in, first out) and swallowed every back before `NavHost`'s seekable predictive pop could see it: the edge gesture showed no preview at all. A screen may still register a handler for its own local UI that has to go first (the font picker in Settings does, and closes only the picker); Home keeps an unconditional one that does nothing, so a back on the root never leaves the launcher.
+
+Leaving Settings by any path (its arrow, the Back key, TalkBack, a swipe, the system gesture) makes Home read the preferences again (`NavRouteKind.settingsClosed`, observed in `MainActivity`). That used to run only in Settings' own back callback, which the system gesture no longer goes through. It runs when the route changes, that is at the start of the pop, as the old callback did. `MainUiViewModel` also follows preference changes live (`Prefs.homescreenPreferences`: the font, the layout and the Private Space placement among them), so the screen shown under Settings, in the predictive preview too, is current; the refresh on leaving re-reads what that flow does not (the home app slots).
+
+### Predictive back
+
+The numbers are the Android predictive-back design guidance for going back to another screen of the same app, the same for every route (a panel without an edge included):
+
+| | Leaving screen | Screen under it |
+|---|---|---|
+| Scale | 100% to 90% (`exitScale`) | 110% to 100% (`enterScale`) |
+| Shift | sideways by at most `W / 20 - 8 dp`, the way the finger moves | none |
+| Fade | gone after 35% of the gesture | starts at 35% of the gesture |
+| Curve | cubic Bezier (0.1, 0.1, 0, 1) for scale and shift, linear for the fades | the same |
+
+`PredictiveBackMath.shiftSign` gives the direction from the edge the swipe started at: left edge `+x` (right), right edge `-x` (left), no edge `0` (`shiftOffset` turns it into the sideways offset of the screen). A Back key press reports the left edge (see above), so it shifts right. The direction is the physical one and is not mirrored for right-to-left layouts. The 8 dp margin is `VoidDimens.predictiveBackEdgeMargin`.
+
+`NavHost` seeks these transitions **by time**: the gesture progress becomes a fraction of the total duration, so every part is a tween (not a spring) of one shared duration, 300 ms times the animation-speed factor (180, 300 or 480 ms), and the two fades are split at 35% of it (105 ms out; 195 ms in after a 105 ms delay at standard speed). Committing the gesture continues from the current fraction and cancelling plays it back to the start; both are `NavHost`'s own and cannot be tuned from here.
+
+### The swipe inside a panel
+
+`screenBackSwipe` (on the root of every panel, gated by the "Swipe to go back" setting) closes the panel with a swipe toward the edge it came from. It follows the Material 3 `SwipeToDismissBox` conventions, in dp, and decides on release:
+
+| Rule | Value | Source |
+|---|---|---|
+| Commit by distance | travelled 56 dp along the dismiss direction | `SwipeToDismissBoxDefaults.positionalThreshold` (material3 1.3.2) as `VoidDimens.swipeCommitDistance` |
+| Commit by flick | released at 125 dp/s or faster along the dismiss direction, after at least the axis lock distance | `DismissVelocityThreshold` (material3 1.3.2) as `VoidDimens.swipeFlickVelocity` |
+| Cancel by flick back | released at 125 dp/s or faster the other way: the panel stays, however far the finger went. A slower return is decided by the distance | `AnchoredDraggableState` settles on the anchor the velocity points to once it reaches the threshold, and only then looks at the distance |
+| Axis lock | a drag within about 34 degrees of an axis (dominance 1.5) locks it at 1.5 touch slops (12 dp); a diagonal locks to its longer axis at 3 touch slops (24 dp); the axis never changes during the drag | `SwipeMath.lockAxis`, `AxisLock` |
+| Drag measured from | the touch-down point, so the travel before the touch slop counts. It is the sum of what the finger moved in each event (position minus previous position, both read through the panel's transform of that moment), not a difference from the touch-down position: a panel that is still sliding in moves under a resting finger, and that motion must not count as a swipe | `BackSwipeRecognizer` in `ScreenBackSwipe.kt` |
+| Not committed | anything shorter or slower, a drag on the other axis, a drag that a child consumed first, or a pointer the system cancelled | |
+
+All distances are compared in dp (`px / density`), so a swipe needs the same finger travel on every display. Velocity comes from a `VelocityTracker` fed with the travel, not the position, so the panel's own motion is not in it. A flick back at 125 dp/s or faster cancels (see the table), and a negative travel never commits. Thresholds do not depend on the animation speed.
+
+Settings has no edge and closes with a swipe **down**, as before. TalkBack's Dismiss action on the panel root does the same as the swipe (`dismissAction`); with the Settings font picker open, it closes the picker instead.
+
+Because a child that consumes the drag first wins, a vertical swipe starts the dismiss only on regions that consume nothing (headers, the search bar, gaps): the lists of the drawer, the notification list and Settings scroll instead, and a note row slides to delete. The system back gesture, the Back key and TalkBack are the reliable ways out of those screens. A swipe that starts in the strip Android claims for its own back gesture is cancelled by the system, which then plays the predictive animation, so it does nothing here.
+
 ## Spring tokens
 
 `VoidMotion` holds the Material 3 **standard** spring tokens (dampingRatio, stiffness) from material3 1.4.0 `StandardMotionTokens`. `MotionScheme` is internal in every released material3 (1.3.2 on our classpath has none), so the numbers are copied and `VoidMotionScheme` mirrors the `MotionScheme` function names (`fastSpatialSpec`, `defaultSpatialSpec`, `slowSpatialSpec`, `fastEffectsSpec`, `defaultEffectsSpec`, `slowEffectsSpec`) so adopting it later is mechanical.
@@ -88,14 +139,24 @@ At standard speed a panel settles to one pixel in about 0.45 s, and the covered 
 ## Limits
 
 - Forward swipes are not finger-tracked: `NavHost` cannot seek a forward transition, so a panel starts when the swipe is recognised and then springs in. A finger-tracked open needs Home permanently composed under an overlay panel host; that is a separate change.
-- System back still runs through each screen's own back handler (`ChildScreenBackHandler`), so the plain pop (the push reversed) plays, not the predictive-back preview.
+- The swipe inside a panel is not finger-tracked: nothing moves until it is recognised and released, then the plain pop plays. Only the system back gesture follows the finger, and only on Android 14 and later. Finger-tracking the swipe would need synthetic back events fed to `NavHost`, which can wedge the system's own back input if one is left unfinished, so it is not done.
+- The predictive preview is `NavHost`'s: it has no vertical shift for the drawer and the notification list (the edge it is given is horizontal only), the corners stay square while it scales, and the cancel is a linear tween. A panel that left toward the left edge may first shift right when the swipe started at the left edge, and a Back key press always reports the left edge, so any panel shifts right.
+- A vertical in-panel dismiss only starts on regions that consume no drag (see above). Fixing that needs a nested-scroll hand-off from the lists.
+- `SwipeMath.rubberBand` has no caller yet: it is reserved for a finger-tracked swipe (the peek of a panel that is about to open), which does not exist. A `backProgress` mapping (travel over the commit distance) is deliberately not built: with nothing that tracks the finger there is nothing to feed it to (it would only be needed to drive `NavHost` with synthetic back events, which is rejected above).
+- The predictive pair follows the written guidance, so around 35% of the gesture the leaving screen has faded out and the screen under it has not started to: only the black window shows for that moment, in a held gesture and on a Back key press. The checklist asks to look at it on an emulator. If it reads as Home vanishing, start the fade-in of the screen under it at 0% from a non-zero alpha (keeping the 110% to 100% scale and the 35% fade-out) and change `PredictiveBackMath`, its test and the table above together.
 - Reversing a push in flight (open the drawer, then dismiss it at once) plays the screen under the panel back on Compose's default springs, not on the `popEnter` spring: `EnterExitTransition` applies an enter spec only to the PreEnter to Visible segment and an exit spec only to Visible to PostExit, and the reversal is PostExit to Visible, which uses the defaults. There is no public API to change that segment. The panel leaves on its own `popExit` spring, so Home settles a little before the panel has gone.
-- A dismiss that arrives while the panel is already closing is ignored (`MainActivity.popPanel` pops only while a screen is left under the panel). The closing panel stays on screen and touchable until its exit finishes, about 0.45 s at standard speed and about 0.8 s at slow speed, and popping again would remove Home and leave the `NavHost` blank.
+- A dismiss that arrives while the panel is already closing is ignored (`MainActivity.popPanel(panel)` pops only while that panel is the top entry and a screen is left under it: `shouldPopPanel`). The closing panel stays on screen and touchable until its exit finishes, about 0.45 s at standard speed and about 0.8 s at slow speed, and popping again would remove the screen under it as well (Settings over the drawer would go on to Home), or Home itself and leave the `NavHost` blank.
 - Two swipe-opened destinations do not follow the swipe direction yet. The notification list opened by a horizontal swipe (the `NOTIFICATIONS` swipe action) still drops from the top, because the edge is chosen from the destination alone and a swipe down or the status-bar pull open the same destination. A swipe action that launches an external app (`APP`) has no directional motion at all (`HomeScreen.dispatchSwipeAction` calls a plain `startActivity`). Both need the trigger direction, for example a one-shot edge hint set by Home's open callbacks and read by `edgeOf`, which belongs with the Home gesture changes. When `APP` gets directional motion, derive the slide pair from the physical finger direction (finger moves right, content enters from the left); `MainViewModel.launchApp`'s `swipeDirection` strings are the inverse of that and must not be wired straight through.
-- Gesture thresholds, edge-start swipes and haptics are separate work.
+- Home's own swipes (opening a panel) still use the old release-only logic and a pixel threshold; moving them to `SwipeMath`, edge-start swipes and haptics are separate work.
 
 ## Tests
 
-`NavTravelTest` (direction of every layer for every edge, the four offsets `NavMotion` hands to `slideIn` and `slideOut` (`enterStart`, `exitEnd`, `popEnterStart`, `popExitEnd`), a pop is the push played backwards, parallax, `None` has no translation), `NavMotionTest` (`PanelOrigin.resolve` table including a panel on both sides and an unknown route, the parts and the spring of every transition for every edge and speed), `VoidMotionTest` (token values, speed scaling, thresholds), `ScreenBackSwipeTest` (close direction per edge).
+`NavTravelTest` (direction of every layer for every edge, the four offsets `NavMotion` hands to `slideIn` and `slideOut` (`enterStart`, `exitEnd`, `popEnterStart`, `popExitEnd`), a pop is the push played backwards, parallax, `None` has no translation), `NavMotionTest` (`PanelOrigin.resolve` table including a panel on both sides and an unknown route, the parts and the spring of every transition for every edge and speed, the predictive pair with its tweens written out from the guidance curve, `settingsClosed`, `shouldPopPanel`), `VoidMotionTest` (token values, speed scaling, thresholds), `ScreenBackSwipeTest` (dismiss direction per edge and the decision to close, driven through `BackSwipeRecognizer`: distance, flick, flick back, the other axis, a child that consumed the drag, a cancel, the travel before the slop, a panel sliding under a resting finger), `SwipeMathTest` (axis lock cones, diagonals and that it never changes, rubber band slope and limit, commit by distance and by flick, a short flick, a flick or drag the wrong way, a flick back after the distance, dp conversion at several densities), `PredictiveBackMathTest` (edge signs, the shift cap and the sideways-only offset, the 35% fade split, durations per speed, the easing control points and two of its values), `NotesScreenTest` (the delete swipe of a note is never the close swipe, in LTR and RTL), and `ListeningLeaseTest` (see below).
 
-Not covered by a JVM test, because the project has no Robolectric or navigation-testing: the `hasRoute` mapping in `MainActivity.routeKind()`, the choice of `targetState` or `initialState` in the four `NavHost` lambdas, the `NavPanel` provision of `LocalPanelEdge`, and `popPanel`. They are exercised by `docs/testing/manual-checklist.md` on a device; an instrumented test of the real graph needs `navigation-testing` and the lambdas extracted into one function, and is a follow-up.
+`ScreenBackSwipeInstrumentedTest` (`src/androidTest`) runs the pointer loop of `screenBackSwipe` on the real Compose input pipeline: a slow drag past 56 dp closes, a short slow one does not, a short fast flick closes, the wrong way and the other axis do nothing, a child that consumes the drag wins, a cancelled pointer does nothing, a tap does nothing, a panel sliding under a resting finger does not close, and with the setting off the swipe does nothing while Dismiss still closes. It compiles with the build but has not been run: it needs an emulator, and the physical device is not used for instrumented tests.
+
+Not covered by a JVM or instrumented test, because the project has no Robolectric or navigation-testing: the `hasRoute` mapping in `MainActivity.routeKind()`, the choice of `targetState` or `initialState` in the four `NavHost` lambdas and the two predictive ones, the `NavPanel` provision of `LocalPanelEdge`, the `currentBackStackEntry == panel` lookup in `popPanel` (its decision is `shouldPopPanel`), and the Settings refresh effect. They are exercised by `docs/testing/manual-checklist.md` on a device; an instrumented test of the real graph needs `navigation-testing` and the lambdas extracted into one function, and is a follow-up.
+
+## Widgets and the widget host
+
+`AppWidgetHost` registers one listener per host id for the whole process, and each Widgets screen builds its own host. The screen that is closing stays composed until its exit animation ends, so opening Widgets again in that time started a second host, and the first screen's `stopListening` then silenced it: the widgets stopped updating. `WidgetsViewModel` now takes a `ListeningLease` on a process-wide `ListenerCount`: every screen starts listening (so the newest one receives the updates), and only the last one to leave stops it (`ListeningLeaseTest`). Releasing twice, from the disposed effect and from `onCleared`, is harmless.

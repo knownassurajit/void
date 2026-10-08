@@ -11,6 +11,21 @@ object VoidDimens {
     val widgetPreviewHeight = 48.dp
     val fontStateIconSize = 24.dp
     val fontProgressStrokeWidth = 2.dp
+
+    /**
+     * Drag distance along the dismiss direction that commits a swipe on release: the Material 3
+     * `SwipeToDismissBox` positional threshold (`SwipeToDismissBoxDefaults.positionalThreshold`).
+     */
+    val swipeCommitDistance = 56.dp
+
+    /**
+     * Release speed, per second, that commits a swipe that travelled at least as far as the axis
+     * lock distance: the Material 3 `SwipeToDismissBox` `DismissVelocityThreshold`.
+     */
+    val swipeFlickVelocity = 125.dp
+
+    /** Gap the shrinking screen keeps from the screen edge in a predictive back (Android predictive-back design). */
+    val predictiveBackEdgeMargin = 8.dp
 }
 
 object VoidAlpha {

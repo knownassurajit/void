@@ -1,10 +1,15 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.unit.IntOffset
+import androidx.navigationevent.NavigationEvent
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -224,7 +229,114 @@ class NavMotionTest {
         assertTrue(part(enter, "Fade").orEmpty().contains("alpha=0.0"))
     }
 
+    // ---- predictive back ----
+
+    // `TweenSpec` has a value-based hashCode and prints as "TweenSpec@<hash>", like `SpringSpec`.
+    private fun tweenOf(transition: Any, name: String): String? =
+        part(transition, name)?.let { TWEEN.find(it)?.groupValues?.get(1) }
+
+    // The easing is written out, not read from `PredictiveBackMath.easing`, so that changing the curve fails this test.
+    private fun tween(durationMillis: Int, delayMillis: Int = 0, linear: Boolean = false): String =
+        Integer.toHexString(
+            tween<Float>(
+                durationMillis,
+                delayMillis,
+                if (linear) LinearEasing else CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
+            ).hashCode()
+        )
+
+    private val edgeMarginPx = 21f
+
+    @Test
+    fun predictivePopExit_shrinksMovesAndFadesOutOnTheGuidanceTimings() {
+        val exit = NavMotion.predictivePopExit(NavigationEvent.EDGE_LEFT, motion, edgeMarginPx)
+        assertTrue(part(exit, "Scale").orEmpty().contains("scale=0.9"))
+        assertTrue(part(exit, "Fade").orEmpty().contains("alpha=0.0"))
+        assertTrue(part(exit, "Slide") != null)
+        // Scale and slide play the whole 300 ms on the guidance curve; the fade is over after 35% of it.
+        assertEquals(tween(300), tweenOf(exit, "Scale"))
+        assertEquals(tween(300), tweenOf(exit, "Slide"))
+        assertEquals(tween(105, linear = true), tweenOf(exit, "Fade"))
+    }
+
+    @Test
+    fun predictivePopEnter_growsFromTheOutsideAndFadesInAfterThirtyFivePercent() {
+        val enter = NavMotion.predictivePopEnter(motion)
+        assertTrue(part(enter, "Scale").orEmpty().contains("scale=1.1"))
+        assertTrue(part(enter, "Fade").orEmpty().contains("alpha=0.0"))
+        assertNull(part(enter, "Slide"))
+        assertEquals(tween(300), tweenOf(enter, "Scale"))
+        assertEquals(tween(195, delayMillis = 105, linear = true), tweenOf(enter, "Fade"))
+    }
+
+    @Test
+    fun predictiveTransitions_playForTheAnimationSpeedAndEndTogether() {
+        val durations = mapOf(Prefs.AnimationSpeed.FAST to 180, Prefs.AnimationSpeed.STANDARD to 300, Prefs.AnimationSpeed.SLOW to 480)
+        durations.forEach { (speed, duration) ->
+            val scheme = VoidMotionScheme(speed)
+            val exit = NavMotion.predictivePopExit(NavigationEvent.EDGE_NONE, scheme, edgeMarginPx)
+            val enter = NavMotion.predictivePopEnter(scheme)
+            assertEquals(speed, tween(duration), tweenOf(exit, "Scale"))
+            assertEquals(speed, tween(duration), tweenOf(enter, "Scale"))
+            val fadeOut = PredictiveBackMath.fadeOutMillis(duration)
+            assertEquals(speed, tween(fadeOut, linear = true), tweenOf(exit, "Fade"))
+            assertEquals(
+                speed,
+                tween(duration - fadeOut, delayMillis = fadeOut, linear = true),
+                tweenOf(enter, "Fade")
+            )
+        }
+    }
+
+    @Test
+    fun predictiveTransitions_areSprungNowhere() {
+        // A seek maps the gesture progress to time, so springs would end at an unrelated moment.
+        val exit = NavMotion.predictivePopExit(NavigationEvent.EDGE_RIGHT, motion, edgeMarginPx)
+        val enter = NavMotion.predictivePopEnter(motion)
+        listOf(exit to listOf("Scale", "Slide", "Fade"), enter to listOf("Scale", "Fade")).forEach { (transition, parts) ->
+            parts.forEach { assertNull("$it", springOf(transition, it)) }
+        }
+    }
+
+    // ---- leaving Settings ----
+
+    @Test
+    fun settingsClosed_isTrueWhenSettingsIsLeftForAnyScreen() {
+        assertTrue(NavRouteKind.settingsClosed(NavRouteKind.Settings, NavRouteKind.AppDrawer))
+        assertTrue(NavRouteKind.settingsClosed(NavRouteKind.Settings, NavRouteKind.Home))
+        assertTrue(NavRouteKind.settingsClosed(NavRouteKind.Settings, null))
+    }
+
+    @Test
+    fun settingsClosed_isFalseOtherwise() {
+        assertFalse(NavRouteKind.settingsClosed(null, NavRouteKind.Settings))
+        assertFalse(NavRouteKind.settingsClosed(NavRouteKind.Settings, NavRouteKind.Settings))
+        assertFalse(NavRouteKind.settingsClosed(NavRouteKind.Home, NavRouteKind.AppDrawer))
+        assertFalse(NavRouteKind.settingsClosed(NavRouteKind.AppDrawer, NavRouteKind.Settings))
+        assertFalse(NavRouteKind.settingsClosed(null, null))
+    }
+
+    // ---- shouldPopPanel ----
+
+    @Test
+    fun shouldPopPanel_popsThePanelOnTopWhileAScreenIsLeftUnderIt() {
+        assertTrue(shouldPopPanel(panelIsTop = true, hasEntryBelow = true))
+    }
+
+    @Test
+    fun shouldPopPanel_ignoresADismissFromAPanelThatIsAlreadyClosing() {
+        // Regression: Settings closing over the drawer, a second dismiss from Settings popped the drawer too.
+        assertFalse(shouldPopPanel(panelIsTop = false, hasEntryBelow = true))
+        assertFalse(shouldPopPanel(panelIsTop = false, hasEntryBelow = false))
+    }
+
+    @Test
+    fun shouldPopPanel_neverPopsHome() {
+        assertFalse(shouldPopPanel(panelIsTop = true, hasEntryBelow = false))
+    }
+
     private companion object {
         val SPRING = Regex("""SpringSpec@([0-9a-f]+)""")
+        val TWEEN = Regex("""TweenSpec@([0-9a-f]+)""")
     }
 }

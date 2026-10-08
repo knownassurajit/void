@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
-import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import kotlinx.coroutines.Dispatchers
@@ -211,8 +210,6 @@ fun AppDrawerScreen(
             filteredApps.groupBy { it.appLabel.firstOrNull()?.uppercase() ?: "#" }.toSortedMap()
         }
     }
-
-    ChildScreenBackHandler(onBack)
 
     Box(
         modifier = Modifier

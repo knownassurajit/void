@@ -32,6 +32,14 @@ class VoidMotionTest {
     }
 
     @Test
+    fun scheme_exposesTheSpeedFactorForTheTweensThatCannotBeSprings() {
+        assertEquals(0.6f, fast.speedFactor, 0f)
+        assertEquals(1.0f, standard.speedFactor, 0f)
+        assertEquals(1.6f, slow.speedFactor, 0f)
+        assertEquals(1.0f, VoidMotionScheme("warp").speedFactor, 0f)
+    }
+
+    @Test
     fun stiffnessFor_isStiffnessOverFactorSquared() {
         assertEquals(300f / (0.6f * 0.6f), VoidMotion.stiffnessFor(Prefs.AnimationSpeed.FAST, 300f), 0.01f)
         assertEquals(300f, VoidMotion.stiffnessFor(Prefs.AnimationSpeed.STANDARD, 300f), 0f)

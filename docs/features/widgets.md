@@ -6,6 +6,8 @@ Widgets are hosted on a **dedicated Widgets screen** using native `AppWidgetHost
 
 This is live system widget rendering — not a decorative overlay.
 
+Android keeps a single listener registration per `AppWidgetHost` id (`1024`), while each Widgets screen builds its own host and the closing screen stays composed until its exit animation ends. Listening is therefore reference counted (`ListeningLease`): every Widgets screen starts it, and only the last one to leave stops it, so reopening Widgets while it is still closing never silences the new screen. See `docs/architecture/motion.md`.
+
 ## Customization
 
 - Pin / unpin providers

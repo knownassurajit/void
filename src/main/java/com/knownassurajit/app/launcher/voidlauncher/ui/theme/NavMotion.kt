@@ -2,7 +2,9 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -36,6 +38,15 @@ val LocalContentSwipeToBack = compositionLocalOf { true }
  * A panel from an edge slides in with no fade while the screen under it moves the same way by a
  * parallax distance and dims. A panel without an edge ([PanelEdge.None]) scales and fades instead
  * (Material shared axis Z). A pop plays the push backwards.
+ *
+ * A system back gesture on Android 14 or later (a swipe from a screen edge) plays
+ * [predictivePopExit] and [predictivePopEnter] instead of the pop pair, whatever the panel: the
+ * Material predictive-back animation, which follows the finger (see [PredictiveBackMath]). So does
+ * a Back key press that lasts longer than a frame on Android 14 or later: the platform starts the
+ * same predictive back for it, with no progress and, in the Android 14 and 16 sources, the left
+ * edge, and these lambdas cannot tell the two apart. API 26 to 33, every in-app pop (the back
+ * arrow, a swipe inside a panel, TalkBack's Dismiss action) and a key whose down and up arrive in
+ * one frame play the pop pair.
  */
 object NavMotion {
     /** The panel opens: it slides in from its edge, or (no edge) scales up and fades in. */
@@ -75,6 +86,34 @@ object NavMotion {
         } else {
             slideOut(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popExitEnd(edge, it) }
         }
+
+    /**
+     * The screen being left by a back gesture that started at [swipeEdge] (a `NavigationEvent`
+     * edge) shrinks to 90%, moves sideways the way the finger moves by at most `W / 20 - 8 dp`
+     * ([edgeMarginPx] is the 8 dp), and has faded out by 35% of the gesture. The same for every
+     * route.
+     */
+    fun predictivePopExit(swipeEdge: Int, motion: VoidMotionScheme, edgeMarginPx: Float): ExitTransition {
+        val duration = PredictiveBackMath.durationMillis(motion.speedFactor)
+        return scaleOut(tween(duration, easing = PredictiveBackMath.easing), PredictiveBackMath.exitScale) +
+            slideOut(tween(duration, easing = PredictiveBackMath.easing)) { fullSize ->
+                PredictiveBackMath.shiftOffset(swipeEdge, fullSize, edgeMarginPx)
+            } +
+            fadeOut(tween(PredictiveBackMath.fadeOutMillis(duration), easing = LinearEasing))
+    }
+
+    /** The screen under it grows from 110% to 100% and fades in from 35% of the gesture on. */
+    fun predictivePopEnter(motion: VoidMotionScheme): EnterTransition {
+        val duration = PredictiveBackMath.durationMillis(motion.speedFactor)
+        return scaleIn(tween(duration, easing = PredictiveBackMath.easing), PredictiveBackMath.enterScale) +
+            fadeIn(
+                tween(
+                    durationMillis = PredictiveBackMath.fadeInMillis(duration),
+                    delayMillis = PredictiveBackMath.fadeInDelayMillis(duration),
+                    easing = LinearEasing
+                )
+            )
+    }
 }
 
 /**

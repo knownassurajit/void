@@ -71,6 +71,9 @@ object VoidMotion {
  * for sub-pixel distances.
  */
 class VoidMotionScheme(private val speedKey: String) {
+    /** How long an animation plays relative to the Material default, for the tweens that cannot be springs. */
+    val speedFactor: Float get() = VoidMotion.speedFactor(speedKey)
+
     fun <T> fastSpatialSpec(visibilityThreshold: T? = null): SpringSpec<T> = scaled(
         VoidMotion.spatialFastDamping,
         VoidMotion.spatialFastStiffness,

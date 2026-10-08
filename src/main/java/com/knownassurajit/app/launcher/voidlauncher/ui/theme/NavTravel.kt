@@ -31,8 +31,21 @@ enum class NavRouteKind {
             Prefs.SwipeAction.NOTES -> Notes
             else -> null
         }
+
+        /** Whether Settings was just left, so Home must read the preferences Settings wrote again. */
+        fun settingsClosed(previous: NavRouteKind?, current: NavRouteKind?): Boolean =
+            previous == Settings && current != Settings
     }
 }
+
+/**
+ * Whether a dismiss that comes from a panel pops the back stack. A closing panel stays on screen
+ * and touchable until its exit animation ends, so a second dismiss (a swipe, the back arrow,
+ * TalkBack's Dismiss) can arrive from a panel that is no longer on top ([panelIsTop] is false):
+ * popping then would remove the screen below it as well. And with nothing below the panel
+ * ([hasEntryBelow] is false) only Home is left, which must stay.
+ */
+fun shouldPopPanel(panelIsTop: Boolean, hasEntryBelow: Boolean): Boolean = panelIsTop && hasEntryBelow
 
 /** Decides which edge each destination enters from. */
 object PanelOrigin {
