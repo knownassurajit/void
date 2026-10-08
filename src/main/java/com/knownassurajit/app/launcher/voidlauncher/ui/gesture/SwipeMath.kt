@@ -56,15 +56,23 @@ object SwipeMath {
     /**
      * Resistance for a drag that is not allowed to follow the finger all the way: `limit * x / (x +
      * limit)`. It follows the finger one to one at first (slope 1 at 0), then slows down and never
-     * reaches [limit]. It is odd, so a negative [x] gives the mirrored result.
-     *
-     * Nothing calls it yet: it is reserved for a finger-tracked swipe (the peek of a panel that is
-     * about to open), which does not exist today (see `docs/architecture/motion.md`, Limits).
+     * reaches [limit]. It is odd, so a negative [x] gives the mirrored result. Home uses it to
+     * follow a swipe that is opening a panel (see `HomeSwipeRecognizer`).
      */
     fun rubberBand(x: Float, limit: Float): Float {
         if (limit <= 0f) return 0f
         val distance = abs(x)
         return sign(x) * limit * distance / (distance + limit)
+    }
+
+    /**
+     * How fast [rubberBand] moves per unit the finger moves at [x]: `limit^2 / (|x| + limit)^2`, 1
+     * at 0 and falling toward 0. Multiplying a finger speed by it gives the speed of the content.
+     */
+    fun rubberBandSlope(x: Float, limit: Float): Float {
+        if (limit <= 0f) return 0f
+        val stretched = abs(x) + limit
+        return limit * limit / (stretched * stretched)
     }
 
     /**

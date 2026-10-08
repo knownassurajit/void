@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Slide out to bottom — used for app drawer dismiss -->
+<!--
+    Home leaves downward when the app comes in from the top (LaunchAnimation.FromTop): 20% of the
+    height, the parallax of NavTravel.verticalParallax, dimmed to 68%.
+-->
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:shareInterpolator="false">
     <translate
         android:fromYDelta="0"
-        android:toYDelta="100%p"
-        android:duration="280"
-        android:interpolator="@android:anim/accelerate_interpolator" />
+        android:toYDelta="20%p"
+        android:duration="300"
+        android:interpolator="@interpolator/emphasized_decelerate" />
     <alpha
         android:fromAlpha="1.0"
-        android:toAlpha="0.0"
-        android:duration="240"
-        android:interpolator="@android:anim/accelerate_interpolator" />
+        android:toAlpha="0.68"
+        android:duration="300"
+        android:interpolator="@interpolator/emphasized_decelerate" />
 </set>

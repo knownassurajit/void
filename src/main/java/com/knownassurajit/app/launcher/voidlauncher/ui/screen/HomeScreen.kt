@@ -9,14 +9,8 @@ import android.provider.CalendarContract
 import android.view.Gravity
 import android.widget.Toast
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.drag
-import androidx.compose.ui.input.pointer.positionChange
-import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,15 +87,23 @@ import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppSlot
 import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppsCap
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
-import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
 import com.knownassurajit.app.launcher.voidlauncher.helper.HomeLayoutHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.HomeReorderHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeEdgeExclusionStrips
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeSettings
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeState
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeFeatureFlags
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeTarget
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.homeSwipe
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.homeSwipeOffset
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.withTabularFigures
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import androidx.activity.compose.BackHandler
 
 // ── Alignment helpers ──
@@ -213,19 +215,20 @@ private fun openScreenTimeDestination(context: android.content.Context) {
 fun HomeScreen(
     state: MainUiState,
     isCurrentDestination: Boolean = true,
+    isSettled: Boolean = true,
     onOpenApps: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenNotificationSummary: () -> Unit,
     onOpenWidgets: () -> Unit,
     onOpenNotes: () -> Unit,
+    onLaunchSwipeApp: (packageName: String, enterFrom: PanelEdge) -> Boolean,
     onAppClick: (HomeApp) -> Unit,
     onClockClick: () -> Unit,
     onDateClick: () -> Unit,
     onHomeAppsChanged: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val density = LocalDensity.current
     val prefs = remember { Prefs.get(context) }
     val haptic = LocalHapticFeedback.current
     val clockAlign = remember(state.clockHorizontalAlignment) { gravityToAlignment(state.clockHorizontalAlignment) }
@@ -237,12 +240,25 @@ fun HomeScreen(
     val appTextAlign = remember(state.appHorizontalAlignment) { gravityToTextAlign(state.appHorizontalAlignment) }
 
     // ── Swipe gesture state ──
-    val swipeThreshold = 120f
     var showAppPicker by remember { mutableStateOf(false) }
 
     var isDraggingGlobal by remember { mutableStateOf(false) }
     val isDraggingGlobalLatest = rememberUpdatedState(isDraggingGlobal)
-    val swipeDownEnabledLatest = rememberUpdatedState(state.enableSwipeDownNotifications)
+    val latestState = rememberUpdatedState(state)
+    val swipeState = remember { HomeSwipeState() }
+    val motion = rememberVoidMotionScheme(state.animationSpeed)
+
+    // Swipes start only while Home is the screen on top and no navigation transition is moving it.
+    val swipesActive = isCurrentDestination && isSettled
+    // The edge strips are asked for again whenever Home becomes the current screen, so a change made in
+    // Settings (a swipe app, a feature switch) is picked up; the gesture itself reads the preferences afresh.
+    val edgeSettings = remember(
+        swipesActive,
+        state.leftSwipeAction,
+        state.rightSwipeAction,
+        state.enableGestures,
+        state.enableSwipeDownNotifications
+    ) { homeSwipeSettings(state, prefs) }
 
     // Consume back press only while home is the current destination.
     BackHandler(enabled = isCurrentDestination) { /* home is the root */ }
@@ -252,66 +268,28 @@ fun HomeScreen(
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
-            // Stable keys — do NOT key on isDraggingGlobal (restarts cancel child reorder).
-            // Yield to long-press (reorder / picker) instead of consuming the pointer immediately.
-            .pointerInput(
-                state.leftSwipeAction,
-                state.rightSwipeAction,
-                state.enableGestures,
-                state.enableSwipeDownNotifications
-            ) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    if (isDraggingGlobalLatest.value) {
-                        return@awaitEachGesture
-                    }
-                    val edge = with(density) { 24.dp.toPx() }
-                    val atSystemEdge = down.position.x < edge || down.position.x > size.width - edge
-                    val slop = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis.toLong()) {
-                        awaitTouchSlopOrCancellation(down.id) { change, _ ->
-                            if (!atSystemEdge) change.consume()
-                        }
-                    }
-                    if (slop == null || isDraggingGlobalLatest.value) {
-                        return@awaitEachGesture
-                    }
-                    var total = slop.positionChange()
-                    drag(slop.id) { change ->
-                        if (isDraggingGlobalLatest.value) return@drag
-                        total += change.positionChange()
-                        if (!atSystemEdge) change.consume()
-                    }
-                    if (isDraggingGlobalLatest.value) return@awaitEachGesture
-                    val absX = abs(total.x)
-                    val absY = abs(total.y)
-                    if (atSystemEdge && absX > absY) {
-                        return@awaitEachGesture
-                    }
-                    if (absX > swipeThreshold || absY > swipeThreshold) {
-                        if (absX > absY) {
-                            if (state.enableGestures) {
-                                if (total.x > 0) {
-                                    dispatchSwipeAction("left", state.leftSwipeAction, context, prefs,
-                                        onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
-                                } else {
-                                    dispatchSwipeAction("right", state.rightSwipeAction, context, prefs,
-                                        onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
-                                }
-                            }
-                        } else {
-                            if (total.y > 0) {
-                                if (swipeDownEnabledLatest.value) {
-                                    onOpenNotifications()
-                                }
-                            } else {
-                                onOpenApps()
-                            }
-                        }
-                    }
+            // Chained after the padding, so a swipe never starts in the status or navigation bar area.
+            // Home itself does not move under the finger: only the content below follows it.
+            .homeSwipe(
+                state = swipeState,
+                enabled = swipesActive,
+                motion = motion,
+                isReordering = { isDraggingGlobalLatest.value },
+                targetFor = { edge -> homeSwipeSettings(latestState.value, prefs).targetFor(edge) },
+                onCommit = { target ->
+                    dispatchSwipeTarget(
+                        target = target,
+                        onOpenApps = onOpenApps,
+                        onOpenNotificationSummary = onOpenNotificationSummary,
+                        onOpenWidgets = onOpenWidgets,
+                        onOpenNotes = onOpenNotes,
+                        onOpenNotifications = onOpenNotifications,
+                        onLaunchApp = onLaunchSwipeApp
+                    )
                 }
-            }
+            )
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().homeSwipeOffset(swipeState)) {
             val clockEnabled = state.showClock || state.showDate ||
                 (state.showScreenTime && state.screenTime.isNotBlank())
             val appsEnabled = state.showHomeApps
@@ -374,6 +352,11 @@ fun HomeScreen(
                 if (appsEnabled) Apps()
             }
         }
+
+        HomeEdgeExclusionStrips(
+            left = swipesActive && edgeSettings.targetFor(PanelEdge.Left) != SwipeTarget.None,
+            right = swipesActive && edgeSettings.targetFor(PanelEdge.Right) != SwipeTarget.None
+        )
     }
 
     // ── App picker sheet ──
@@ -1015,39 +998,65 @@ private fun HomeAppPickerSheet(
     }
 }
 
-private fun dispatchSwipeAction(
-    direction: String,
-    action: String,
-    context: android.content.Context,
-    prefs: Prefs,
-    onSummary: () -> Unit,
-    onWidgets: () -> Unit,
-    onNotes: () -> Unit,
-    onNotifications: () -> Unit
-) {
-    when (action) {
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
-            if (prefs.enableNotificationSummary) onSummary()
+/**
+ * What each direction of a Home swipe opens, from the screen state and the preferences that are
+ * not part of it (the optional screens' switches and the apps chosen for the sides). Read afresh
+ * for every swipe, so a change made in Settings applies to the next one.
+ */
+private fun homeSwipeSettings(state: MainUiState, prefs: Prefs): HomeSwipeSettings = homeSwipeSettings(
+    state = state,
+    leftAppPackage = prefs.leftSwipeAppPackage,
+    rightAppPackage = prefs.rightSwipeAppPackage,
+    flags = SwipeFeatureFlags(
+        notes = prefs.enableNotes,
+        widgets = prefs.enableWidgets,
+        notificationSummary = prefs.enableNotificationSummary
+    )
+)
+
+/** [homeSwipeSettings] with the preferences already read, so the mapping itself can be unit tested. */
+internal fun homeSwipeSettings(
+    state: MainUiState,
+    leftAppPackage: String,
+    rightAppPackage: String,
+    flags: SwipeFeatureFlags
+): HomeSwipeSettings = HomeSwipeSettings(
+    gesturesEnabled = state.enableGestures,
+    swipeDownEnabled = state.enableSwipeDownNotifications,
+    leftAction = state.leftSwipeAction,
+    rightAction = state.rightSwipeAction,
+    leftAppPackage = leftAppPackage,
+    rightAppPackage = rightAppPackage,
+    flags = flags
+)
+
+/**
+ * Runs what a committed swipe resolved to ([HomeSwipeSettings.targetFor]) and says whether it
+ * could, which decides between the confirming and the rejecting haptic cue. The panels start their
+ * transition from the edge of their route, the app is launched with [SwipeTarget.App.edge] for the
+ * window animation of the Android versions that play one (see `LaunchAnimation`).
+ */
+internal fun dispatchSwipeTarget(
+    target: SwipeTarget,
+    onOpenApps: () -> Unit,
+    onOpenNotificationSummary: () -> Unit,
+    onOpenWidgets: () -> Unit,
+    onOpenNotes: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onLaunchApp: (packageName: String, enterFrom: PanelEdge) -> Boolean
+): Boolean {
+    when (target) {
+        is SwipeTarget.Panel -> when (target.route) {
+            NavRouteKind.AppDrawer -> onOpenApps()
+            NavRouteKind.NotificationSummary -> onOpenNotificationSummary()
+            NavRouteKind.Widgets -> onOpenWidgets()
+            NavRouteKind.Notes -> onOpenNotes()
+            // Never the target of a swipe (see HomeSwipeSettings.targetFor).
+            NavRouteKind.Home, NavRouteKind.Settings, NavRouteKind.NotificationPanel -> return false
         }
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
-            if (prefs.enableWidgets) onWidgets()
-        }
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> {
-            if (prefs.enableNotes) onNotes()
-        }
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATIONS -> onNotifications()
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.APP -> {
-            val pkg = if (direction == "left") prefs.leftSwipeAppPackage else prefs.rightSwipeAppPackage
-            if (pkg.isNotEmpty()) {
-                try {
-                    val intent = context.packageManager.getLaunchIntentForPackage(pkg)
-                    if (intent != null) {
-                        context.startActivity(intent)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
+        is SwipeTarget.App -> return onLaunchApp(target.packageName, target.edge)
+        SwipeTarget.Notifications -> onOpenNotifications()
+        SwipeTarget.None -> return false
     }
+    return true
 }

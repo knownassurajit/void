@@ -1,5 +1,6 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
+import androidx.compose.animation.EnterExitState
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
@@ -46,6 +47,14 @@ enum class NavRouteKind {
  * ([hasEntryBelow] is false) only Home is left, which must stay.
  */
 fun shouldPopPanel(panelIsTop: Boolean, hasEntryBelow: Boolean): Boolean = panelIsTop && hasEntryBelow
+
+/**
+ * Whether a destination is at rest: no `NavHost` transition is moving it any more (it is fully
+ * [EnterExitState.Visible] and is not on its way to anything else). A Home swipe that starts
+ * sooner would stack a second panel on top of one that is still leaving.
+ */
+fun isAtRest(currentState: EnterExitState, targetState: EnterExitState): Boolean =
+    currentState == EnterExitState.Visible && targetState == EnterExitState.Visible
 
 /** Decides which edge each destination enters from. */
 object PanelOrigin {

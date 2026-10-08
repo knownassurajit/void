@@ -156,6 +156,36 @@ class SwipeMathTest {
         assertEquals(0f, SwipeMath.rubberBand(50f, -5f), 0f)
     }
 
+    // ---- rubberBandSlope ----
+
+    @Test
+    fun rubberBandSlope_isOneAtZeroAndFallsAsTheBandStiffens() {
+        assertEquals(1f, SwipeMath.rubberBandSlope(0f, 24f), 0f)
+        assertEquals(0.25f, SwipeMath.rubberBandSlope(24f, 24f), 0.0001f)
+        var previous = 2f
+        (0..400).forEach {
+            val slope = SwipeMath.rubberBandSlope(it.toFloat(), 24f)
+            assertTrue("$it", slope < previous)
+            previous = slope
+        }
+    }
+
+    @Test
+    fun rubberBandSlope_isTheDerivativeOfRubberBand() {
+        listOf(0f, 5f, 24f, 90f).forEach { x ->
+            val step = 0.01f
+            val measured = (SwipeMath.rubberBand(x + step, 24f) - SwipeMath.rubberBand(x, 24f)) / step
+            assertEquals("$x", measured, SwipeMath.rubberBandSlope(x, 24f), 0.01f)
+        }
+    }
+
+    @Test
+    fun rubberBandSlope_isEvenAndZeroWithoutALimit() {
+        assertEquals(SwipeMath.rubberBandSlope(30f, 24f), SwipeMath.rubberBandSlope(-30f, 24f), 0f)
+        assertEquals(0f, SwipeMath.rubberBandSlope(30f, 0f), 0f)
+        assertEquals(0f, SwipeMath.rubberBandSlope(30f, -5f), 0f)
+    }
+
     // ---- shouldCommit ----
 
     private fun commit(travelPx: Float, velocityPxPerSecond: Float = 0f, density: Float = 2f): Boolean =

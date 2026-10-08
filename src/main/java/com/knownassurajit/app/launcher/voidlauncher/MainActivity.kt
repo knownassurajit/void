@@ -51,6 +51,7 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelOrigin
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.isAtRest
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.shouldPopPanel
 
@@ -234,9 +235,13 @@ class MainActivity : ComponentActivity() {
                         }
                     ) {
                         composable<HomeRoute> {
+                            // Home is at rest once no transition moves it any more: a swipe that starts
+                            // while a panel is still leaving would stack a second panel on top.
+                            val atRest = isAtRest(transition.currentState, transition.targetState)
                             HomeScreen(
                                 state = uiState,
                                 isCurrentDestination = currentRoute == NavRouteKind.Home,
+                                isSettled = atRest,
                                 onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
                                 onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
                                 onOpenNotifications = {
@@ -245,6 +250,9 @@ class MainActivity : ComponentActivity() {
                                 onOpenNotificationSummary = { navController.navigate(NotificationSummaryRoute) { launchSingleTop = true } },
                                 onOpenWidgets = { navController.navigate(WidgetsRoute) { launchSingleTop = true } },
                                 onOpenNotes = { navController.navigate(NotesRoute) { launchSingleTop = true } },
+                                onLaunchSwipeApp = { packageName, enterFrom ->
+                                    mainViewModel.launchSwipeApp(packageName, enterFrom)
+                                },
                                 onAppClick = { app -> launchHomeApp(app) },
                                 onClockClick = { mainViewModel.setDefaultClockApp() },
                                 onDateClick = { openCalendar(this@MainActivity) },

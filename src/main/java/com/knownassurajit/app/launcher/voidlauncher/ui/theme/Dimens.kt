@@ -26,6 +26,19 @@ object VoidDimens {
 
     /** Gap the shrinking screen keeps from the screen edge in a predictive back (Android predictive-back design). */
     val predictiveBackEdgeMargin = 8.dp
+
+    /**
+     * The limit of the rubber band that lets Home follow a finger that is opening a panel: Home
+     * moves with the finger at first and never farther than this, because the panel itself only
+     * starts when the swipe is released.
+     */
+    val swipePeekLimit = 64.dp
+
+    /** The narrowest strip along a screen edge asked to stay out of the system back gesture: the platform's back gesture inset. */
+    val edgeExclusionMinWidth = 30.dp
+
+    /** Extra width of that strip past the inset, so a swipe that starts just inside the system strip still reaches the app. */
+    val edgeExclusionMargin = 8.dp
 }
 
 object VoidAlpha {

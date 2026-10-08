@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Comes in from the bottom edge over its whole height (LaunchAnimation.FromBottom); Home leaves upward (slide_out_top). -->
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:shareInterpolator="false">
     <translate
         android:fromYDelta="100%p"
         android:toYDelta="0"
-        android:duration="280"
-        android:interpolator="@android:interpolator/fast_out_slow_in" />
-    <alpha
-        android:fromAlpha="0.85"
-        android:toAlpha="1.0"
-        android:duration="280"
-        android:interpolator="@android:interpolator/fast_out_slow_in" />
+        android:duration="300"
+        android:interpolator="@interpolator/emphasized_decelerate" />
 </set>
