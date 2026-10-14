@@ -14,18 +14,8 @@ import java.text.Collator
 object PrivateSpaceHelper {
     private const val TAG = "PrivateSpaceHelper"
 
-    fun isAddEntry(app: AppModel): Boolean {
-        val label = app.appLabel.trim()
-        if (label.equals("Add", ignoreCase = true) ||
-            label.equals("Add apps", ignoreCase = true) ||
-            label.equals("Add app", ignoreCase = true)
-        ) {
-            return true
-        }
-        val cls = (app as? AppModel.App)?.activityClassName.orEmpty()
-        return cls.contains("PrivateSpace", ignoreCase = true) &&
-            (cls.contains("Add", ignoreCase = true) || cls.contains("Install", ignoreCase = true))
-    }
+    fun isAddEntry(app: AppModel): Boolean =
+        PrivateSpaceUi.isAddEntryLabel(app.appLabel, (app as? AppModel.App)?.activityClassName)
 
     fun isPrivateSpaceSupported(context: Context): Boolean {
         return try {
@@ -58,28 +48,58 @@ object PrivateSpaceHelper {
         }
     }
 
-    fun isQuietModeEnabled(context: Context): Boolean {
-        return try {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return true
-            val profile = getPrivateSpaceProfile(context) ?: return true
-            val um = context.getSystemService(Context.USER_SERVICE) as? UserManager ?: return true
+    /**
+     * The one place that decides whether Private Space is active for the drawer: the OS supports it,
+     * the platform capability gate passes, and the user left the feature enabled in Settings.
+     */
+    fun isEnabled(context: Context, prefs: Prefs): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&
+            FeatureAvailability.isPrivateSpaceAvailable(context) &&
+            prefs.privateSpaceEnabled
+
+    /**
+     * Reads the lock state straight from the system, which is the single source of truth: null when
+     * there is no private profile, true while quiet mode is on (locked), false when it is off. A read
+     * failure is reported as locked so the UI fails closed. Runs the binder calls off the main thread.
+     */
+    suspend fun queryLocked(context: Context): Boolean? = withContext(Dispatchers.IO) {
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return@withContext null
+            val profile = getPrivateSpaceProfile(context) ?: return@withContext null
+            val um = context.getSystemService(Context.USER_SERVICE) as? UserManager
+                ?: return@withContext true
             um.isQuietModeEnabled(profile)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to read quiet mode", e)
+            Log.w(TAG, "quiet_mode_read_failed reason=${e.javaClass.simpleName}")
             true
         }
     }
 
+    /**
+     * Asks the system to flip quiet mode. `requestQuietModeEnabled` is a synchronous system_server
+     * call, so it runs on IO. The result only says what the request achieved; it is not the lock
+     * state, so callers must re-query with [queryLocked] afterwards.
+     */
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-    fun togglePrivateSpace(context: Context) {
+    suspend fun togglePrivateSpace(context: Context): ToggleOutcome = withContext(Dispatchers.IO) {
         try {
-            val profile = getPrivateSpaceProfile(context) ?: return
-            val um = context.getSystemService(Context.USER_SERVICE) as? UserManager ?: return
-            val locked = um.isQuietModeEnabled(profile)
-            um.requestQuietModeEnabled(!locked, profile)
-            Log.i(TAG, "Private Space quiet mode requested locked=${!locked}")
+            val profile = getPrivateSpaceProfile(context) ?: return@withContext ToggleOutcome.FAILED
+            val um = context.getSystemService(Context.USER_SERVICE) as? UserManager
+                ?: return@withContext ToggleOutcome.FAILED
+            val requestedQuiet = !um.isQuietModeEnabled(profile)
+            val outcome = PrivateSpaceUi.outcomeFor(
+                requestedQuiet = requestedQuiet,
+                requestReturned = um.requestQuietModeEnabled(requestedQuiet, profile)
+            )
+            Log.i(TAG, "quiet_mode_requested requestedQuiet=$requestedQuiet outcome=$outcome")
+            outcome
+        } catch (_: SecurityException) {
+            // Only the foreground default launcher may change quiet mode.
+            Log.w(TAG, "quiet_mode_request_denied")
+            ToggleOutcome.FAILED
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to toggle Private Space", e)
+            Log.w(TAG, "quiet_mode_request_failed reason=${e.javaClass.simpleName}")
+            ToggleOutcome.FAILED
         }
     }
 

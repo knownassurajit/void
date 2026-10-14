@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.knownassurajit.app.launcher.voidlauncher.MainActivity
 import com.knownassurajit.app.launcher.voidlauncher.R
+import com.knownassurajit.app.launcher.voidlauncher.data.NoteRepository
 
 class NoteReminderReceiver : BroadcastReceiver() {
 
@@ -54,7 +55,7 @@ class NoteReminderReceiver : BroadcastReceiver() {
             }
             val contentPendingIntent = PendingIntent.getActivity(
                 context,
-                noteId.toInt(),
+                NoteReminderScheduler.requestCodeFor(noteId),
                 openIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -86,7 +87,7 @@ class NoteReminderReceiver : BroadcastReceiver() {
             }
 
             @android.annotation.SuppressLint("MissingPermission", "NotificationPermission")
-            NotificationManagerCompat.from(context).notify(noteId.toInt(), builder.build())
+            NotificationManagerCompat.from(context).notify(NoteReminderScheduler.requestCodeFor(noteId), builder.build())
         }
 
         private fun createReminderChannel(nm: NotificationManager) {
@@ -107,8 +108,13 @@ class NoteReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1L)
-        val noteText = intent.getStringExtra(EXTRA_NOTE_TEXT) ?: return
         if (noteId <= 0L) return
-        dispatchReminder(context, noteId, intent.getStringExtra(EXTRA_NOTE_TITLE), noteText)
+        // The note may have been edited, completed or deleted since the alarm was set: read it again.
+        val note = NoteRepository(context).getAllNotes().firstOrNull { it.id == noteId }
+        if (note == null || note.isCompleted) {
+            android.util.Log.i("NoteReminderReceiver", "reminder_skipped reason=${if (note == null) "deleted" else "completed"}")
+            return
+        }
+        dispatchReminder(context, noteId, intent.getStringExtra(EXTRA_NOTE_TITLE), note.text)
     }
 }

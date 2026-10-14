@@ -1,7 +1,7 @@
 # Privacy Policy for VOID
 
 **Effective Date:** August 13, 2026  
-**Last Updated:** August 13, 2026
+**Last Updated:** October 7, 2026
 
 ## 1. Overview
 VOID ("the Application") is a minimalist Android launcher with on-device AI notification summaries, developed by Surajit Das ("we", "us", or "our"). We believe privacy is a fundamental right. VOID is open-source (GPLv3) and designed around zero data collection.
@@ -22,6 +22,7 @@ User settings, pinned home screen apps, and quick notes are saved locally in pri
 ## 5. Third-Party Services, Tracking & Ads
 - **No Tracking or Telemetry:** No analytics tools (e.g. Firebase Analytics) or telemetry services are included.
 - **No Advertisements:** VOID Launcher is completely free of ads.
+- **Downloadable Fonts:** Some launcher fonts (Google Fonts families) are downloaded on demand by Google Play services, not by VOID. VOID's own code does not connect to any server to get fonts. While the font picker is open, VOID asks Google Play services for the Regular weight of the families you scroll to (so each name can be shown in its own face), and for every weight of the family you choose; very large fonts are only requested when you choose them. A request carries the family name, weight, and style; the download and any data it involves are handled by Google Play services under Google's terms and privacy policy. Outside the font picker, only the font you chose is requested. Offline or without Google Play services these fonts are simply unavailable while the bundled fonts keep working.
 
 ## 6. Open Source Transparency
 The source code of VOID Launcher is published under the GNU General Public License v3.0, allowing complete public auditability of data safety practices.

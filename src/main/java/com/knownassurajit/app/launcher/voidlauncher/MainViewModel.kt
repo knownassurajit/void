@@ -5,7 +5,11 @@ import android.app.Application
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.LauncherApps
+import android.os.Build
+import android.os.Bundle
+import android.os.Process
 import android.os.UserHandle
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
@@ -21,6 +25,9 @@ import com.knownassurajit.app.launcher.voidlauncher.helper.isVoidDefault
 import com.knownassurajit.app.launcher.voidlauncher.helper.isPackageInstalled
 import com.knownassurajit.app.launcher.voidlauncher.helper.showToast
 import com.knownassurajit.app.launcher.voidlauncher.helper.usageStats.EventLogWrapper
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.LaunchAnimation
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.launchAnimation
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -53,19 +60,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val checkForMessages = SingleLiveEvent<Unit?>()
     val resetLauncherLiveData = SingleLiveEvent<Unit?>()
 
-    fun selectedApp(appModel: AppModel, flag: Int, swipeDirection: String? = null) {
+    fun selectedApp(appModel: AppModel, flag: Int) {
         when (flag) {
             Constants.FLAG_LAUNCH_APP -> {
                 when (appModel) {
                     is AppModel.PinnedShortcut -> launchShortcut(appModel)
-                    is AppModel.App ->
-                        launchApp(appModel.appPackage, appModel.activityClassName, appModel.user, swipeDirection)
+                    is AppModel.App -> launchApp(appModel.appPackage, appModel.activityClassName, appModel.user)
                 }
             }
 
             Constants.FLAG_HIDDEN_APPS -> {
                 if (appModel is AppModel.App) {
-                    launchApp(appModel.appPackage, appModel.activityClassName, appModel.user, swipeDirection)
+                    launchApp(appModel.appPackage, appModel.activityClassName, appModel.user)
                 }
             }
 
@@ -364,16 +370,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateSwipeApps.postValue(Unit)
     }
 
-    private fun launchApp(packageName: String, activityClassName: String?, userHandle: UserHandle, swipeDirection: String? = null) {
+    /**
+     * Launches the app a Home swipe is bound to. The window animation comes in from [enterFrom], the
+     * edge the swipe brings content in from (the left swipe action: from the left, with the finger
+     * moving right), so the app follows the swipe the way the panels do, on the Android versions
+     * that play a custom launch animation (see [LaunchAnimation.playsOn]).
+     *
+     * Only the package is stored for a swipe app. The activity is its primary launcher activity,
+     * the one `getLaunchIntentForPackage` returns (as the swipe did before it went through
+     * [launchApp]), not the last of several launcher entries that [launchApp] picks for a hidden
+     * app; the launcher list decides only when the package manager has no launch intent. It runs in
+     * the current user.
+     *
+     * Returns whether the launch started; a failure has already been shown as a message.
+     */
+    fun launchSwipeApp(packageName: String, enterFrom: PanelEdge): Boolean {
+        val primaryActivity = appContext.packageManager.getLaunchIntentForPackage(packageName)?.component?.className
+        return launchApp(packageName, primaryActivity, Process.myUserHandle(), enterFrom)
+    }
+
+    private fun launchApp(
+        packageName: String,
+        activityClassName: String?,
+        userHandle: UserHandle,
+        enterFrom: PanelEdge? = null
+    ): Boolean {
         val launcher = appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
         val activityInfo = launcher.getActivityList(packageName, userHandle)
 
         val component = if (activityClassName.isNullOrBlank()) {
-            // activityClassName will be null for hidden apps.
+            // activityClassName will be null for hidden apps (and for a swipe app without a launch intent).
             when (activityInfo.size) {
                 0 -> {
+                    Log.w(TAG, "app_launch_failed reason=no_launcher_activity")
                     appContext.showToast(appContext.getString(R.string.app_not_found))
-                    return
+                    return false
                 }
 
                 1 -> ComponentName(packageName, activityInfo[0].name)
@@ -383,42 +414,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ComponentName(packageName, activityClassName)
         }
 
-        // Directional animation: the entering window slides in FROM the direction swiped.
-        // swipe-left  → user moves finger left → new content comes FROM the right
-        // swipe-right → user moves finger right → new content comes FROM the left
-        // swipe-up    → user moves finger up   → new content comes FROM the bottom (app drawer style)
-        val opts = when (swipeDirection) {
-            "left" -> ActivityOptions.makeCustomAnimation(
-                appContext, R.anim.slide_in_right, R.anim.slide_out_left
-            ).toBundle()
-            "right" -> ActivityOptions.makeCustomAnimation(
-                appContext, R.anim.slide_in_left, R.anim.slide_out_right
-            ).toBundle()
-            "up" -> ActivityOptions.makeCustomAnimation(
-                appContext, R.anim.slide_in_bottom, R.anim.slide_out_top
-            ).toBundle()
-            else -> null
-        }
+        val opts = swipeLaunchOptions(enterFrom)
 
         try {
             launcher.startMainActivity(component, userHandle, null, opts)
+            return true
         } catch (e: Exception) {
+            Log.w(TAG, "app_launch_failed stage=initial reason=${e.javaClass.simpleName}")
             // Stored activity class may be stale (e.g. app updated its launcher activity).
             // Re-resolve from the package and retry.
             if (!activityClassName.isNullOrBlank() && activityInfo.isNotEmpty()) {
+                Log.w(TAG, "app_launch_retry stage=resolved_component")
                 val freshComponent = ComponentName(packageName, activityInfo[0].name)
                 try {
                     launcher.startMainActivity(freshComponent, userHandle, null, opts)
-                    return // success after re-resolve
+                    return true // success after re-resolve
                 } catch (_: Exception) { /* fall through to next fallback */ }
             }
             // Final fallback: try with own user handle
+            Log.w(TAG, "app_launch_retry stage=own_user")
             try {
-                launcher.startMainActivity(component, android.os.Process.myUserHandle(), null, opts)
+                launcher.startMainActivity(component, Process.myUserHandle(), null, opts)
+                return true
             } catch (e2: Exception) {
+                Log.w(TAG, "app_launch_failed stage=final reason=${e2.javaClass.simpleName}")
                 appContext.showToast(appContext.getString(R.string.unable_to_open_app))
+                return false
             }
         }
+    }
+
+    /**
+     * The window animation of an app that a swipe launches: it slides in from the edge the swipe
+     * brought it from while Home leaves the same way (the system plays it: see [LaunchAnimation]).
+     * `null` is the default animation: a tap, or an Android version that ignores a custom animation
+     * for a launch that opens a new task (12 and later).
+     */
+    private fun swipeLaunchOptions(enterFrom: PanelEdge?): Bundle? {
+        val animation = enterFrom?.launchAnimation() ?: return null
+        if (!LaunchAnimation.playsOn(Build.VERSION.SDK_INT)) {
+            Log.d(TAG, "launch_animation_skipped reason=task_transition sdk=${Build.VERSION.SDK_INT}")
+            return null
+        }
+        return ActivityOptions.makeCustomAnimation(appContext, animation.enter, animation.exit).toBundle()
     }
 
     fun getAppList(includeHiddenApps: Boolean = false) {
@@ -486,5 +524,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 e.printStackTrace()
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "MainViewModel"
     }
 }

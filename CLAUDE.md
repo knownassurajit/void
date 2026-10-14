@@ -3,7 +3,7 @@
 ## VOID Launcher SOP
 
 Minimalist Android launcher. Kotlin + Compose + Material 3. Single-activity.  
-SDK: min 26 · target/compile 36 · JDK 17.  
+SDK: min 26 · target/compile 37 · JDK 17.  
 Package: `com.knownassurajit.app.launcher.voidlauncher` · App ID: `com.voidlauncher.app`.
 
 ---

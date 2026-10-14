@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Comes in from the right edge over its whole width (LaunchAnimation.FromRight); Home leaves to the left (slide_out_left). -->
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:shareInterpolator="false">
     <translate
         android:fromXDelta="100%p"
         android:toXDelta="0"
-        android:duration="280"
-        android:interpolator="@android:interpolator/fast_out_slow_in" />
-    <alpha
-        android:fromAlpha="0.9"
-        android:toAlpha="1.0"
-        android:duration="280"
-        android:interpolator="@android:interpolator/fast_out_slow_in" />
+        android:duration="300"
+        android:interpolator="@interpolator/emphasized_decelerate" />
 </set>
