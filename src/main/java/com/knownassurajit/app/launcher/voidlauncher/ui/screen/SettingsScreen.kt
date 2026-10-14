@@ -134,9 +134,27 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeTo
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavMotion
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.FontFamilies
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.rememberFontResolution
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
+import com.knownassurajit.app.launcher.voidlauncher.MainUiState
+import com.knownassurajit.app.launcher.voidlauncher.helper.HomeLayoutHelper
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.HomePreviewContent
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.ScaledScreenPreview
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.SettingsPreviewPane
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.SettingsPreviewTarget
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.weightLabelRes
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeTextColor
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolve
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.filled.FormatBold
+import androidx.compose.material.icons.filled.Opacity
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material3.FilterChipDefaults
+import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 val LocalSettingsPrefs = staticCompositionLocalOf<Prefs> { error("LocalSettingsPrefs missing") }
@@ -178,7 +196,13 @@ fun SettingsScreen(onBack: () -> Unit) {
     var use24HourClock by remember { mutableStateOf(prefs.use24HourClock) }
     var showSeconds by remember { mutableStateOf(prefs.showClockSeconds) }
     var activePreviewTarget by remember { mutableStateOf<SettingsPreviewTarget?>(null) }
-    var previewFont by remember { mutableStateOf<String?>(null) }
+    var clockOpacity by remember { mutableFloatStateOf(prefs.clockOpacity) }
+    var homeAppsOpacity by remember { mutableFloatStateOf(prefs.homeAppsOpacity) }
+    var clockColor by remember { mutableStateOf(prefs.clockColor) }
+    var homeAppsColor by remember { mutableStateOf(prefs.homeAppsColor) }
+    var clockFontWeight by remember { mutableIntStateOf(prefs.clockFontWeight) }
+    var homeAppsFontWeight by remember { mutableIntStateOf(prefs.homeAppsFontWeight) }
+    var homeSidePadding by remember { mutableFloatStateOf(prefs.homeSidePaddingDp) }
 
     var enableGestures by remember { mutableStateOf(prefs.enableGestures) }
     var enableSwipeDownNotifications by remember { mutableStateOf(prefs.enableSwipeDownNotifications) }
@@ -198,6 +222,38 @@ fun SettingsScreen(onBack: () -> Unit) {
     if (showDeveloperInfo) {
         DeveloperInfoDialog(onDismiss = { showDeveloperInfo = false })
     }
+
+    // Everything the previews draw, as Settings holds it right now (before Home has re-read Prefs).
+    val previewState = MainUiState(
+        showClock = showClock,
+        showDate = showDate,
+        showScreenTime = showScreenTime,
+        showHomeApps = showHomeApps,
+        homeAppsCount = maxHomeApps,
+        clockHorizontalAlignment = clockHorizontalAlignment,
+        clockVerticalAlignment = clockVerticalAlignment,
+        appHorizontalAlignment = appHorizontalAlignment,
+        appVerticalAlignment = appVerticalAlignment,
+        clockSectionWeight = clockSectionWeight,
+        clockSizeScale = clockSizeScale,
+        dateSizeScale = dateSizeScale,
+        screenTimeSizeScale = screenTimeSizeScale,
+        homeSectionOrder = homeSectionOrder,
+        homeTextSizeScale = homeTextSize,
+        appDrawerTextSizeScale = drawerTextSize,
+        appSpacingDp = appSpacing,
+        appFont = appFont,
+        use24HourClock = use24HourClock,
+        showSeconds = showSeconds,
+        clockOpacity = clockOpacity,
+        homeAppsOpacity = homeAppsOpacity,
+        clockColor = clockColor,
+        homeAppsColor = homeAppsColor,
+        clockFontWeight = clockFontWeight,
+        homeAppsFontWeight = homeAppsFontWeight,
+        homeSidePaddingDp = homeSidePadding
+    )
+    val onHoldingPreview: (SettingsPreviewTarget?) -> Unit = { activePreviewTarget = it }
 
     CompositionLocalProvider(LocalSettingsPrefs provides prefs) {
         Box(
@@ -264,31 +320,46 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                     }
 
-                    if (search.lookHeader) {
-                        SettingsGroupHeader(stringResource(R.string.settings_group_look))
+                    if (search.appearanceHeader) {
+                        SettingsGroupHeader(stringResource(R.string.settings_group_appearance))
                     }
-                    if (search.aesthetics) {
+                    if (search.appearance) {
                         AestheticsSection(
                             appFont = appFont,
                             onOpenFontPicker = { showFontPicker = true }
                         )
-                    }
-                    if (search.appearance) {
                         AppearanceSection(
                             showStatusBar = showStatusBar,
-                            onShowStatusBarChange = { showStatusBar = it },
-                            autoShowKeyboard = autoShowKeyboard,
-                            onAutoShowKeyboardChange = { autoShowKeyboard = it }
+                            onShowStatusBarChange = { showStatusBar = it }
                         )
                     }
-                    if (search.clock) {
-                        ClockAndDateSection(
+
+                    if (search.homeHeader) {
+                        SettingsGroupHeader(stringResource(R.string.settings_group_home))
+                        HomePreviewCard(state = previewState)
+                    }
+                    if (search.homeLayout) {
+                        HomeLayoutSection(
                             showClock = showClock,
                             onShowClockChange = { showClock = it },
                             showDate = showDate,
                             onShowDateChange = { showDate = it },
                             showScreenTime = showScreenTime,
                             onShowScreenTimeChange = { showScreenTime = it },
+                            showHomeApps = showHomeApps,
+                            onShowHomeAppsChange = { showHomeApps = it },
+                            homeSectionOrder = homeSectionOrder,
+                            onHomeSectionOrderChange = { homeSectionOrder = it },
+                            clockSectionWeight = clockSectionWeight,
+                            onClockSectionWeightChange = { clockSectionWeight = it },
+                            homeSidePadding = homeSidePadding,
+                            onHomeSidePaddingChange = { homeSidePadding = it },
+                            snackbarHostState = snackbarHostState,
+                            onHoldingPreview = onHoldingPreview
+                        )
+                    }
+                    if (search.clock) {
+                        ClockAndDateSection(
                             use24HourClock = use24HourClock,
                             onUse24HourClockChange = { use24HourClock = it },
                             showSeconds = showSeconds,
@@ -297,25 +368,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                             onClockHorizontalAlignmentChange = { clockHorizontalAlignment = it },
                             clockVerticalAlignment = clockVerticalAlignment,
                             onClockVerticalAlignmentChange = { clockVerticalAlignment = it },
-                            clockSectionWeight = clockSectionWeight,
-                            onClockSectionWeightChange = { clockSectionWeight = it },
                             clockSizeScale = clockSizeScale,
                             onClockSizeScaleChange = { clockSizeScale = it },
                             dateSizeScale = dateSizeScale,
                             onDateSizeScaleChange = { dateSizeScale = it },
                             screenTimeSizeScale = screenTimeSizeScale,
                             onScreenTimeSizeScaleChange = { screenTimeSizeScale = it },
-                            showHomeApps = showHomeApps,
-                            onShowHomeAppsChange = { showHomeApps = it },
-                            homeSectionOrder = homeSectionOrder,
-                            onHomeSectionOrderChange = { homeSectionOrder = it },
-                            snackbarHostState = snackbarHostState,
-                            onHoldingPreview = { activePreviewTarget = it }
+                            textStyle = HomeTextStyleChoice(clockFontWeight, clockColor, clockOpacity),
+                            onFontWeightChange = { clockFontWeight = it; prefs.clockFontWeight = it },
+                            onColorChange = { clockColor = it; prefs.clockColor = it },
+                            onOpacityChange = { clockOpacity = it; prefs.clockOpacity = it },
+                            onHoldingPreview = onHoldingPreview
                         )
-                    }
-
-                    if (search.homeHeader) {
-                        SettingsGroupHeader(stringResource(R.string.settings_group_home))
                     }
                     if (search.homeApps) {
                         HomeAppsSection(
@@ -327,26 +391,30 @@ fun SettingsScreen(onBack: () -> Unit) {
                             onAppVerticalAlignmentChange = { appVerticalAlignment = it },
                             appSpacing = appSpacing,
                             onAppSpacingChange = { appSpacing = it },
-                            onHoldingPreview = { activePreviewTarget = it }
-                        )
-                    }
-                    if (search.textSize) {
-                        TextSizeSection(
                             homeTextSize = homeTextSize,
                             onHomeTextSizeChange = { homeTextSize = it },
-                            drawerTextSize = drawerTextSize,
-                            onDrawerTextSizeChange = { drawerTextSize = it },
-                            onHoldingPreview = { activePreviewTarget = it }
+                            textStyle = HomeTextStyleChoice(homeAppsFontWeight, homeAppsColor, homeAppsOpacity),
+                            onFontWeightChange = { homeAppsFontWeight = it; prefs.homeAppsFontWeight = it },
+                            onColorChange = { homeAppsColor = it; prefs.homeAppsColor = it },
+                            onOpacityChange = { homeAppsOpacity = it; prefs.homeAppsOpacity = it },
+                            onHoldingPreview = onHoldingPreview
                         )
                     }
 
-                    if (search.appLibraryHeader) {
-                        SettingsGroupHeader(stringResource(R.string.settings_group_app_library))
+                    if (search.appDrawerHeader) {
+                        SettingsGroupHeader(stringResource(R.string.settings_group_app_drawer))
                     }
-                    if (search.appLibrary) {
-                        AppLibrarySection(
+                    if (search.appDrawer) {
+                        AppDrawerSection(
                             showAlphabetCategories = showAlphabetCategories,
                             onShowAlphabetCategoriesChange = { showAlphabetCategories = it },
+                            autoShowKeyboard = autoShowKeyboard,
+                            onAutoShowKeyboardChange = { autoShowKeyboard = it },
+                            drawerTextSize = drawerTextSize,
+                            onDrawerTextSizeChange = { drawerTextSize = it },
+                            onHoldingPreview = onHoldingPreview
+                        )
+                        PrivateSpaceSection(
                             privateSpaceEnabled = privateSpaceEnabled,
                             onPrivateSpaceEnabledChange = { privateSpaceEnabled = it },
                             privateSpacePlacement = privateSpacePlacement,
@@ -434,19 +502,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                     onFontSelected = { id ->
                         prefs.appFont = id
                         appFont = id
-                        previewFont = null
-                        activePreviewTarget = null
                         showFontPicker = false
                     },
-                    onDismiss = {
-                        previewFont = null
-                        activePreviewTarget = null
-                        showFontPicker = false
-                    },
-                    onPreviewFont = { font ->
-                        previewFont = font
-                        activePreviewTarget = if (font != null) SettingsPreviewTarget.HOME else null
-                    }
+                    onDismiss = { showFontPicker = false }
                 )
             }
 
@@ -457,25 +515,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
             ) {
                 activePreviewTarget?.let { target ->
-                    SettingsPreviewPane(
-                        target = target,
-                        clockSizeScale = clockSizeScale,
-                        dateSizeScale = dateSizeScale,
-                        screenTimeSizeScale = screenTimeSizeScale,
-                        clockSectionWeight = clockSectionWeight,
-                        appSpacingDp = appSpacing,
-                        homeTextSizeScale = homeTextSize,
-                        drawerTextSizeScale = drawerTextSize,
-                        appFont = previewFont ?: appFont,
-                        clockAlignment = clockHorizontalAlignment,
-                        appAlignment = appHorizontalAlignment,
-                        clockVerticalAlignment = clockVerticalAlignment,
-                        appVerticalAlignment = appVerticalAlignment,
-                        showClock = showClock,
-                        showDate = showDate,
-                        showScreenTime = showScreenTime,
-                        showHomeApps = showHomeApps
-                    )
+                    SettingsPreviewPane(target = target, state = previewState)
                 }
             }
 
@@ -495,24 +535,23 @@ fun SettingsScreen(onBack: () -> Unit) {
 
 private data class SettingsSearchFlags(
     val defaultLauncher: Boolean,
-    val aesthetics: Boolean,
     val appearance: Boolean,
+    val homeLayout: Boolean,
     val clock: Boolean,
     val homeApps: Boolean,
-    val textSize: Boolean,
-    val appLibrary: Boolean,
+    val appDrawer: Boolean,
     val gestures: Boolean,
     val features: Boolean,
     val permissions: Boolean
 ) {
-    val lookHeader: Boolean get() = aesthetics || appearance || clock
-    val homeHeader: Boolean get() = homeApps || textSize
-    val appLibraryHeader: Boolean get() = appLibrary
+    val appearanceHeader: Boolean get() = appearance
+    val homeHeader: Boolean get() = homeLayout || clock || homeApps
+    val appDrawerHeader: Boolean get() = appDrawer
     val gesturesHeader: Boolean get() = gestures
     val featuresHeader: Boolean get() = features
     val permissionsHeader: Boolean get() = permissions
     val anyVisible: Boolean
-        get() = defaultLauncher || lookHeader || homeHeader || appLibraryHeader ||
+        get() = defaultLauncher || appearanceHeader || homeHeader || appDrawerHeader ||
             gesturesHeader || featuresHeader || permissionsHeader
 }
 
@@ -521,90 +560,67 @@ private fun EvaluateSettingsSearch(
     query: String,
     privateSpaceAvailable: Boolean
 ): SettingsSearchFlags {
-    val lookGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.settings_group_look)))
+    val appearanceGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.settings_group_appearance)))
     val homeGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.settings_group_home)))
-    val appLibraryGroup = matchesSettingsQuery(
-        query,
-        listOf(stringResource(R.string.settings_group_app_library))
-    )
-    val gesturesGroup = matchesSettingsQuery(
-        query,
-        listOf(stringResource(R.string.settings_group_gestures_motion))
-    )
-    val featuresGroup = matchesSettingsQuery(
-        query,
-        listOf(stringResource(R.string.settings_group_features))
-    )
+    val appDrawerGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.settings_group_app_drawer)))
+    val gesturesGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.settings_group_gestures_motion)))
+    val featuresGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.settings_group_features)))
     val permissionsGroup = matchesSettingsQuery(query, listOf(stringResource(R.string.permissions)))
 
-    val aestheticsTerms = listOf("Aesthetics", "Launcher Font") + FontCatalog.searchTerms
     val appearanceTerms = listOf(
-        stringResource(R.string.appearance),
+        stringResource(R.string.settings_section_font_style),
+        stringResource(R.string.settings_launcher_font),
+        stringResource(R.string.settings_system_display),
+        stringResource(R.string.settings_system_wallpaper),
+        stringResource(R.string.settings_section_system_bars),
         stringResource(R.string.notification_bar),
-        "Show system status icons",
-        stringResource(R.string.auto_show_keyboard),
-        "Pop up keyboard on search"
+        stringResource(R.string.settings_status_bar_subtitle)
+    ) + FontCatalog.searchTerms
+    val homeLayoutTerms = listOf(
+        stringResource(R.string.settings_section_home_layout),
+        stringResource(R.string.settings_show_clock),
+        stringResource(R.string.show_date_time),
+        stringResource(R.string.screen_time),
+        stringResource(R.string.settings_show_home_apps),
+        stringResource(R.string.settings_section_order),
+        stringResource(R.string.clock_first),
+        stringResource(R.string.apps_first),
+        stringResource(R.string.clock_section_weight),
+        stringResource(R.string.settings_side_padding),
+        stringResource(R.string.settings_side_padding_subtitle)
     )
     val clockTerms = listOf(
-        "Clock & Date",
-        "Show Clock",
-        "Top-level time display",
-        stringResource(R.string.show_date_time),
-        "Current date under the clock",
-        stringResource(R.string.screen_time),
-        "Device usage metrics",
-        "Show Home Apps",
-        "Display pinned apps on the home screen",
-        "24-Hour Format",
-        "Use military time notation",
-        "Show Seconds",
-        "Display seconds on the home screen clock",
-        "Clock Horizontal Alignment",
-        "Clock Vertical Alignment",
-        "Left, Center, or Right",
-        "Top, Middle, or Bottom",
-        stringResource(R.string.left),
-        stringResource(R.string.center),
-        stringResource(R.string.right),
-        stringResource(R.string.top),
-        stringResource(R.string.middle),
-        stringResource(R.string.bottom),
+        stringResource(R.string.settings_section_clock),
+        stringResource(R.string.settings_24_hour),
+        stringResource(R.string.settings_show_seconds),
+        stringResource(R.string.settings_clock_horizontal),
+        stringResource(R.string.settings_clock_vertical),
         stringResource(R.string.clock_size),
-        "Time only",
         stringResource(R.string.date_size),
-        "Date line only",
         stringResource(R.string.screen_time_size),
-        "Screen time line only",
-        stringResource(R.string.clock_section_weight),
-        "Home Section Order",
-        stringResource(R.string.clock_first),
-        stringResource(R.string.apps_first)
+        stringResource(R.string.settings_font_weight),
+        stringResource(R.string.settings_text_color),
+        stringResource(R.string.settings_opacity)
     )
     val homeAppsTerms = listOf(
-        "Home Apps",
-        "Max apps on Home Screen",
-        "Limit applications shown",
-        "Apps Horizontal Alignment",
-        "Apps Vertical Alignment",
-        "App Spacing",
-        "Space between app labels"
-    )
-    val textSizeTerms = listOf(
-        "Text Size",
-        stringResource(R.string.text_size),
+        stringResource(R.string.settings_section_home_apps),
+        stringResource(R.string.settings_max_home_apps),
+        stringResource(R.string.settings_apps_horizontal),
+        stringResource(R.string.settings_apps_vertical),
+        stringResource(R.string.settings_app_spacing),
         stringResource(R.string.home_text_size),
-        "Scale font on home",
-        stringResource(R.string.app_drawer_text_size),
-        "Scale font in drawer"
+        stringResource(R.string.text_size),
+        stringResource(R.string.settings_font_weight),
+        stringResource(R.string.settings_text_color),
+        stringResource(R.string.settings_opacity)
     )
-    val appLibraryTerms = buildList {
-        add("App Library")
-        add("Show Alphabet Categories")
-        add("Group by starting letter")
-        add("Enable Private Space")
-        add("Unlock OS hidden profiles")
-        add("Not configured in system settings")
+    val appDrawerTerms = buildList {
+        add(stringResource(R.string.settings_show_alphabet))
+        add(stringResource(R.string.auto_show_keyboard))
+        add(stringResource(R.string.app_drawer_text_size))
+        add(stringResource(R.string.text_size))
         add(stringResource(R.string.private_space))
+        add(stringResource(R.string.settings_enable_private_space))
         if (privateSpaceAvailable) {
             add(stringResource(R.string.private_space_placement))
             add(stringResource(R.string.private_space_placement_subtitle))
@@ -669,12 +685,11 @@ private fun EvaluateSettingsSearch(
                 stringResource(R.string.manage_default_home_settings)
             )
         ),
-        aesthetics = lookGroup || matchesSettingsQuery(query, aestheticsTerms),
-        appearance = lookGroup || matchesSettingsQuery(query, appearanceTerms),
-        clock = lookGroup || matchesSettingsQuery(query, clockTerms),
+        appearance = appearanceGroup || matchesSettingsQuery(query, appearanceTerms),
+        homeLayout = homeGroup || matchesSettingsQuery(query, homeLayoutTerms),
+        clock = homeGroup || matchesSettingsQuery(query, clockTerms),
         homeApps = homeGroup || matchesSettingsQuery(query, homeAppsTerms),
-        textSize = homeGroup || matchesSettingsQuery(query, textSizeTerms),
-        appLibrary = appLibraryGroup || matchesSettingsQuery(query, appLibraryTerms),
+        appDrawer = appDrawerGroup || matchesSettingsQuery(query, appDrawerTerms),
         gestures = gesturesGroup || matchesSettingsQuery(query, gesturesTerms),
         features = featuresGroup || matchesSettingsQuery(query, featuresTerms),
         permissions = permissionsGroup || matchesSettingsQuery(query, permissionsTerms)
@@ -700,30 +715,6 @@ private fun SettingsGroupHeader(title: String) {
             bottom = VoidDimens.compactSpacing
         )
     )
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SettingChoiceChips(
-    selected: String,
-    options: List<Pair<String, String>>,
-    onSelected: (String) -> Unit
-) {
-    FlowRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        options.forEach { (value, label) ->
-            FilterChip(
-                selected = selected == value,
-                onClick = { onSelected(value) },
-                label = { Text(label) }
-            )
-        }
-    }
 }
 
 @Composable
@@ -840,16 +831,16 @@ private fun AestheticsSection(
             stringResource(R.string.font_subtitle_needs_play_services, saved?.displayName.orEmpty())
     }
 
-    SettingsSectionHeader("Aesthetics")
+    SettingsSectionHeader(stringResource(R.string.settings_section_font_style))
     SettingActionItem(
-        title = "Launcher Font",
+        title = stringResource(R.string.settings_launcher_font),
         subtitle = currentFontName,
         icon = { Icon(Icons.Default.FontDownload, contentDescription = null) },
         onClick = onOpenFontPicker
     )
     SettingActionItem(
-        title = "System Display & Dark Theme",
-        subtitle = "Open system display, dark mode, and contrast settings",
+        title = stringResource(R.string.settings_system_display),
+        subtitle = stringResource(R.string.settings_system_display_subtitle),
         icon = { Icon(Icons.Default.Brightness4, contentDescription = null) },
         onClick = {
             try {
@@ -860,8 +851,8 @@ private fun AestheticsSection(
         }
     )
     SettingActionItem(
-        title = "System Wallpaper & Style",
-        subtitle = "Open system wallpaper, colors, and styling controls",
+        title = stringResource(R.string.settings_system_wallpaper),
+        subtitle = stringResource(R.string.settings_system_wallpaper_subtitle),
         icon = { Icon(Icons.Default.Wallpaper, contentDescription = null) },
         onClick = {
             try {
@@ -873,46 +864,82 @@ private fun AestheticsSection(
     )
 }
 
+@Composable
+private fun AppearanceSection(
+    showStatusBar: Boolean,
+    onShowStatusBarChange: (Boolean) -> Unit
+) {
+    val prefs = LocalSettingsPrefs.current
+
+    SettingsSectionHeader(stringResource(R.string.settings_section_system_bars))
+    SettingToggleItem(
+        title = stringResource(R.string.notification_bar),
+        subtitle = stringResource(R.string.settings_status_bar_subtitle),
+        icon = { Icon(Icons.Default.SpaceBar, contentDescription = null) },
+        checked = showStatusBar,
+        onCheckedChange = { onShowStatusBarChange(it); prefs.showStatusBar = it },
+        tooltipText = "When disabled, the system status bar hides but can be revealed by swiping down from the top edge."
+    )
+}
+
+private const val HOME_PREVIEW_CARD_SCALE = 0.4f
+
+/** The live Home preview at the top of the Home screen group: it redraws on every change below it. */
+@Composable
+private fun HomePreviewCard(state: MainUiState) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = VoidDimens.rowSpacing),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ScaledScreenPreview(scale = HOME_PREVIEW_CARD_SCALE) {
+            HomePreviewContent(state = state)
+        }
+        Text(
+            text = stringResource(R.string.preview_hold_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = VoidDimens.rowSpacing)
+        )
+    }
+}
+
+/** Weight, color and opacity of one Home text block (clock or apps). */
+private data class HomeTextStyleChoice(val fontWeight: Int, val color: String, val opacity: Float)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ClockAndDateSection(
+private fun HomeLayoutSection(
     showClock: Boolean,
     onShowClockChange: (Boolean) -> Unit,
     showDate: Boolean,
     onShowDateChange: (Boolean) -> Unit,
     showScreenTime: Boolean,
     onShowScreenTimeChange: (Boolean) -> Unit,
-    use24HourClock: Boolean,
-    onUse24HourClockChange: (Boolean) -> Unit,
-    showSeconds: Boolean,
-    onShowSecondsChange: (Boolean) -> Unit,
-    clockHorizontalAlignment: Int,
-    onClockHorizontalAlignmentChange: (Int) -> Unit,
-    clockVerticalAlignment: Int,
-    onClockVerticalAlignmentChange: (Int) -> Unit,
-    clockSectionWeight: Float,
-    onClockSectionWeightChange: (Float) -> Unit,
-    clockSizeScale: Float,
-    onClockSizeScaleChange: (Float) -> Unit,
-    dateSizeScale: Float,
-    onDateSizeScaleChange: (Float) -> Unit,
-    screenTimeSizeScale: Float,
-    onScreenTimeSizeScaleChange: (Float) -> Unit,
     showHomeApps: Boolean,
     onShowHomeAppsChange: (Boolean) -> Unit,
     homeSectionOrder: String,
     onHomeSectionOrderChange: (String) -> Unit,
+    clockSectionWeight: Float,
+    onClockSectionWeightChange: (Float) -> Unit,
+    homeSidePadding: Float,
+    onHomeSidePaddingChange: (Float) -> Unit,
     snackbarHostState: SnackbarHostState,
-    onHoldingPreview: ((SettingsPreviewTarget?) -> Unit)? = null
+    onHoldingPreview: (SettingsPreviewTarget?) -> Unit
 ) {
     val context = LocalContext.current
     val prefs = LocalSettingsPrefs.current
     val scope = rememberCoroutineScope()
+    val usageRedirected = stringResource(R.string.settings_usage_access_redirected)
+    val usageFailed = stringResource(R.string.settings_usage_access_failed)
+    val screenTimeEnabled = stringResource(R.string.settings_screen_time_enabled)
 
-    SettingsSectionHeader("Clock & Date")
+    SettingsSectionHeader(stringResource(R.string.settings_section_home_layout))
     SettingToggleItem(
-        title = "Show Clock",
-        subtitle = "Top-level time display",
+        title = stringResource(R.string.settings_show_clock),
+        subtitle = stringResource(R.string.settings_show_clock_subtitle),
         icon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
         checked = showClock,
         onCheckedChange = { onShowClockChange(it); prefs.showClockWidget = it },
@@ -920,14 +947,14 @@ private fun ClockAndDateSection(
     )
     SettingToggleItem(
         title = stringResource(R.string.show_date_time),
-        subtitle = "Current date under the clock",
+        subtitle = stringResource(R.string.settings_show_date_subtitle),
         icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
         checked = showDate,
         onCheckedChange = { onShowDateChange(it); prefs.showDateWidget = it }
     )
     SettingToggleItem(
         title = stringResource(R.string.screen_time),
-        subtitle = "Device usage metrics",
+        subtitle = stringResource(R.string.settings_screen_time_subtitle),
         icon = { Icon(Icons.Default.Timer, contentDescription = null) },
         checked = showScreenTime,
         tooltipText = "Shows daily screen time from Digital Wellbeing. Requires Usage Access permission.",
@@ -944,114 +971,152 @@ private fun ClockAndDateSection(
                 if (mode != android.app.AppOpsManager.MODE_ALLOWED) {
                     try {
                         context.startActivity(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                        scope.launch { snackbarHostState.showSnackbar("Redirected to Usage Access settings") }
+                        scope.launch { snackbarHostState.showSnackbar(usageRedirected) }
                     } catch (e: Exception) {
-                        scope.launch { snackbarHostState.showSnackbar("Could not open settings automatically") }
+                        scope.launch { snackbarHostState.showSnackbar(usageFailed) }
                     }
                 } else {
-                    scope.launch { snackbarHostState.showSnackbar("Screen Time enabled") }
+                    scope.launch { snackbarHostState.showSnackbar(screenTimeEnabled) }
                 }
             }
         }
     )
     SettingToggleItem(
-        title = "Show Home Apps",
-        subtitle = "Display pinned apps on the home screen",
+        title = stringResource(R.string.settings_show_home_apps),
+        subtitle = stringResource(R.string.settings_show_home_apps_subtitle),
         icon = { Icon(Icons.Default.Apps, contentDescription = null) },
         checked = showHomeApps,
         onCheckedChange = { onShowHomeAppsChange(it); prefs.showHomeApps = it }
     )
+    SettingChoiceItem(
+        title = stringResource(R.string.settings_section_order),
+        icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
+        selected = homeSectionOrder,
+        options = listOf(
+            "clock_first" to stringResource(R.string.clock_first),
+            "apps_first" to stringResource(R.string.apps_first)
+        ),
+        onSelected = { onHomeSectionOrderChange(it); prefs.homeSectionOrder = it }
+    )
+    val clockPct = (clockSectionWeight * 100).roundToInt()
+    SettingSliderItem(
+        title = stringResource(R.string.clock_section_weight),
+        subtitle = stringResource(R.string.settings_split_subtitle, clockPct, 100 - clockPct),
+        icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
+        value = clockSectionWeight,
+        range = HomeLayoutHelper.MIN_CLOCK_WEIGHT..HomeLayoutHelper.MAX_CLOCK_WEIGHT,
+        valueText = { "${(it * 100).roundToInt()}%" },
+        tooltipText = "Default is 35% clock / 65% apps. Sections scroll if content is larger than the allocated space.",
+        onHoldingChanged = { holding -> onHoldingPreview(if (holding) SettingsPreviewTarget.HOME else null) },
+        onChanged = { onClockSectionWeightChange(it); prefs.clockSectionWeight = it }
+    )
+    SettingSliderItem(
+        title = stringResource(R.string.settings_side_padding),
+        subtitle = stringResource(R.string.settings_side_padding_subtitle),
+        icon = { Icon(Icons.Default.SpaceBar, contentDescription = null) },
+        value = homeSidePadding,
+        range = HomeStyle.MIN_SIDE_PADDING_DP..HomeStyle.MAX_SIDE_PADDING_DP,
+        valueText = { "${it.roundToInt()} dp" },
+        onHoldingChanged = { holding -> onHoldingPreview(if (holding) SettingsPreviewTarget.HOME else null) },
+        onChanged = { onHomeSidePaddingChange(it); prefs.homeSidePaddingDp = it }
+    )
+}
+
+@Composable
+private fun ClockAndDateSection(
+    use24HourClock: Boolean,
+    onUse24HourClockChange: (Boolean) -> Unit,
+    showSeconds: Boolean,
+    onShowSecondsChange: (Boolean) -> Unit,
+    clockHorizontalAlignment: Int,
+    onClockHorizontalAlignmentChange: (Int) -> Unit,
+    clockVerticalAlignment: Int,
+    onClockVerticalAlignmentChange: (Int) -> Unit,
+    clockSizeScale: Float,
+    onClockSizeScaleChange: (Float) -> Unit,
+    dateSizeScale: Float,
+    onDateSizeScaleChange: (Float) -> Unit,
+    screenTimeSizeScale: Float,
+    onScreenTimeSizeScaleChange: (Float) -> Unit,
+    textStyle: HomeTextStyleChoice,
+    onFontWeightChange: (Int) -> Unit,
+    onColorChange: (String) -> Unit,
+    onOpacityChange: (Float) -> Unit,
+    onHoldingPreview: (SettingsPreviewTarget?) -> Unit
+) {
+    val prefs = LocalSettingsPrefs.current
+    val holdHome: (Boolean) -> Unit = { holding -> onHoldingPreview(if (holding) SettingsPreviewTarget.HOME else null) }
+
+    SettingsSectionHeader(stringResource(R.string.settings_section_clock))
     SettingToggleItem(
-        title = "24-Hour Format",
-        subtitle = "Use military time notation",
+        title = stringResource(R.string.settings_24_hour),
+        subtitle = stringResource(R.string.settings_24_hour_subtitle),
         icon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
         checked = use24HourClock,
         onCheckedChange = { onUse24HourClockChange(it); prefs.use24HourClock = it },
         tooltipText = "Switch between 12h (AM/PM) and 24h format for the home screen clock."
     )
     SettingToggleItem(
-        title = "Show Seconds",
-        subtitle = "Display seconds on the home screen clock",
+        title = stringResource(R.string.settings_show_seconds),
+        subtitle = stringResource(R.string.settings_show_seconds_subtitle),
         icon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
         checked = showSeconds,
         onCheckedChange = { onShowSecondsChange(it); prefs.showClockSeconds = it },
         tooltipText = "Enabling seconds will cause the clock to update every second, which may have a minor impact on battery life."
     )
     SettingAlignmentItem(
-        title = "Clock Horizontal Alignment",
-        subtitle = "Left, Center, or Right",
+        title = stringResource(R.string.settings_clock_horizontal),
+        subtitle = stringResource(R.string.settings_horizontal_subtitle),
         icon = { Icon(Icons.Default.LinearScale, contentDescription = null) },
         currentGravity = clockHorizontalAlignment,
-        options = listOf(Gravity.START to "Left", Gravity.CENTER_HORIZONTAL to "Center", Gravity.END to "Right"),
-        tooltipText = "Tap and hold this to align your time horizontally relative to the clock section.",
+        options = horizontalOptions(),
         onChanged = { onClockHorizontalAlignmentChange(it); prefs.clockAlignment = it }
     )
     SettingAlignmentItem(
-        title = "Clock Vertical Alignment",
-        subtitle = "Top, Middle, or Bottom",
+        title = stringResource(R.string.settings_clock_vertical),
+        subtitle = stringResource(R.string.settings_vertical_subtitle),
         icon = { Icon(Icons.Default.Transform, contentDescription = null) },
         currentGravity = clockVerticalAlignment,
-        options = listOf(Gravity.TOP to "Top", Gravity.CENTER_VERTICAL to "Middle", Gravity.BOTTOM to "Bottom"),
-        tooltipText = "Change how your clock is placed vertically on the home screen UI.",
+        options = verticalOptions(),
         onChanged = { onClockVerticalAlignmentChange(it); prefs.clockVerticalAlignment = it }
     )
     SettingSliderItem(
         title = stringResource(R.string.clock_size),
-        subtitle = "Time only",
+        subtitle = stringResource(R.string.settings_clock_size_subtitle),
         icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
         value = clockSizeScale,
-        range = 0.5f..1.5f,
-        tooltipText = "Scale the clock independently of date and screen time.",
-        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
+        range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
+        valueText = ::scaleText,
+        onHoldingChanged = holdHome,
         onChanged = { onClockSizeScaleChange(it); prefs.clockSizeScale = it }
     )
     SettingSliderItem(
         title = stringResource(R.string.date_size),
-        subtitle = "Date line only",
+        subtitle = stringResource(R.string.settings_date_size_subtitle),
         icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
         value = dateSizeScale,
-        range = 0.5f..1.5f,
-        tooltipText = "Scale the date independently of the clock.",
-        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
+        range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
+        valueText = ::scaleText,
+        onHoldingChanged = holdHome,
         onChanged = { onDateSizeScaleChange(it); prefs.dateSizeScale = it }
     )
     SettingSliderItem(
         title = stringResource(R.string.screen_time_size),
-        subtitle = "Screen time line only",
+        subtitle = stringResource(R.string.settings_screen_time_size_subtitle),
         icon = { Icon(Icons.Default.Timer, contentDescription = null) },
         value = screenTimeSizeScale,
-        range = 0.5f..1.5f,
-        tooltipText = "Scale screen time independently of the clock and date.",
-        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
+        range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
+        valueText = ::scaleText,
+        onHoldingChanged = holdHome,
         onChanged = { onScreenTimeSizeScaleChange(it); prefs.screenTimeSizeScale = it }
     )
-    val clockPct = (clockSectionWeight * 100).toInt()
-    SettingSliderItem(
-        title = stringResource(R.string.clock_section_weight),
-        subtitle = "Clock $clockPct% · Apps ${100 - clockPct}%",
-        icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
-        value = clockSectionWeight,
-        range = 0.22f..0.48f,
-        tooltipText = "Default is 35% clock / 65% apps. Sections scroll if content is larger than the allocated space.",
-        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
-        onChanged = { onClockSectionWeightChange(it); prefs.clockSectionWeight = it }
+    HomeTextStyleItems(
+        style = textStyle,
+        onFontWeightChange = onFontWeightChange,
+        onColorChange = onColorChange,
+        onOpacityChange = onOpacityChange,
+        onHoldingPreview = holdHome
     )
-    SettingsSectionHeader("Home Section Order")
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterChip(
-            selected = homeSectionOrder == "clock_first",
-            onClick = { onHomeSectionOrderChange("clock_first"); prefs.homeSectionOrder = "clock_first" },
-            label = { Text(stringResource(R.string.clock_first)) }
-        )
-        FilterChip(
-            selected = homeSectionOrder == "apps_first",
-            onClick = { onHomeSectionOrderChange("apps_first"); prefs.homeSectionOrder = "apps_first" },
-            label = { Text(stringResource(R.string.apps_first)) }
-        )
-    }
 }
 
 @Composable
@@ -1064,14 +1129,21 @@ private fun HomeAppsSection(
     onAppVerticalAlignmentChange: (Int) -> Unit,
     appSpacing: Float,
     onAppSpacingChange: (Float) -> Unit,
-    onHoldingPreview: ((SettingsPreviewTarget?) -> Unit)? = null
+    homeTextSize: Float,
+    onHomeTextSizeChange: (Float) -> Unit,
+    textStyle: HomeTextStyleChoice,
+    onFontWeightChange: (Int) -> Unit,
+    onColorChange: (String) -> Unit,
+    onOpacityChange: (Float) -> Unit,
+    onHoldingPreview: (SettingsPreviewTarget?) -> Unit
 ) {
     val prefs = LocalSettingsPrefs.current
+    val holdHome: (Boolean) -> Unit = { holding -> onHoldingPreview(if (holding) SettingsPreviewTarget.HOME else null) }
 
-    SettingsSectionHeader("Home Apps")
+    SettingsSectionHeader(stringResource(R.string.settings_section_home_apps))
     SettingCounterItem(
-        title = "Max apps on Home Screen",
-        subtitle = "Limit applications shown",
+        title = stringResource(R.string.settings_max_home_apps),
+        subtitle = stringResource(R.string.settings_max_home_apps_subtitle),
         icon = { Icon(Icons.Default.Apps, contentDescription = null) },
         value = maxHomeApps,
         tooltipText = "Specify how many priority apps (up to 10) you want available directly from the home screen.",
@@ -1079,70 +1151,126 @@ private fun HomeAppsSection(
         onIncrease = { if (maxHomeApps < 10) { onMaxHomeAppsChange(maxHomeApps + 1); prefs.maxHomeApps = maxHomeApps + 1 } }
     )
     SettingAlignmentItem(
-        title = "Apps Horizontal Alignment",
-        subtitle = "Left, Center, or Right",
+        title = stringResource(R.string.settings_apps_horizontal),
+        subtitle = stringResource(R.string.settings_horizontal_subtitle),
         icon = { Icon(Icons.Default.LinearScale, contentDescription = null) },
         currentGravity = appHorizontalAlignment,
-        options = listOf(Gravity.START to "Left", Gravity.CENTER_HORIZONTAL to "Center", Gravity.END to "Right"),
-        tooltipText = "Align your minimalist home apps array on the X-axis.",
+        options = horizontalOptions(),
         onChanged = { onAppHorizontalAlignmentChange(it); prefs.homeAlignment = it }
     )
     SettingAlignmentItem(
-        title = "Apps Vertical Alignment",
-        subtitle = "Top, Middle, or Bottom",
+        title = stringResource(R.string.settings_apps_vertical),
+        subtitle = stringResource(R.string.settings_vertical_subtitle),
         icon = { Icon(Icons.Default.Transform, contentDescription = null) },
         currentGravity = appVerticalAlignment,
-        options = listOf(Gravity.TOP to "Top", Gravity.CENTER_VERTICAL to "Middle", Gravity.BOTTOM to "Bottom"),
-        tooltipText = "Align your minimalist home apps array on the Y-axis.",
+        options = verticalOptions(),
         onChanged = { onAppVerticalAlignmentChange(it); prefs.homeVerticalAlignment = it }
     )
     SettingSliderItem(
-        title = "App Spacing",
-        subtitle = "Space between app labels",
+        title = stringResource(R.string.settings_app_spacing),
+        subtitle = stringResource(R.string.settings_app_spacing_subtitle),
         icon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) },
         value = appSpacing,
-        range = 0f..48f,
-        tooltipText = "Increase or decrease the dynamic visual gap separating each pinned tool.",
-        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
+        range = 0f..HomeStyle.MAX_APP_SPACING,
+        valueText = { "${it.roundToInt()}" },
+        onHoldingChanged = holdHome,
         onChanged = { onAppSpacingChange(it); prefs.appSpacingDp = it }
+    )
+    SettingSliderItem(
+        title = stringResource(R.string.home_text_size),
+        subtitle = stringResource(R.string.settings_home_text_size_subtitle),
+        icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
+        value = homeTextSize,
+        range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_APP_SIZE_SCALE,
+        valueText = ::scaleText,
+        onHoldingChanged = holdHome,
+        onChanged = { onHomeTextSizeChange(it); prefs.homeTextSizeScale = it }
+    )
+    HomeTextStyleItems(
+        style = textStyle,
+        onFontWeightChange = onFontWeightChange,
+        onColorChange = onColorChange,
+        onOpacityChange = onOpacityChange,
+        onHoldingPreview = holdHome
+    )
+}
+
+/** Weight, color and opacity rows, shared by the clock and the home apps sections. */
+@Composable
+private fun HomeTextStyleItems(
+    style: HomeTextStyleChoice,
+    onFontWeightChange: (Int) -> Unit,
+    onColorChange: (String) -> Unit,
+    onOpacityChange: (Float) -> Unit,
+    onHoldingPreview: (Boolean) -> Unit
+) {
+    SettingChoiceItem(
+        title = stringResource(R.string.settings_font_weight),
+        icon = { Icon(Icons.Default.FormatBold, contentDescription = null) },
+        selected = style.fontWeight,
+        options = HomeStyle.fontWeights.map { weight -> weight to stringResource(weight.weightLabelRes()) },
+        onSelected = onFontWeightChange
+    )
+    SettingColorItem(
+        title = stringResource(R.string.settings_text_color),
+        selected = HomeTextColor.fromKey(style.color),
+        onSelected = { onColorChange(it.key) }
+    )
+    SettingSliderItem(
+        title = stringResource(R.string.settings_opacity),
+        subtitle = "",
+        icon = { Icon(Icons.Default.Opacity, contentDescription = null) },
+        value = style.opacity,
+        range = HomeStyle.MIN_OPACITY..HomeStyle.MAX_OPACITY,
+        valueText = { "${(it * 100).roundToInt()}%" },
+        onHoldingChanged = onHoldingPreview,
+        onChanged = onOpacityChange
     )
 }
 
 @Composable
-private fun TextSizeSection(
-    homeTextSize: Float,
-    onHomeTextSizeChange: (Float) -> Unit,
+private fun AppDrawerSection(
+    showAlphabetCategories: Boolean,
+    onShowAlphabetCategoriesChange: (Boolean) -> Unit,
+    autoShowKeyboard: Boolean,
+    onAutoShowKeyboardChange: (Boolean) -> Unit,
     drawerTextSize: Float,
     onDrawerTextSizeChange: (Float) -> Unit,
-    onHoldingPreview: ((SettingsPreviewTarget?) -> Unit)? = null
+    onHoldingPreview: (SettingsPreviewTarget?) -> Unit
 ) {
     val prefs = LocalSettingsPrefs.current
 
-    SettingsSectionHeader("Text Size")
-    SettingSliderItem(
-        title = stringResource(R.string.home_text_size),
-        subtitle = "Scale font on home",
-        icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
-        value = homeTextSize,
-        range = 0.5f..2.0f,
-        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
-        onChanged = { onHomeTextSizeChange(it); prefs.homeTextSizeScale = it }
+    SettingsSectionHeader(stringResource(R.string.settings_section_app_list))
+    SettingToggleItem(
+        title = stringResource(R.string.settings_show_alphabet),
+        subtitle = stringResource(R.string.settings_show_alphabet_subtitle),
+        icon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) },
+        checked = showAlphabetCategories,
+        onCheckedChange = { onShowAlphabetCategoriesChange(it); prefs.showAlphabetCategories = it },
+        tooltipText = "Groups apps A–Z in the app drawer for quick alphabetical navigation."
+    )
+    SettingToggleItem(
+        title = stringResource(R.string.auto_show_keyboard),
+        subtitle = stringResource(R.string.settings_auto_keyboard_subtitle),
+        icon = { Icon(Icons.Default.Keyboard, contentDescription = null) },
+        checked = autoShowKeyboard,
+        onCheckedChange = { onAutoShowKeyboardChange(it); prefs.autoShowKeyboard = it },
+        tooltipText = "Automatically pops up the keyboard when you enter the app drawer for faster search."
     )
     SettingSliderItem(
         title = stringResource(R.string.app_drawer_text_size),
-        subtitle = "Scale font in drawer",
+        subtitle = stringResource(R.string.settings_drawer_text_size_subtitle),
         icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
         value = drawerTextSize,
-        range = 0.5f..2.0f,
-        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.DRAWER else null) },
+        range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_APP_SIZE_SCALE,
+        valueText = ::scaleText,
+        onHoldingChanged = { holding -> onHoldingPreview(if (holding) SettingsPreviewTarget.DRAWER else null) },
         onChanged = { onDrawerTextSizeChange(it); prefs.appDrawerTextSizeScale = it }
     )
 }
 
 @Composable
-private fun AppLibrarySection(
-    showAlphabetCategories: Boolean,
-    onShowAlphabetCategoriesChange: (Boolean) -> Unit,
+private fun PrivateSpaceSection(
     privateSpaceEnabled: Boolean,
     onPrivateSpaceEnabledChange: (Boolean) -> Unit,
     privateSpacePlacement: String,
@@ -1153,44 +1281,34 @@ private fun AppLibrarySection(
 ) {
     val prefs = LocalSettingsPrefs.current
     val scope = rememberCoroutineScope()
+    val notConfigured = stringResource(R.string.settings_private_space_not_configured)
+    val enabledMessage = stringResource(R.string.settings_private_space_enabled)
+    val disabledMessage = stringResource(R.string.settings_private_space_disabled)
 
-    SettingsSectionHeader("App Library")
+    SettingsSectionHeader(stringResource(R.string.private_space))
     SettingToggleItem(
-        title = "Show Alphabet Categories",
-        subtitle = "Group by starting letter",
-        icon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) },
-        checked = showAlphabetCategories,
-        onCheckedChange = { onShowAlphabetCategoriesChange(it); prefs.showAlphabetCategories = it },
-        tooltipText = "Groups apps A–Z in the app drawer for quick alphabetical navigation."
-    )
-    SettingToggleItem(
-        title = "Enable Private Space",
-        subtitle = if (isPrivateSpaceConfigured) "Unlock OS hidden profiles" else "Not configured in system settings",
+        title = stringResource(R.string.settings_enable_private_space),
+        subtitle = stringResource(
+            if (isPrivateSpaceConfigured) R.string.settings_private_space_subtitle else R.string.settings_private_space_not_configured
+        ),
         icon = { Icon(Icons.Default.Security, contentDescription = null) },
         checked = privateSpaceEnabled && isPrivateSpaceConfigured,
         onCheckedChange = {
             if (!isPrivateSpaceConfigured) {
-                scope.launch { snackbarHostState.showSnackbar("Private Space is not configured.") }
+                scope.launch { snackbarHostState.showSnackbar(notConfigured) }
             } else {
                 onPrivateSpaceEnabledChange(it); prefs.privateSpaceEnabled = it
-                scope.launch { snackbarHostState.showSnackbar(if (it) "Private Space Enabled" else "Private Space Disabled") }
+                scope.launch { snackbarHostState.showSnackbar(if (it) enabledMessage else disabledMessage) }
             }
         },
         tooltipText = "Private Space isolates sensitive apps behind a separate authentication layer. Must be configured in system settings first."
     )
-    if (privateSpaceAvailable) {
-        Text(
-            text = stringResource(R.string.private_space_placement),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
-        )
-        Text(
-            text = stringResource(R.string.private_space_placement_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
-        )
-        SettingChoiceChips(
+    // Placement only matters once the space is configured and turned on.
+    if (privateSpaceAvailable && privateSpaceEnabled && isPrivateSpaceConfigured) {
+        SettingChoiceItem(
+            title = stringResource(R.string.private_space_placement),
+            subtitle = stringResource(R.string.private_space_placement_subtitle),
+            icon = { Icon(Icons.Default.Security, contentDescription = null) },
             selected = privateSpacePlacement,
             options = listOf(
                 Prefs.PrivateSpacePlacement.BOTTOM to stringResource(R.string.private_space_placement_bottom),
@@ -1205,31 +1323,107 @@ private fun AppLibrarySection(
 }
 
 @Composable
-private fun AppearanceSection(
-    showStatusBar: Boolean,
-    onShowStatusBarChange: (Boolean) -> Unit,
-    autoShowKeyboard: Boolean,
-    onAutoShowKeyboardChange: (Boolean) -> Unit
-) {
-    val prefs = LocalSettingsPrefs.current
+private fun horizontalOptions(): List<Pair<Int, String>> = listOf(
+    Gravity.START to stringResource(R.string.left),
+    Gravity.CENTER_HORIZONTAL to stringResource(R.string.center),
+    Gravity.END to stringResource(R.string.right)
+)
 
-    SettingsSectionHeader(stringResource(R.string.appearance))
-    SettingToggleItem(
-        title = stringResource(R.string.notification_bar),
-        subtitle = "Show system status icons",
-        icon = { Icon(Icons.Default.SpaceBar, contentDescription = null) },
-        checked = showStatusBar,
-        onCheckedChange = { onShowStatusBarChange(it); prefs.showStatusBar = it },
-        tooltipText = "When disabled, the system status bar hides but can be revealed by swiping down from the top edge."
-    )
-    SettingToggleItem(
-        title = stringResource(R.string.auto_show_keyboard),
-        subtitle = "Pop up keyboard on search",
-        icon = { Icon(Icons.Default.Keyboard, contentDescription = null) },
-        checked = autoShowKeyboard,
-        onCheckedChange = { onAutoShowKeyboardChange(it); prefs.autoShowKeyboard = it },
-        tooltipText = "Automatically pops up the keyboard when you enter the app drawer for faster search."
-    )
+@Composable
+private fun verticalOptions(): List<Pair<Int, String>> = listOf(
+    Gravity.TOP to stringResource(R.string.top),
+    Gravity.CENTER_VERTICAL to stringResource(R.string.middle),
+    Gravity.BOTTOM to stringResource(R.string.bottom)
+)
+
+private fun scaleText(value: Float): String = String.format(Locale.getDefault(), "%.1f×", value)
+
+/** A titled row of single-choice chips. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> SettingChoiceItem(
+    title: String,
+    icon: @Composable () -> Unit,
+    selected: T,
+    options: List<Pair<T, String>>,
+    subtitle: String = "",
+    onSelected: (T) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            icon()
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.bodyLarge)
+                if (subtitle.isNotEmpty()) {
+                    Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = VoidDimens.rowSpacing)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(VoidDimens.rowSpacing)
+        ) {
+            options.forEach { (value, label) ->
+                FilterChip(
+                    selected = selected == value,
+                    onClick = { onSelected(value) },
+                    label = { Text(label) }
+                )
+            }
+        }
+    }
+}
+
+/** Theme color roles as swatches: each chip shows the color it applies. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SettingColorItem(
+    title: String,
+    selected: HomeTextColor,
+    onSelected: (HomeTextColor) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Palette, contentDescription = null)
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+        }
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = VoidDimens.rowSpacing)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(VoidDimens.rowSpacing)
+        ) {
+            HomeTextColor.entries.forEach { role ->
+                FilterChip(
+                    selected = selected == role,
+                    onClick = { onSelected(role) },
+                    label = { Text(stringResource(role.labelRes())) },
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(FilterChipDefaults.IconSize)
+                                .background(role.resolve(), CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+private fun HomeTextColor.labelRes(): Int = when (this) {
+    HomeTextColor.Default -> R.string.home_color_default
+    HomeTextColor.Primary -> R.string.home_color_primary
+    HomeTextColor.Secondary -> R.string.home_color_secondary
+    HomeTextColor.Tertiary -> R.string.home_color_tertiary
+    HomeTextColor.Muted -> R.string.home_color_muted
 }
 
 @Composable
@@ -1258,18 +1452,10 @@ private fun GesturesSection(
     val couldNotOpenNotificationSettings = stringResource(R.string.could_not_open_notification_settings)
 
     SettingsSectionHeader(stringResource(R.string.gestures))
-    Text(
-        text = stringResource(R.string.animation_speed),
-        style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
-    )
-    Text(
-        text = stringResource(R.string.animation_speed_subtitle),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
-    )
-    SettingChoiceChips(
+    SettingChoiceItem(
+        title = stringResource(R.string.animation_speed),
+        subtitle = stringResource(R.string.animation_speed_subtitle),
+        icon = { Icon(Icons.Default.Swipe, contentDescription = null) },
         selected = animationSpeed,
         options = listOf(
             Prefs.AnimationSpeed.FAST to stringResource(R.string.animation_speed_fast),
@@ -1683,6 +1869,7 @@ fun SettingSliderItem(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     tooltipText: String? = null,
+    valueText: (Float) -> String = { String.format(Locale.getDefault(), "%.1f", it) },
     onHoldingChanged: ((Boolean) -> Unit)? = null,
     onChanged: (Float) -> Unit
 ) {
@@ -1710,7 +1897,7 @@ fun SettingSliderItem(
                         }
                     }
                     Text(
-                        text = String.format("%.1f", value),
+                        text = valueText(value),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1971,211 +2158,6 @@ private fun SettingsAppPickerSheet(
                             .padding(vertical = 14.dp)
                     ) {
                         Text(app.first, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-        }
-    }
-}
-
-enum class SettingsPreviewTarget {
-    HOME,
-    DRAWER
-}
-
-@Composable
-private fun SettingsPreviewPane(
-    target: SettingsPreviewTarget,
-    clockSizeScale: Float,
-    dateSizeScale: Float,
-    screenTimeSizeScale: Float,
-    clockSectionWeight: Float,
-    appSpacingDp: Float,
-    homeTextSizeScale: Float,
-    drawerTextSizeScale: Float,
-    appFont: String,
-    clockAlignment: Int,
-    appAlignment: Int,
-    clockVerticalAlignment: Int,
-    appVerticalAlignment: Int,
-    showClock: Boolean,
-    showDate: Boolean,
-    showScreenTime: Boolean,
-    showHomeApps: Boolean
-) {
-    val resolution = rememberFontResolution(appFont)
-    val fontFamily = FontFamilies.familyFor(resolution.spec)
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background.copy(alpha = 0.94f)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(bottom = 12.dp)
-                ) {
-                    Text(
-                        text = if (target == SettingsPreviewTarget.HOME) "LIVE HOME PREVIEW" else "LIVE DRAWER PREVIEW",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                    )
-                }
-
-                if (target == SettingsPreviewTarget.HOME) {
-                    val clockAlign = remember(clockAlignment) {
-                        when (clockAlignment) {
-                            Gravity.CENTER_HORIZONTAL -> Alignment.CenterHorizontally
-                            Gravity.END -> Alignment.End
-                            else -> Alignment.Start
-                        }
-                    }
-                    val clockTextAlign = remember(clockAlignment) {
-                        when (clockAlignment) {
-                            Gravity.CENTER_HORIZONTAL -> TextAlign.Center
-                            Gravity.END -> TextAlign.End
-                            else -> TextAlign.Start
-                        }
-                    }
-                    val appAlign = remember(appAlignment) {
-                        when (appAlignment) {
-                            Gravity.CENTER_HORIZONTAL -> Alignment.CenterHorizontally
-                            Gravity.END -> Alignment.End
-                            else -> Alignment.Start
-                        }
-                    }
-                    val appTextAlign = remember(appAlignment) {
-                        when (appAlignment) {
-                            Gravity.CENTER_HORIZONTAL -> TextAlign.Center
-                            Gravity.END -> TextAlign.End
-                            else -> TextAlign.Start
-                        }
-                    }
-
-                    // Clock section
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(clockSectionWeight.coerceIn(0.2f, 0.6f)),
-                        contentAlignment = when (clockVerticalAlignment) {
-                            Gravity.TOP -> Alignment.TopStart
-                            Gravity.CENTER_VERTICAL -> Alignment.CenterStart
-                            else -> Alignment.BottomStart
-                        }
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = clockAlign
-                        ) {
-                            if (showClock) {
-                                Text(
-                                    text = "10:08",
-                                    fontSize = 54.sp * clockSizeScale,
-                                    fontFamily = fontFamily,
-                                    fontWeight = FontWeight.Normal,
-                                    textAlign = clockTextAlign,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                            }
-                            if (showDate) {
-                                Text(
-                                    text = "Thursday, Oct 8",
-                                    fontSize = 16.sp * dateSizeScale,
-                                    fontFamily = fontFamily,
-                                    textAlign = clockTextAlign,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
-                            if (showScreenTime) {
-                                Text(
-                                    text = "2h 15m screen time",
-                                    fontSize = 13.sp * screenTimeSizeScale,
-                                    fontFamily = fontFamily,
-                                    textAlign = clockTextAlign,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Apps section
-                    if (showHomeApps) {
-                        val computedSpacing = (18f * (if (appSpacingDp <= 0f) 0.5f else appSpacingDp / 16f)).coerceIn(4f, 48f)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f - clockSectionWeight.coerceIn(0.2f, 0.6f)),
-                            contentAlignment = when (appVerticalAlignment) {
-                                Gravity.TOP -> Alignment.TopStart
-                                Gravity.CENTER_VERTICAL -> Alignment.CenterStart
-                                else -> Alignment.BottomStart
-                            }
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalAlignment = appAlign,
-                                verticalArrangement = Arrangement.spacedBy(computedSpacing.dp)
-                            ) {
-                                val previewApps = listOf("Phone", "Messages", "Browser", "Camera", "Settings")
-                                for (app in previewApps) {
-                                    Text(
-                                        text = app,
-                                        fontSize = 18.sp * homeTextSizeScale,
-                                        fontFamily = fontFamily,
-                                        textAlign = appTextAlign,
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // App Drawer preview
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 8.dp)
-                    ) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                        ) {
-                            Text(
-                                text = "Search apps...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        val sampleDrawerApps = listOf("Calendar", "Camera", "Chrome", "Contacts", "Files", "Messages", "Music", "Settings")
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            for (appName in sampleDrawerApps) {
-                                Text(
-                                    text = appName,
-                                    fontSize = 17.sp * drawerTextSizeScale,
-                                    fontFamily = fontFamily,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f)
-                                )
-                            }
-                        }
                     }
                 }
             }

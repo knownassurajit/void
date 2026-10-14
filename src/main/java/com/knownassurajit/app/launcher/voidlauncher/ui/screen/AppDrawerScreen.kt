@@ -73,6 +73,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.knownassurajit.app.launcher.voidlauncher.helper.AppCacheManager
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceUi
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceControls
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceHeader
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.helper.ToggleOutcome
@@ -172,7 +174,8 @@ fun AppDrawerScreen(
             addAction(Intent.ACTION_PROFILE_ADDED)
             addAction(Intent.ACTION_PROFILE_REMOVED)
         }
-        androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+        // Profile broadcasts come from the system, which still reaches a non-exported receiver.
+        androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
         onDispose {
             runCatching { context.unregisterReceiver(receiver) }
         }
@@ -336,25 +339,12 @@ private fun AppDrawerSearchBar(
                 )
             )
             if (showPrivateSpaceControls) {
-                IconButton(onClick = onTogglePrivateSpace) {
-                    Icon(
-                        imageVector = if (isPrivateSpaceLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
-                        contentDescription = stringResource(
-                            if (isPrivateSpaceLocked) R.string.unlock_private_space
-                            else R.string.lock_private_space
-                        ),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (PrivateSpaceUi.settingsActionVisible(isPrivateSpaceLocked, hasPrivateSpaceSettings)) {
-                    IconButton(onClick = onOpenPrivateSpaceSettings) {
-                        Icon(
-                            imageVector = Icons.Outlined.Shield,
-                            contentDescription = stringResource(R.string.private_space_settings),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                PrivateSpaceControls(
+                    isLocked = isPrivateSpaceLocked,
+                    hasSettings = hasPrivateSpaceSettings,
+                    onToggle = onTogglePrivateSpace,
+                    onOpenSettings = onOpenPrivateSpaceSettings
+                )
             }
             IconButton(onClick = onOpenSettings) {
                 Icon(
@@ -431,50 +421,28 @@ private fun ColumnScope.AppDrawerAppList(
         }
 
         if (showPrivateSection) {
-            if (showBottomPrivateHeader) {
-            item(key = "private_divider") {
-                VoidSectionDivider()
-            }
-            item(key = "private_header") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = VoidDimens.rowSpacing),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Shield,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(VoidDimens.rowSpacing))
-                    Text(
-                        text = stringResource(R.string.private_space),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onTogglePrivateSpace) {
-                        Icon(
-                            imageVector = if (isPrivateSpaceLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
-                            contentDescription = stringResource(
-                                if (isPrivateSpaceLocked) R.string.unlock_private_space
-                                else R.string.lock_private_space
-                            ),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (PrivateSpaceUi.settingsActionVisible(isPrivateSpaceLocked, hasPrivateSpaceSettings)) {
-                        IconButton(onClick = onOpenPrivateSpaceSettings) {
-                            Icon(
-                                imageVector = Icons.Outlined.Settings,
-                                contentDescription = stringResource(R.string.private_space_settings),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+            // Bottom placement: the header carries the controls. Search-bar placement: the controls sit
+            // next to the search field and the header only labels the private apps while they show.
+            if (showBottomPrivateHeader || !isPrivateSpaceLocked) {
+                item(key = "private_divider") {
+                    VoidSectionDivider()
                 }
-            }
+                item(key = "private_header") {
+                    PrivateSpaceHeader(
+                        controls = if (showBottomPrivateHeader) {
+                            {
+                                PrivateSpaceControls(
+                                    isLocked = isPrivateSpaceLocked,
+                                    hasSettings = hasPrivateSpaceSettings,
+                                    onToggle = onTogglePrivateSpace,
+                                    onOpenSettings = onOpenPrivateSpaceSettings
+                                )
+                            }
+                        } else {
+                            null
+                        }
+                    )
+                }
             }
             if (!isPrivateSpaceLocked) {
                 itemsIndexed(
@@ -521,7 +489,7 @@ private fun AppDrawerItem(
         if (isPrivate) {
             Icon(
                 imageVector = Icons.Outlined.Lock,
-                contentDescription = "Private App",
+                contentDescription = stringResource(R.string.private_app),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -543,9 +511,9 @@ private fun AppDrawerPrivateSpaceSearchRow(
         Icon(
             imageVector = Icons.Outlined.Shield,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.tertiary
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(VoidDimens.rowSpacing))
         Column {
             Text(
                 text = stringResource(R.string.private_space),
@@ -553,7 +521,7 @@ private fun AppDrawerPrivateSpaceSearchRow(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (isLocked) "Tap to unlock" else "Tap to lock",
+                text = stringResource(if (isLocked) R.string.private_space_tap_to_unlock else R.string.private_space_tap_to_lock),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

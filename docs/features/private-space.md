@@ -43,3 +43,7 @@ Pixel_8a AVD with a secure screen lock (PIN), VOID set as the home app, and a pr
 4. Lock or unlock from system UI while the drawer is in the background, then return: state matches the system without reopening the drawer.
 5. Set another launcher as home and tap the lock toggle: the "Couldn't change Private Space" toast shows and the UI keeps the real state.
 6. Turn the Private Space setting off in VOID Settings and reopen the drawer: no section, no receiver crash on leaving the drawer.
+
+## Controls (both placements)
+
+`PrivateSpaceControls` is used in the search bar and in the bottom header alike: a tonal pill with the lock toggle and, only while unlocked, the Private Space settings action (shield-badged `AdminPanelSettings` icon, never the launcher-settings gear). The action expands inside the pill, so unlocking does not move the search field. With the search-bar placement the unlocked private apps keep a labelled "Private Space" section at the bottom.

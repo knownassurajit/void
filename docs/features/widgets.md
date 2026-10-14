@@ -26,3 +26,10 @@ There is no W/H stepper chrome. Resize follows available screen width so cells s
 ## Out of scope
 
 Home-screen grid widget placement is intentionally not part of this epic.
+
+## Grid placement
+
+- The grid has 4 square columns; each pinned widget has a cell (`WIDGET_POSITIONS`, `provider|column|row`) and a span (`WIDGET_SPANS`).
+- Add: tap a widget in the picker (first free cell) or hold it and drag it onto the grid. While held, the picker hides, the cells are outlined and the landing cell (the free one nearest the finger) is highlighted.
+- Move: hold a pinned widget and drag it. Resize: long-press to select, then drag the corner handle; the span snaps to whole cells, follows the provider's `resizeMode` and shrinks to the largest size that does not cover another widget.
+- Layout rules live in `helper/WidgetGrid.kt` (pure, unit tested). Layouts saved before cells existed are placed in their saved order.

@@ -24,3 +24,17 @@
 ## Responsive reflow
 
 When a section is disabled, remaining enabled sections take full height. When both are on, each section is allocated a clamped weight. Overflow is clipped so vertical swipe-up can still open the app library.
+
+## Text style and margins
+
+| Setting | Key | Range / values | Default |
+| --- | --- | --- | --- |
+| Clock font weight | `CLOCK_FONT_WEIGHT` | 400, 500, 700 | 700 |
+| Clock text color | `CLOCK_COLOR` | default, primary, secondary, tertiary, muted | default |
+| Clock opacity | `CLOCK_OPACITY` | 0.2 – 1.0 | 1.0 |
+| Home apps font weight | `HOME_APPS_FONT_WEIGHT` | 400, 500, 700 | 400 |
+| Home apps text color | `HOME_APPS_COLOR` | as clock | default |
+| Home apps opacity | `HOME_APPS_OPACITY` | 0.2 – 1.0 | 1.0 |
+| Side margins | `HOME_SIDE_PADDING_DP` | 8 – 48 dp | 20 dp |
+
+Colors are theme roles, so they follow dark mode and dynamic color. Home and the Settings previews draw from the same `HomeStyle` styles and spacing math; the Home screen group starts with a live scaled preview.

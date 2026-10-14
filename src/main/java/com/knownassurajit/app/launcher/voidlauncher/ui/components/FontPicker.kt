@@ -18,16 +18,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -91,16 +90,17 @@ private const val SAMPLE_REQUEST_DELAY_MS = 180L
 /**
  * Full-screen font chooser drawn inside the Settings screen (not a window), so other overlays can sit above it.
  *
- * Bundled and System rows commit at once. A Google Fonts row first downloads every declared weight and commits only
- * when that succeeded; on failure the picker stays open, shows a message, and [onFontSelected] is not called. The
- * rules are in [FontPickerSession]; this composable only forwards taps and draws the result.
+ * Tapping a row only previews it: the specimen card at the top redraws the clock, app labels and a pangram in that
+ * face, so a font is seen before it is chosen. [Apply][R.string.font_apply] commits the previewed family. Bundled and
+ * System families commit at once. A Google Fonts family first downloads every declared weight and commits only when
+ * that succeeded; on failure the picker stays open, shows a message, and [onFontSelected] is not called. The rules
+ * are in [FontPickerSession]; this composable only forwards taps and draws the result.
  */
 @Composable
 fun FontPicker(
     selectedId: String,
     onFontSelected: (String) -> Unit,
     onDismiss: () -> Unit,
-    onPreviewFont: ((String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -130,6 +130,8 @@ fun FontPicker(
 
     var query by remember { mutableStateOf("") }
     var kind by remember { mutableStateOf<FontKind?>(null) }
+    var previewId by remember { mutableStateOf(selectedId) }
+    val previewSpec = FontCatalog.find(previewId) ?: FontCatalog.default
     val groups = remember(query, kind, gmsAvailable) { FontCatalog.groups(query, kind, gmsAvailable) }
 
     // Open with the selected family in view (the item before it, so a sticky header does not cover it).
@@ -154,6 +156,14 @@ fun FontPicker(
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize().imePadding()) {
                 FontPickerTopBar(title = title, onDismiss = onDismiss)
+                FontSpecimenCard(
+                    spec = previewSpec,
+                    sampleReady = !previewSpec.needsDownload || states.isReady(previewSpec.id, FontCoverage.Sample),
+                    applied = previewSpec.id == selectedId,
+                    rowState = states.rowState(previewSpec.id),
+                    onSampleWanted = { session.prefetchSample(previewSpec) },
+                    onApply = { session.select(previewSpec) }
+                )
                 VoidSearchField(
                     query = query,
                     onQueryChange = { query = it },
@@ -174,12 +184,12 @@ fun FontPicker(
                             items(group.fonts, key = { it.id }) { spec ->
                                 FontRow(
                                     spec = spec,
-                                    selected = spec.id == selectedId,
+                                    applied = spec.id == selectedId,
+                                    previewed = spec.id == previewId,
                                     rowState = states.rowState(spec.id),
                                     sampleReady = states.isReady(spec.id, FontCoverage.Sample),
                                     onSampleWanted = { session.prefetchSample(spec) },
-                                    onPreviewFont = onPreviewFont,
-                                    onClick = { session.select(spec) }
+                                    onClick = { previewId = spec.id }
                                 )
                             }
                         }
@@ -190,6 +200,96 @@ fun FontPicker(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter).imePadding()
             )
+        }
+    }
+}
+
+/**
+ * The previewed family drawn the way Home uses it: the clock, app labels and a pangram with digits.
+ * A downloadable family is drawn in its own face once its sample load finished, until then in the
+ * default face with a progress hint.
+ */
+@Composable
+private fun FontSpecimenCard(
+    spec: FontSpec,
+    sampleReady: Boolean,
+    applied: Boolean,
+    rowState: FontRowState,
+    onSampleWanted: () -> Unit,
+    onApply: () -> Unit
+) {
+    if (!sampleReady) {
+        LaunchedEffect(spec.id) { onSampleWanted() }
+    }
+    val family = if (sampleReady) FontFamilies.familyFor(spec, FontCoverage.Sample) else null
+    val downloading = rowState == FontRowState.Downloading
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.rowSpacing)
+    ) {
+        Column(modifier = Modifier.padding(VoidDimens.sectionSpacing)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = spec.displayName,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                if (!sampleReady) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(VoidDimens.fontStateIconSize),
+                        strokeWidth = VoidDimens.fontProgressStrokeWidth
+                    )
+                }
+            }
+            Text(
+                text = stringResource(R.string.font_specimen_clock),
+                style = MaterialTheme.typography.displayMedium,
+                fontFamily = family,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+            Text(
+                text = stringResource(R.string.font_specimen_apps),
+                style = MaterialTheme.typography.titleLarge,
+                fontFamily = family,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+            Text(
+                text = stringResource(R.string.font_specimen_pangram),
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = family,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                modifier = Modifier.padding(top = VoidDimens.compactSpacing)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = VoidDimens.rowSpacing),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = fontSupportingText(spec),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(onClick = onApply, enabled = !applied && !downloading) {
+                    if (downloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(FilterChipDefaults.IconSize),
+                            strokeWidth = VoidDimens.fontProgressStrokeWidth
+                        )
+                    } else {
+                        Text(stringResource(if (applied) R.string.font_applied else R.string.font_apply))
+                    }
+                }
+            }
         }
     }
 }
@@ -296,11 +396,11 @@ private fun FontNoMatches() {
 @Composable
 private fun FontRow(
     spec: FontSpec,
-    selected: Boolean,
+    applied: Boolean,
+    previewed: Boolean,
     rowState: FontRowState,
     sampleReady: Boolean,
     onSampleWanted: () -> Unit,
-    onPreviewFont: ((String?) -> Unit)? = null,
     onClick: () -> Unit
 ) {
     // Fonts that need a download show the name in their own face only once it is safe to compose them.
@@ -311,35 +411,38 @@ private fun FontRow(
             onSampleWanted()
         }
     }
-    val stateText = fontStateDescription(spec, selected, rowState)
+    val stateText = fontStateDescription(spec, applied, rowState)
+    val family = if (showOwnFace) FontFamilies.familyFor(spec, FontCoverage.Sample) else null
 
     ListItem(
         headlineContent = {
             Text(
                 text = spec.displayName,
-                fontFamily = if (showOwnFace) FontFamilies.familyFor(spec, FontCoverage.Sample) else null
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = family
             )
         },
-        supportingContent = { Text(fontSupportingText(spec)) },
-        trailingContent = { FontRowTrailingIcon(selected, rowState, spec.needsDownload) },
+        supportingContent = {
+            Column {
+                Text(
+                    text = stringResource(R.string.font_row_sample),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontFamily = family,
+                    maxLines = 1
+                )
+                Text(fontSupportingText(spec), style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        trailingContent = { FontRowTrailingIcon(applied, rowState, spec.needsDownload) },
         colors = ListItemDefaults.colors(
-            containerColor = if (selected) {
+            containerColor = if (previewed) {
                 MaterialTheme.colorScheme.secondaryContainer
             } else {
                 MaterialTheme.colorScheme.background
             }
         ),
         modifier = Modifier
-            .pointerInput(spec.id) {
-                detectTapGestures(
-                    onPress = {
-                        onPreviewFont?.invoke(spec.id)
-                        tryAwaitRelease()
-                        onPreviewFont?.invoke(null)
-                    },
-                    onTap = { onClick() }
-                )
-            }
+            .selectable(selected = previewed, role = Role.RadioButton, onClick = onClick)
             .semantics { stateDescription = stateText }
     )
 }
@@ -404,7 +507,7 @@ private fun fontStateDescription(spec: FontSpec, selected: Boolean, rowState: Fo
 private const val BYTES_PER_KB = 1024L
 
 @StringRes
-private fun Int.weightLabelRes(): Int = when (this) {
+internal fun Int.weightLabelRes(): Int = when (this) {
     FontWeight.Medium.weight -> R.string.font_weight_medium
     FontWeight.Bold.weight -> R.string.font_weight_bold
     else -> R.string.font_weight_regular

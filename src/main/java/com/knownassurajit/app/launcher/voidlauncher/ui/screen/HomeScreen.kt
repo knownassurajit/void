@@ -104,6 +104,9 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeTextColor
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolve
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.withTabularFigures
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
@@ -339,7 +342,7 @@ fun HomeScreen(
             @Composable
             fun Divider() {
                 HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = VoidDimens.screenPadding),
+                    modifier = Modifier.padding(horizontal = state.homeSidePaddingDp.dp),
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f)
                 )
@@ -410,24 +413,25 @@ private fun ColumnScope.HomeClockSection(
                         else -> Alignment.Center
                     }
                 )
-                .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing),
+                .padding(horizontal = state.homeSidePaddingDp.dp, vertical = VoidDimens.sectionSpacing),
             horizontalAlignment = clockAlign,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(VoidDimens.compactSpacing)
         ) {
+            val clockColor = HomeTextColor.fromKey(state.clockColor)
+            val clockBase = clockColor.resolve()
             // ── Time ──
             if (state.showClock) {
                 Text(
                     text = state.currentTime,
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = MaterialTheme.typography.displayLarge.fontSize *
-                            state.clockSizeScale *
-                            (if (state.showSeconds) 0.7f else 1.0f),
-                        letterSpacing = (-1.5).sp
-                    ).withTabularFigures(),
+                    style = HomeStyle.clockStyle(
+                        MaterialTheme.typography,
+                        state.clockSizeScale,
+                        state.showSeconds,
+                        state.clockFontWeight
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = clockBase.copy(alpha = state.clockOpacity),
                     textAlign = clockTextAlign,
                     modifier = Modifier.clickable {
                             try {
@@ -443,12 +447,8 @@ private fun ColumnScope.HomeClockSection(
             if (state.showDate) {
                 Text(
                     text = state.currentDate.uppercase(),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 2.sp,
-                        fontSize = MaterialTheme.typography.bodySmall.fontSize * state.dateSizeScale
-                    ).withTabularFigures(),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.87f),
+                    style = HomeStyle.dateStyle(MaterialTheme.typography, state.dateSizeScale),
+                    color = clockBase.copy(alpha = 0.87f * state.clockOpacity),
                     textAlign = clockTextAlign,
                     modifier = Modifier.clickable {
                             try {
@@ -465,12 +465,9 @@ private fun ColumnScope.HomeClockSection(
             if (state.showScreenTime && state.screenTime.isNotBlank()) {
                 Text(
                     text = state.screenTime.uppercase(),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Normal,
-                        letterSpacing = 1.5.sp,
-                        fontSize = 11.sp * state.screenTimeSizeScale
-                    ).withTabularFigures(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                    style = HomeStyle.screenTimeStyle(MaterialTheme.typography, state.screenTimeSizeScale),
+                    color = (if (clockColor == HomeTextColor.Default) MaterialTheme.colorScheme.onSurfaceVariant else clockBase)
+                        .copy(alpha = 0.45f * state.clockOpacity),
                     textAlign = clockTextAlign,
                     modifier = Modifier
                         .padding(top = 2.dp)
@@ -498,10 +495,8 @@ private fun ColumnScope.HomeAppsSection(
     // ── Dynamic app spacing based on screen real-estate ──
     val configuration = LocalConfiguration.current
     val screenHeightDp = configuration.screenHeightDp
-    val displayedCount = state.homeApps.size.coerceAtLeast(1)
-    val dynamicBaseSpacing = ((screenHeightDp * 0.75f) / (displayedCount + 3)).coerceIn(4f, 32f)
-    val spacingMultiplier = if (state.appSpacingDp <= 0f) 0f else state.appSpacingDp / 24f
-    val computedSpacing = (dynamicBaseSpacing * spacingMultiplier).coerceIn(0f, 64f)
+    val computedSpacing = HomeStyle.appSpacingDp(screenHeightDp, state.homeApps.size, state.appSpacingDp)
+    val appBase = HomeTextColor.fromKey(state.homeAppsColor).resolve()
 
     // ── Drag-to-reorder state ──
     val reorderList = remember { mutableStateListOf<HomeApp>() }
@@ -613,7 +608,7 @@ private fun ColumnScope.HomeAppsSection(
         modifier = Modifier
             .fillMaxWidth()
             .weight(weight)
-            .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.rowSpacing)
+            .padding(horizontal = state.homeSidePaddingDp.dp, vertical = VoidDimens.rowSpacing)
     ) {
         Box(
             modifier = Modifier
@@ -671,15 +666,15 @@ private fun ColumnScope.HomeAppsSection(
                     ) {
                         Text(
                             text = app.label,
-                            style = MaterialTheme.typography.headlineLarge.copy(
-                                fontWeight = FontWeight.Normal,
-                                fontSize = MaterialTheme.typography.headlineLarge.fontSize * state.homeTextSizeScale,
-                                letterSpacing = (-0.5).sp
+                            style = HomeStyle.appLabelStyle(
+                                MaterialTheme.typography,
+                                state.homeTextSizeScale,
+                                state.homeAppsFontWeight
                             ),
                             color = when {
                                 isThisDragged -> MaterialTheme.colorScheme.primary
-                                isDragging -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-                                else -> MaterialTheme.colorScheme.onBackground
+                                isDragging -> appBase.copy(alpha = 0.35f * state.homeAppsOpacity)
+                                else -> appBase.copy(alpha = state.homeAppsOpacity)
                             },
                             textAlign = appTextAlign,
                             modifier = Modifier
@@ -740,7 +735,7 @@ private fun ColumnScope.HomeAppsSection(
 
             if (isDragging) {
                 Text(
-                    text = "Release to confirm",
+                    text = stringResource(R.string.home_reorder_release_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
                     textAlign = TextAlign.Center,

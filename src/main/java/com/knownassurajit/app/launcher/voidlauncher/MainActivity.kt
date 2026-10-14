@@ -130,8 +130,9 @@ class MainActivity : ComponentActivity() {
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         }
-        registerReceiver(appReceiver, pkgFilter)
-        androidx.core.content.ContextCompat.registerReceiver(this, appReceiver, pkgFilter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+        // Registered once (it used to be registered twice, so every package change synced the cache twice).
+        // Package broadcasts come from the system, which still reaches a non-exported receiver.
+        androidx.core.content.ContextCompat.registerReceiver(this, appReceiver, pkgFilter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
 
         enableEdgeToEdge()
         setContent {
