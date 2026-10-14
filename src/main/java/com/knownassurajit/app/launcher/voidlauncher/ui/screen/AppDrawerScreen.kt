@@ -72,7 +72,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.knownassurajit.app.launcher.voidlauncher.helper.AppCacheManager
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
-import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceUi
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceControls
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceHeader
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider

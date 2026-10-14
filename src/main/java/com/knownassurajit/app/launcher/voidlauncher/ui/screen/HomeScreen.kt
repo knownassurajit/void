@@ -107,7 +107,6 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionS
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeTextColor
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolve
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.withTabularFigures
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 

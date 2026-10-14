@@ -62,17 +62,18 @@ class NavMotionTest {
     }
 
     @Test
-    fun panelAssignedToTheLeftSwipe_entersFromTheRightEdge() {
+    fun panelAssignedToTheLeftSwipe_entersFromTheLeftEdge() {
+        // As PanelOrigin, docs/architecture/motion.md and the Notes delete direction define it.
         assertEquals(
-            PanelEdge.Right,
+            PanelEdge.Left,
             resolve(NavRouteKind.Notes, left = NavRouteKind.Notes, right = NavRouteKind.Widgets)
         )
     }
 
     @Test
-    fun panelAssignedToTheRightSwipe_entersFromTheLeftEdge() {
+    fun panelAssignedToTheRightSwipe_entersFromTheRightEdge() {
         assertEquals(
-            PanelEdge.Left,
+            PanelEdge.Right,
             resolve(NavRouteKind.Widgets, left = NavRouteKind.Notes, right = NavRouteKind.Widgets)
         )
     }
