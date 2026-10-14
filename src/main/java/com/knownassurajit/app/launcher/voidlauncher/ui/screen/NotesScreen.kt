@@ -730,3 +730,7 @@ private fun launchReminderApp(context: Context, note: NoteItem, triggerTime: Lon
         } catch (_: Exception) {}
     }
 }
+
+fun noteDeleteFromStartToEnd(edge: com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge, rtl: Boolean): Boolean =
+    (edge == com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge.Left) != rtl
+
