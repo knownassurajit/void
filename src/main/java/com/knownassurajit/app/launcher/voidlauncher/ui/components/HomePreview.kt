@@ -40,7 +40,6 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolve
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 /** What a Settings preview draws. */
 enum class SettingsPreviewTarget {
@@ -99,16 +98,18 @@ private fun ColumnScope.PreviewClockSection(state: MainUiState, weight: Float) {
     val clockColor = HomeTextColor.fromKey(state.clockColor)
     val base = clockColor.resolve()
     val textAlign = gravityTextAlign(state.clockHorizontalAlignment)
-    val time = remember(state.use24HourClock, state.showSeconds) {
+    // The configuration locale is observable: the samples follow a language change.
+    val locale = LocalConfiguration.current.locales[0]
+    val time = remember(state.use24HourClock, state.showSeconds, locale) {
         val pattern = when {
             state.use24HourClock && state.showSeconds -> "HH:mm:ss"
             state.use24HourClock -> "HH:mm"
             state.showSeconds -> "h:mm:ss a"
             else -> "h:mm a"
         }
-        SimpleDateFormat(pattern, Locale.getDefault()).format(Date()).uppercase(Locale.getDefault())
+        SimpleDateFormat(pattern, locale).format(Date()).uppercase(locale)
     }
-    val date = remember { SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date()).uppercase(Locale.getDefault()) }
+    val date = remember(locale) { SimpleDateFormat("EEE, d MMM", locale).format(Date()).uppercase(locale) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -142,7 +143,7 @@ private fun ColumnScope.PreviewClockSection(state: MainUiState, weight: Float) {
             }
             if (state.showScreenTime) {
                 Text(
-                    text = stringResource(R.string.preview_screen_time).uppercase(Locale.getDefault()),
+                    text = stringResource(R.string.preview_screen_time).uppercase(locale),
                     style = HomeStyle.screenTimeStyle(MaterialTheme.typography, state.screenTimeSizeScale),
                     color = (if (clockColor == HomeTextColor.Default) MaterialTheme.colorScheme.onSurfaceVariant else base)
                         .copy(alpha = 0.45f * state.clockOpacity),
