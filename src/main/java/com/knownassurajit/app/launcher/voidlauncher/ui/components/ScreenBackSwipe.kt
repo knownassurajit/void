@@ -11,9 +11,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeAxis
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeMath
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeToBack
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalNavEnterAxis
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavAxis
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import kotlin.math.abs
 
 @Composable
@@ -58,4 +61,61 @@ fun Modifier.screenBackSwipe(
 @Composable
 fun ChildScreenBackHandler(onBack: () -> Unit) {
     BackHandler(onBack = onBack)
+}
+
+data class DismissDirection(val axis: SwipeAxis, val sign: Int) {
+    fun along(dx: Float, dy: Float): Float = if (axis == SwipeAxis.Horizontal) dx * sign else dy * sign
+}
+
+fun dismissDirection(edge: PanelEdge): DismissDirection = when (edge) {
+    PanelEdge.Left -> DismissDirection(SwipeAxis.Horizontal, -1)
+    PanelEdge.Right -> DismissDirection(SwipeAxis.Horizontal, 1)
+    PanelEdge.Top -> DismissDirection(SwipeAxis.Vertical, -1)
+    PanelEdge.Bottom, PanelEdge.None -> DismissDirection(SwipeAxis.Vertical, 1)
+}
+
+enum class BackSwipeStep {
+    Undecided,
+    Tracking,
+    GiveUp
+}
+
+class BackSwipeRecognizer(
+    val direction: DismissDirection,
+    val slop: Float,
+    val density: Float
+) {
+    var travelX: Float = 0f
+        private set
+    var travelY: Float = 0f
+        private set
+
+    private var state: BackSwipeStep = BackSwipeStep.Undecided
+
+    fun onMove(dx: Float, dy: Float, consumed: Boolean): BackSwipeStep {
+        if (consumed || state == BackSwipeStep.GiveUp) {
+            state = BackSwipeStep.GiveUp
+            return state
+        }
+        travelX += dx
+        travelY += dy
+        val absX = abs(travelX)
+        val absY = abs(travelY)
+        val lockThresholdPx = slop * 1.5f
+        if (state == BackSwipeStep.Undecided) {
+            if (absX < lockThresholdPx && absY < lockThresholdPx) {
+                return BackSwipeStep.Undecided
+            }
+            val alongAxis = if (direction.axis == SwipeAxis.Horizontal) absX > absY else absY > absX
+            state = if (alongAxis) BackSwipeStep.Tracking else BackSwipeStep.GiveUp
+        }
+        return state
+    }
+
+    fun shouldClose(velocityX: Float, velocityY: Float): Boolean {
+        if (state != BackSwipeStep.Tracking) return false
+        val travel = direction.along(travelX, travelY)
+        val velocity = direction.along(velocityX, velocityY)
+        return SwipeMath.shouldCommit(travel, velocity, slop, density)
+    }
 }

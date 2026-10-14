@@ -103,7 +103,7 @@ fun AppDrawerScreen(
                 val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
                 hasPrivateSpace = profile != null
                 if (profile != null) {
-                    isPrivateSpaceLocked = PrivateSpaceHelper.isQuietModeEnabled(context)
+                    isPrivateSpaceLocked = PrivateSpaceHelper.queryLocked(context) ?: true
                     scope.launch {
                         try {
                             val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
@@ -217,8 +217,10 @@ fun AppDrawerScreen(
                 isPrivateSpaceLocked = isPrivateSpaceLocked,
                 onTogglePrivateSpace = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                        PrivateSpaceHelper.togglePrivateSpace(context)
-                        isPrivateSpaceLocked = !isPrivateSpaceLocked
+                        scope.launch {
+                            PrivateSpaceHelper.togglePrivateSpace(context)
+                            isPrivateSpaceLocked = PrivateSpaceHelper.queryLocked(context) ?: !isPrivateSpaceLocked
+                        }
                     }
                 },
                 onOpenPrivateSpaceSettings = {
@@ -254,16 +256,16 @@ fun AppDrawerScreen(
                 onAppClick = onAppClick,
                 onTogglePrivateSpace = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                        PrivateSpaceHelper.togglePrivateSpace(context)
-                        isPrivateSpaceLocked = !isPrivateSpaceLocked
-                        if (!isPrivateSpaceLocked) {
-                            scope.launch {
+                        scope.launch {
+                            PrivateSpaceHelper.togglePrivateSpace(context)
+                            isPrivateSpaceLocked = PrivateSpaceHelper.queryLocked(context) ?: !isPrivateSpaceLocked
+                            if (!isPrivateSpaceLocked) {
                                 val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
                                 privateApps.clear()
                                 privateApps.addAll(pApps)
+                            } else {
+                                privateApps.clear()
                             }
-                        } else {
-                            privateApps.clear()
                         }
                     }
                 }

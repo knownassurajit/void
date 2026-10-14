@@ -1,5 +1,5 @@
 [versions]
-agp = "8.8.0"
+agp = "8.9.1"
 coreKtx = "1.16.0"
 kotlinStdlib = "2.1.0"
 lifecycleViewmodelKtx = "2.8.7"
@@ -8,6 +8,7 @@ workRuntimeKtx = "2.10.0"
 activityCompose = "1.10.1"
 composeBom = "2025.05.01"
 navigationCompose = "2.8.9"
+navigationevent = "1.2.0"
 serializationJson = "1.7.3"
 googleFonts = "1.10.6"
 profileinstaller = "1.4.1"
@@ -35,6 +36,7 @@ compose-material-icons-core = { module = "androidx.compose.material:material-ico
 compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 compose-ui-text-google-fonts = { module = "androidx.compose.ui:ui-text-google-fonts", version.ref = "googleFonts" }
 navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+navigationevent = { module = "androidx.navigationevent:navigationevent", version.ref = "navigationevent" }
 
 # Misc
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serializationJson" }

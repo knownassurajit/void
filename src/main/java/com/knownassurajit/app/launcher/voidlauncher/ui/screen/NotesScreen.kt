@@ -348,3 +348,7 @@ private fun NoteRow(note: NoteItem, onToggle: () -> Unit) {
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
 }
+
+fun noteDeleteFromStartToEnd(edge: com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge, rtl: Boolean): Boolean =
+    (edge == com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge.Left) != rtl
+

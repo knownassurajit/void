@@ -235,4 +235,36 @@
     <string name="private_space_placement_subtitle">Where Private Space appears in the app library</string>
     <string name="private_space_placement_bottom">Bottom</string>
     <string name="private_space_placement_search_bar">Search bar</string>
+
+    <!-- Font Picker Strings -->
+    <string name="font_search_hint">Search fonts</string>
+    <string name="font_search_clear">Clear search query</string>
+    <string name="font_picker_close">Close font picker</string>
+    <string name="font_kind_all">All</string>
+    <string name="font_provider_unavailable">Google Fonts service unavailable</string>
+    <string name="font_no_matches">No matching fonts found</string>
+    <string name="font_weights_separator">, </string>
+    <string name="font_row_bundled">%1$s · %2$s · Bundled</string>
+    <string name="font_row_system">System font</string>
+    <string name="font_row_download">%1$s · %2$s · %3$s download</string>
+    <string name="font_state_selected">Selected</string>
+    <string name="font_state_not_selected">Not selected</string>
+    <string name="font_state_downloading">Downloading font</string>
+    <string name="font_state_failed">Download failed</string>
+    <string name="font_state_downloaded">Downloaded</string>
+    <string name="font_state_available">Available for download</string>
+    <string name="font_state_combined">%1$s, %2$s</string>
+    <string name="font_weight_medium">Medium</string>
+    <string name="font_weight_bold">Bold</string>
+    <string name="font_weight_regular">Regular</string>
+    <string name="font_download_failed">Could not download font</string>
+    <string name="font_download_failed_provider">Google Fonts provider unavailable</string>
+    <string name="font_download_failed_missing">Font not found</string>
+    <string name="font_kind_sans">Sans Serif</string>
+    <string name="font_kind_serif">Serif</string>
+    <string name="font_kind_mono">Monospace</string>
+    <string name="font_kind_display">Display</string>
+    <string name="font_group_bundled">Bundled Fonts</string>
+    <string name="font_group_google_fonts">Google Fonts</string>
+    <string name="font_group_system">System Fonts</string>
 </resources>

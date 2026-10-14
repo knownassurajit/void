@@ -118,7 +118,6 @@ class MainActivity : ComponentActivity() {
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         }
-        registerReceiver(appReceiver, pkgFilter)
         androidx.core.content.ContextCompat.registerReceiver(this, appReceiver, pkgFilter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
 
         enableEdgeToEdge()

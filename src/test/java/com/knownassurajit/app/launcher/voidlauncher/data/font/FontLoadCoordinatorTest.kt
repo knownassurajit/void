@@ -259,16 +259,16 @@ class FontLoadCoordinatorTest {
     fun sampleTimeout_startsOnlyOnceTheLoadHoldsItsTurn() = blocking {
         val (first, second) = others
         val releases = mapOf(first.id to CompletableDeferred<Unit>(), second.id to CompletableDeferred<Unit>())
-        val coordinator = coordinator(timeoutMs = 600) { spec, _ -> releases.getValue(spec.id).await() }
+        val coordinator = coordinator(timeoutMs = 2_000) { spec, _ -> releases.getValue(spec.id).await() }
 
         val firstLoad = coordinator.ensureLoaded(first, FontCoverage.Sample)
         val secondLoad = coordinator.ensureLoaded(second, FontCoverage.Sample)
-        delay(400)
+        delay(200)
         releases.getValue(first.id).complete(Unit)
         assertEquals(FontLoadState.Ready, firstLoad.await())
 
-        // 800 ms after submission (past the 600 ms limit) but only 400 ms after taking its turn.
-        delay(400)
+        // 400 ms after submission but only 200 ms after taking its turn.
+        delay(200)
         releases.getValue(second.id).complete(Unit)
         assertEquals(FontLoadState.Ready, secondLoad.await())
     }

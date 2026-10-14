@@ -312,3 +312,40 @@ object GestureEdgeStrip {
         max(systemGestureInsetPx, VoidDimens.edgeExclusionMinWidth.value * density) +
             VoidDimens.edgeExclusionMargin.value * density
 }
+
+fun homeSwipeSettings(
+    state: com.knownassurajit.app.launcher.voidlauncher.MainUiState,
+    leftAppPackage: String,
+    rightAppPackage: String,
+    flags: SwipeFeatureFlags
+): HomeSwipeSettings = HomeSwipeSettings(
+    gesturesEnabled = state.enableGestures,
+    swipeDownEnabled = state.enableSwipeDownNotifications,
+    leftAction = state.leftSwipeAction,
+    rightAction = state.rightSwipeAction,
+    leftAppPackage = leftAppPackage,
+    rightAppPackage = rightAppPackage,
+    flags = flags
+)
+
+fun dispatchSwipeTarget(
+    target: SwipeTarget,
+    onOpenApps: () -> Unit,
+    onOpenNotificationSummary: () -> Unit,
+    onOpenWidgets: () -> Unit,
+    onOpenNotes: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onLaunchApp: (packageName: String, edge: PanelEdge) -> Boolean
+): Boolean = when (target) {
+    is SwipeTarget.Panel -> when (target.route) {
+        NavRouteKind.AppDrawer -> { onOpenApps(); true }
+        NavRouteKind.NotificationSummary -> { onOpenNotificationSummary(); true }
+        NavRouteKind.Widgets -> { onOpenWidgets(); true }
+        NavRouteKind.Notes -> { onOpenNotes(); true }
+        else -> false
+    }
+    SwipeTarget.Notifications -> { onOpenNotifications(); true }
+    is SwipeTarget.App -> onLaunchApp(target.packageName, target.edge)
+    SwipeTarget.None -> false
+}
+
