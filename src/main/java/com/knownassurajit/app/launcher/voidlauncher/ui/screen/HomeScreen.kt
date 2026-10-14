@@ -92,6 +92,8 @@ import com.knownassurajit.app.launcher.voidlauncher.helper.HomeReorderHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeEdgeExclusionStrips
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeGate
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeRestore
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeSettings
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeState
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeFeatureFlags
@@ -214,8 +216,7 @@ private fun openScreenTimeDestination(context: android.content.Context) {
 @Composable
 fun HomeScreen(
     state: MainUiState,
-    isCurrentDestination: Boolean = true,
-    isSettled: Boolean = true,
+    swipeGate: HomeSwipeGate = HomeSwipeGate.Open,
     onOpenApps: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNotifications: () -> Unit,
@@ -248,8 +249,8 @@ fun HomeScreen(
     val swipeState = remember { HomeSwipeState() }
     val motion = rememberVoidMotionScheme(state.animationSpeed)
 
-    // Swipes start only while Home is the screen on top and no navigation transition is moving it.
-    val swipesActive = isCurrentDestination && isSettled
+    // Swipes start only while Home is the screen on top and nothing moves it (see HomeSwipeGate).
+    val swipesActive = swipeGate.isOpen
     // The edge strips are asked for again whenever Home becomes the current screen, so a change made in
     // Settings (a swipe app, a feature switch) is picked up; the gesture itself reads the preferences afresh.
     val edgeSettings = remember(
@@ -261,7 +262,9 @@ fun HomeScreen(
     ) { homeSwipeSettings(state, prefs) }
 
     // Consume back press only while home is the current destination.
-    BackHandler(enabled = isCurrentDestination) { /* home is the root */ }
+    BackHandler(enabled = swipeGate.isOnTop) { /* home is the root */ }
+
+    HomeSwipeRestore(state = swipeState, gate = swipeGate, motion = motion)
 
     Box(
         modifier = Modifier
@@ -272,7 +275,7 @@ fun HomeScreen(
             // Home itself does not move under the finger: only the content below follows it.
             .homeSwipe(
                 state = swipeState,
-                enabled = swipesActive,
+                gate = swipeGate,
                 motion = motion,
                 isReordering = { isDraggingGlobalLatest.value },
                 targetFor = { edge -> homeSwipeSettings(latestState.value, prefs).targetFor(edge) },

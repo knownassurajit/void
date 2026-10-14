@@ -62,6 +62,19 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.FormatAlignLeft
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -69,6 +82,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -77,6 +91,8 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -118,6 +134,7 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeTo
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavMotion
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.FontFamilies
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.rememberFontResolution
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
 import kotlinx.coroutines.launch
@@ -160,6 +177,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     var showFontPicker by remember { mutableStateOf(false) }
     var use24HourClock by remember { mutableStateOf(prefs.use24HourClock) }
     var showSeconds by remember { mutableStateOf(prefs.showClockSeconds) }
+    var activePreviewTarget by remember { mutableStateOf<SettingsPreviewTarget?>(null) }
+    var previewFont by remember { mutableStateOf<String?>(null) }
 
     var enableGestures by remember { mutableStateOf(prefs.enableGestures) }
     var enableSwipeDownNotifications by remember { mutableStateOf(prefs.enableSwipeDownNotifications) }
@@ -290,7 +309,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                             onShowHomeAppsChange = { showHomeApps = it },
                             homeSectionOrder = homeSectionOrder,
                             onHomeSectionOrderChange = { homeSectionOrder = it },
-                            snackbarHostState = snackbarHostState
+                            snackbarHostState = snackbarHostState,
+                            onHoldingPreview = { activePreviewTarget = it }
                         )
                     }
 
@@ -306,7 +326,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                             appVerticalAlignment = appVerticalAlignment,
                             onAppVerticalAlignmentChange = { appVerticalAlignment = it },
                             appSpacing = appSpacing,
-                            onAppSpacingChange = { appSpacing = it }
+                            onAppSpacingChange = { appSpacing = it },
+                            onHoldingPreview = { activePreviewTarget = it }
                         )
                     }
                     if (search.textSize) {
@@ -314,7 +335,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                             homeTextSize = homeTextSize,
                             onHomeTextSizeChange = { homeTextSize = it },
                             drawerTextSize = drawerTextSize,
-                            onDrawerTextSizeChange = { drawerTextSize = it }
+                            onDrawerTextSizeChange = { drawerTextSize = it },
+                            onHoldingPreview = { activePreviewTarget = it }
                         )
                     }
 
@@ -412,10 +434,49 @@ fun SettingsScreen(onBack: () -> Unit) {
                     onFontSelected = { id ->
                         prefs.appFont = id
                         appFont = id
+                        previewFont = null
+                        activePreviewTarget = null
                         showFontPicker = false
                     },
-                    onDismiss = { showFontPicker = false }
+                    onDismiss = {
+                        previewFont = null
+                        activePreviewTarget = null
+                        showFontPicker = false
+                    },
+                    onPreviewFont = { font ->
+                        previewFont = font
+                        activePreviewTarget = if (font != null) SettingsPreviewTarget.HOME else null
+                    }
                 )
+            }
+
+            AnimatedVisibility(
+                visible = activePreviewTarget != null,
+                modifier = Modifier.fillMaxSize(),
+                enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+            ) {
+                activePreviewTarget?.let { target ->
+                    SettingsPreviewPane(
+                        target = target,
+                        clockSizeScale = clockSizeScale,
+                        dateSizeScale = dateSizeScale,
+                        screenTimeSizeScale = screenTimeSizeScale,
+                        clockSectionWeight = clockSectionWeight,
+                        appSpacingDp = appSpacing,
+                        homeTextSizeScale = homeTextSize,
+                        drawerTextSizeScale = drawerTextSize,
+                        appFont = previewFont ?: appFont,
+                        clockAlignment = clockHorizontalAlignment,
+                        appAlignment = appHorizontalAlignment,
+                        clockVerticalAlignment = clockVerticalAlignment,
+                        appVerticalAlignment = appVerticalAlignment,
+                        showClock = showClock,
+                        showDate = showDate,
+                        showScreenTime = showScreenTime,
+                        showHomeApps = showHomeApps
+                    )
+                }
             }
 
             if (showAppPicker != null) {
@@ -786,6 +847,30 @@ private fun AestheticsSection(
         icon = { Icon(Icons.Default.FontDownload, contentDescription = null) },
         onClick = onOpenFontPicker
     )
+    SettingActionItem(
+        title = "System Display & Dark Theme",
+        subtitle = "Open system display, dark mode, and contrast settings",
+        icon = { Icon(Icons.Default.Brightness4, contentDescription = null) },
+        onClick = {
+            try {
+                context.startActivity(Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                })
+            } catch (_: Exception) {}
+        }
+    )
+    SettingActionItem(
+        title = "System Wallpaper & Style",
+        subtitle = "Open system wallpaper, colors, and styling controls",
+        icon = { Icon(Icons.Default.Wallpaper, contentDescription = null) },
+        onClick = {
+            try {
+                context.startActivity(Intent(Intent.ACTION_SET_WALLPAPER).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                })
+            } catch (_: Exception) {}
+        }
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -817,7 +902,8 @@ private fun ClockAndDateSection(
     onShowHomeAppsChange: (Boolean) -> Unit,
     homeSectionOrder: String,
     onHomeSectionOrderChange: (String) -> Unit,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    onHoldingPreview: ((SettingsPreviewTarget?) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val prefs = LocalSettingsPrefs.current
@@ -916,6 +1002,7 @@ private fun ClockAndDateSection(
         value = clockSizeScale,
         range = 0.5f..1.5f,
         tooltipText = "Scale the clock independently of date and screen time.",
+        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
         onChanged = { onClockSizeScaleChange(it); prefs.clockSizeScale = it }
     )
     SettingSliderItem(
@@ -925,6 +1012,7 @@ private fun ClockAndDateSection(
         value = dateSizeScale,
         range = 0.5f..1.5f,
         tooltipText = "Scale the date independently of the clock.",
+        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
         onChanged = { onDateSizeScaleChange(it); prefs.dateSizeScale = it }
     )
     SettingSliderItem(
@@ -934,6 +1022,7 @@ private fun ClockAndDateSection(
         value = screenTimeSizeScale,
         range = 0.5f..1.5f,
         tooltipText = "Scale screen time independently of the clock and date.",
+        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
         onChanged = { onScreenTimeSizeScaleChange(it); prefs.screenTimeSizeScale = it }
     )
     val clockPct = (clockSectionWeight * 100).toInt()
@@ -944,6 +1033,7 @@ private fun ClockAndDateSection(
         value = clockSectionWeight,
         range = 0.22f..0.48f,
         tooltipText = "Default is 35% clock / 65% apps. Sections scroll if content is larger than the allocated space.",
+        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
         onChanged = { onClockSectionWeightChange(it); prefs.clockSectionWeight = it }
     )
     SettingsSectionHeader("Home Section Order")
@@ -973,7 +1063,8 @@ private fun HomeAppsSection(
     appVerticalAlignment: Int,
     onAppVerticalAlignmentChange: (Int) -> Unit,
     appSpacing: Float,
-    onAppSpacingChange: (Float) -> Unit
+    onAppSpacingChange: (Float) -> Unit,
+    onHoldingPreview: ((SettingsPreviewTarget?) -> Unit)? = null
 ) {
     val prefs = LocalSettingsPrefs.current
 
@@ -1012,6 +1103,7 @@ private fun HomeAppsSection(
         value = appSpacing,
         range = 0f..48f,
         tooltipText = "Increase or decrease the dynamic visual gap separating each pinned tool.",
+        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
         onChanged = { onAppSpacingChange(it); prefs.appSpacingDp = it }
     )
 }
@@ -1021,7 +1113,8 @@ private fun TextSizeSection(
     homeTextSize: Float,
     onHomeTextSizeChange: (Float) -> Unit,
     drawerTextSize: Float,
-    onDrawerTextSizeChange: (Float) -> Unit
+    onDrawerTextSizeChange: (Float) -> Unit,
+    onHoldingPreview: ((SettingsPreviewTarget?) -> Unit)? = null
 ) {
     val prefs = LocalSettingsPrefs.current
 
@@ -1032,6 +1125,7 @@ private fun TextSizeSection(
         icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
         value = homeTextSize,
         range = 0.5f..2.0f,
+        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.HOME else null) },
         onChanged = { onHomeTextSizeChange(it); prefs.homeTextSizeScale = it }
     )
     SettingSliderItem(
@@ -1040,6 +1134,7 @@ private fun TextSizeSection(
         icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
         value = drawerTextSize,
         range = 0.5f..2.0f,
+        onHoldingChanged = { holding -> onHoldingPreview?.invoke(if (holding) SettingsPreviewTarget.DRAWER else null) },
         onChanged = { onDrawerTextSizeChange(it); prefs.appDrawerTextSizeScale = it }
     )
 }
@@ -1323,6 +1418,26 @@ private fun FeaturesSection(
             leadingIcon = if (enableNotes) { { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) } } else null
         )
     }
+
+    if (enableNotes) {
+        var notesTitleAlign by remember { mutableIntStateOf(prefs.notesTitleAlignment) }
+        SettingAlignmentItem(
+            title = "Notes Title Alignment",
+            subtitle = "Left, Center, or Right",
+            icon = { Icon(Icons.Default.FormatAlignLeft, contentDescription = null) },
+            currentGravity = notesTitleAlign,
+            options = listOf(
+                Gravity.START to "Left",
+                Gravity.CENTER_HORIZONTAL to "Center",
+                Gravity.END to "Right"
+            ),
+            tooltipText = "Align the 'Notes' header on the notes panel.",
+            onChanged = {
+                notesTitleAlign = it
+                prefs.notesTitleAlignment = it
+            }
+        )
+    }
 }
 
 @Composable
@@ -1334,6 +1449,20 @@ private fun PermissionsSection() {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+    )
+    SettingActionItem(
+        title = "App Info & System Permissions",
+        subtitle = "Open dedicated Android settings to manage all app permissions and defaults",
+        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+        onClick = {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } catch (_: Exception) {}
+        }
     )
     SettingActionItem(
         title = stringResource(R.string.perm_notification_listener),
@@ -1379,19 +1508,47 @@ private fun PermissionsSection() {
         title = stringResource(R.string.perm_query_apps),
         subtitle = stringResource(R.string.perm_query_apps_body),
         icon = { Icon(Icons.Default.Apps, contentDescription = null) },
-        onClick = { /* install-time permission; listed for reference */ }
+        onClick = {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } catch (_: Exception) {}
+        }
     )
     SettingActionItem(
         title = stringResource(R.string.perm_widgets),
         subtitle = stringResource(R.string.perm_widgets_body),
         icon = { Icon(Icons.Default.Widgets, contentDescription = null) },
-        onClick = { /* bind is requested when pinning a widget */ }
+        onClick = {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } catch (_: Exception) {}
+        }
     )
     SettingActionItem(
         title = stringResource(R.string.perm_private_space),
         subtitle = stringResource(R.string.perm_private_space_body),
         icon = { Icon(Icons.Default.Security, contentDescription = null) },
-        onClick = { /* granted with the Private Space profile on API 35+ */ }
+        onClick = {
+            try {
+                context.startActivity(Intent("android.settings.PRIVATE_SPACE_SETTINGS").apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                })
+            } catch (_: Exception) {
+                try {
+                    context.startActivity(Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    })
+                } catch (_: Exception) {}
+            }
+        }
     )
 }
 
@@ -1526,8 +1683,18 @@ fun SettingSliderItem(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     tooltipText: String? = null,
+    onHoldingChanged: ((Boolean) -> Unit)? = null,
     onChanged: (Float) -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isDragged by interactionSource.collectIsDraggedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val isHolding = isDragged || isPressed
+
+    LaunchedEffect(isHolding) {
+        onHoldingChanged?.invoke(isHolding)
+    }
+
     val content: @Composable () -> Unit = {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -1552,6 +1719,7 @@ fun SettingSliderItem(
                     value = value,
                     onValueChange = onChanged,
                     valueRange = range,
+                    interactionSource = interactionSource,
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
                         activeTrackColor = MaterialTheme.colorScheme.primary
@@ -1803,6 +1971,211 @@ private fun SettingsAppPickerSheet(
                             .padding(vertical = 14.dp)
                     ) {
                         Text(app.first, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+enum class SettingsPreviewTarget {
+    HOME,
+    DRAWER
+}
+
+@Composable
+private fun SettingsPreviewPane(
+    target: SettingsPreviewTarget,
+    clockSizeScale: Float,
+    dateSizeScale: Float,
+    screenTimeSizeScale: Float,
+    clockSectionWeight: Float,
+    appSpacingDp: Float,
+    homeTextSizeScale: Float,
+    drawerTextSizeScale: Float,
+    appFont: String,
+    clockAlignment: Int,
+    appAlignment: Int,
+    clockVerticalAlignment: Int,
+    appVerticalAlignment: Int,
+    showClock: Boolean,
+    showDate: Boolean,
+    showScreenTime: Boolean,
+    showHomeApps: Boolean
+) {
+    val resolution = rememberFontResolution(appFont)
+    val fontFamily = FontFamilies.familyFor(resolution.spec)
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background.copy(alpha = 0.94f)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        text = if (target == SettingsPreviewTarget.HOME) "LIVE HOME PREVIEW" else "LIVE DRAWER PREVIEW",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
+
+                if (target == SettingsPreviewTarget.HOME) {
+                    val clockAlign = remember(clockAlignment) {
+                        when (clockAlignment) {
+                            Gravity.CENTER_HORIZONTAL -> Alignment.CenterHorizontally
+                            Gravity.END -> Alignment.End
+                            else -> Alignment.Start
+                        }
+                    }
+                    val clockTextAlign = remember(clockAlignment) {
+                        when (clockAlignment) {
+                            Gravity.CENTER_HORIZONTAL -> TextAlign.Center
+                            Gravity.END -> TextAlign.End
+                            else -> TextAlign.Start
+                        }
+                    }
+                    val appAlign = remember(appAlignment) {
+                        when (appAlignment) {
+                            Gravity.CENTER_HORIZONTAL -> Alignment.CenterHorizontally
+                            Gravity.END -> Alignment.End
+                            else -> Alignment.Start
+                        }
+                    }
+                    val appTextAlign = remember(appAlignment) {
+                        when (appAlignment) {
+                            Gravity.CENTER_HORIZONTAL -> TextAlign.Center
+                            Gravity.END -> TextAlign.End
+                            else -> TextAlign.Start
+                        }
+                    }
+
+                    // Clock section
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(clockSectionWeight.coerceIn(0.2f, 0.6f)),
+                        contentAlignment = when (clockVerticalAlignment) {
+                            Gravity.TOP -> Alignment.TopStart
+                            Gravity.CENTER_VERTICAL -> Alignment.CenterStart
+                            else -> Alignment.BottomStart
+                        }
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = clockAlign
+                        ) {
+                            if (showClock) {
+                                Text(
+                                    text = "10:08",
+                                    fontSize = 54.sp * clockSizeScale,
+                                    fontFamily = fontFamily,
+                                    fontWeight = FontWeight.Normal,
+                                    textAlign = clockTextAlign,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            if (showDate) {
+                                Text(
+                                    text = "Thursday, Oct 8",
+                                    fontSize = 16.sp * dateSizeScale,
+                                    fontFamily = fontFamily,
+                                    textAlign = clockTextAlign,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                            if (showScreenTime) {
+                                Text(
+                                    text = "2h 15m screen time",
+                                    fontSize = 13.sp * screenTimeSizeScale,
+                                    fontFamily = fontFamily,
+                                    textAlign = clockTextAlign,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Apps section
+                    if (showHomeApps) {
+                        val computedSpacing = (18f * (if (appSpacingDp <= 0f) 0.5f else appSpacingDp / 16f)).coerceIn(4f, 48f)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f - clockSectionWeight.coerceIn(0.2f, 0.6f)),
+                            contentAlignment = when (appVerticalAlignment) {
+                                Gravity.TOP -> Alignment.TopStart
+                                Gravity.CENTER_VERTICAL -> Alignment.CenterStart
+                                else -> Alignment.BottomStart
+                            }
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = appAlign,
+                                verticalArrangement = Arrangement.spacedBy(computedSpacing.dp)
+                            ) {
+                                val previewApps = listOf("Phone", "Messages", "Browser", "Camera", "Settings")
+                                for (app in previewApps) {
+                                    Text(
+                                        text = app,
+                                        fontSize = 18.sp * homeTextSizeScale,
+                                        fontFamily = fontFamily,
+                                        textAlign = appTextAlign,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // App Drawer preview
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 8.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = "Search apps...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        val sampleDrawerApps = listOf("Calendar", "Camera", "Chrome", "Contacts", "Files", "Messages", "Music", "Settings")
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            for (appName in sampleDrawerApps) {
+                                Text(
+                                    text = appName,
+                                    fontSize = 17.sp * drawerTextSizeScale,
+                                    fontFamily = fontFamily,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.88f)
+                                )
+                            }
+                        }
                     }
                 }
             }

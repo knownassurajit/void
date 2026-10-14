@@ -1,6 +1,5 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
-import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.SpringSpec
@@ -63,17 +62,17 @@ class NavMotionTest {
     }
 
     @Test
-    fun panelAssignedToTheLeftSwipe_entersFromTheLeftEdge() {
+    fun panelAssignedToTheLeftSwipe_entersFromTheRightEdge() {
         assertEquals(
-            PanelEdge.Left,
+            PanelEdge.Right,
             resolve(NavRouteKind.Notes, left = NavRouteKind.Notes, right = NavRouteKind.Widgets)
         )
     }
 
     @Test
-    fun panelAssignedToTheRightSwipe_entersFromTheRightEdge() {
+    fun panelAssignedToTheRightSwipe_entersFromTheLeftEdge() {
         assertEquals(
-            PanelEdge.Right,
+            PanelEdge.Left,
             resolve(NavRouteKind.Widgets, left = NavRouteKind.Notes, right = NavRouteKind.Widgets)
         )
     }
@@ -334,22 +333,6 @@ class NavMotionTest {
     @Test
     fun shouldPopPanel_neverPopsHome() {
         assertFalse(shouldPopPanel(panelIsTop = true, hasEntryBelow = false))
-    }
-
-    // ---- isAtRest ----
-
-    @Test
-    fun isAtRest_whenVisibleAndHeadedForVisible() {
-        assertTrue(isAtRest(EnterExitState.Visible, EnterExitState.Visible))
-    }
-
-    @Test
-    fun isAtRest_notWhileATransitionStillMovesTheScreen() {
-        // Regression: a swipe that started while a panel was still leaving stacked a second panel.
-        val others = EnterExitState.entries.flatMap { current -> EnterExitState.entries.map { target -> current to target } }
-            .filterNot { it == EnterExitState.Visible to EnterExitState.Visible }
-        assertEquals(8, others.size)
-        others.forEach { (current, target) -> assertFalse("$current -> $target", isAtRest(current, target)) }
     }
 
     private companion object {

@@ -56,9 +56,16 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.view.Gravity
+import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.runtime.mutableIntStateOf
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteItem
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteRepository
+import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.dismissDirection
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
@@ -91,6 +98,8 @@ fun NotesScreen(onBack: () -> Unit) {
         edge = LocalPanelEdge.current,
         rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     )
+    val prefs = remember { Prefs.get(context) }
+    var notesTitleAlignment by remember { mutableIntStateOf(prefs.notesTitleAlignment) }
     val repo = remember { NoteRepository(context) }
     val notes = remember { mutableStateListOf<NoteItem>() }
     var newNoteText by remember { mutableStateOf("") }
@@ -117,11 +126,30 @@ fun NotesScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing)
         ) {
-            Text(
-                text = stringResource(R.string.notes_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = when (notesTitleAlignment) {
+                    Gravity.CENTER_HORIZONTAL -> Arrangement.Center
+                    Gravity.END -> Arrangement.End
+                    else -> Arrangement.Start
+                }
+            ) {
+                Text(
+                    text = stringResource(R.string.notes_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.clickable {
+                        val next = when (notesTitleAlignment) {
+                            Gravity.START -> Gravity.CENTER_HORIZONTAL
+                            Gravity.CENTER_HORIZONTAL -> Gravity.END
+                            else -> Gravity.START
+                        }
+                        notesTitleAlignment = next
+                        prefs.notesTitleAlignment = next
+                    }
+                )
+            }
             VoidSectionDivider(modifier = Modifier.padding(vertical = VoidDimens.rowSpacing))
             OutlinedTextField(
                 value = newNoteText,
@@ -205,21 +233,21 @@ fun NotesScreen(onBack: () -> Unit) {
                             enableDismissFromStartToEnd = deleteFromStartToEnd,
                             enableDismissFromEndToStart = !deleteFromStartToEnd,
                             backgroundContent = {
+                                val isDeleting = dismissState.targetValue != SwipeToDismissBoxValue.Settled
+                                val bgColor = if (isDeleting) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(alpha = 0.25f)
+                                val iconColor = if (isDeleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.error
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(horizontal = 8.dp),
+                                        .background(bgColor, MaterialTheme.shapes.small)
+                                        .padding(horizontal = 16.dp),
                                     contentAlignment = if (deleteFromStartToEnd) Alignment.CenterStart else Alignment.CenterEnd
                                 ) {
                                     Icon(
-                                        imageVector = if (deleteFromStartToEnd) {
-                                            Icons.AutoMirrored.Outlined.KeyboardArrowRight
-                                        } else {
-                                            Icons.AutoMirrored.Outlined.KeyboardArrowLeft
-                                        },
+                                        imageVector = Icons.Filled.Delete,
                                         contentDescription = stringResource(R.string.swipe_to_delete),
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(28.dp)
+                                        tint = iconColor,
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
                             }
@@ -228,6 +256,10 @@ fun NotesScreen(onBack: () -> Unit) {
                                 note = note,
                                 onToggle = {
                                     repo.toggleComplete(note.id)
+                                    refreshNotes()
+                                },
+                                onToggleStar = {
+                                    repo.toggleStarred(note.id)
                                     refreshNotes()
                                 }
                             )
@@ -241,7 +273,11 @@ fun NotesScreen(onBack: () -> Unit) {
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteRow(note: NoteItem, onToggle: () -> Unit) {
+private fun NoteRow(
+    note: NoteItem,
+    onToggle: () -> Unit,
+    onToggleStar: () -> Unit
+) {
     val context = LocalContext.current
     val repo = remember { NoteRepository(context) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -310,16 +346,8 @@ private fun NoteRow(note: NoteItem, onToggle: () -> Unit) {
                         alarmManager.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pending)
                     } catch (_: Exception) {}
 
-                    // Insert calendar event via intent (transparent to user)
-                    try {
-                        val calIntent = Intent(Intent.ACTION_INSERT).apply {
-                            data = android.provider.CalendarContract.Events.CONTENT_URI
-                            putExtra(android.provider.CalendarContract.Events.TITLE, note.text)
-                            putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, triggerTime)
-                            putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, triggerTime + 30 * 60 * 1000)
-                        }
-                        context.startActivity(calIntent)
-                    } catch (_: Exception) {}
+                    // Use Google Tasks as default reminder if available for starred tasks, calendar as secondary
+                    launchReminderApp(context, note, triggerTime)
 
                     showTimePicker = false
                 }) { Text(stringResource(R.string.set_reminder)) }
@@ -373,6 +401,63 @@ private fun NoteRow(note: NoteItem, onToggle: () -> Unit) {
                 )
             }
         }
+
+        IconButton(
+            onClick = onToggleStar,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = if (note.isStarred) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = if (note.isStarred) "Starred" else "Star",
+                tint = if (note.isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+}
+
+private fun launchReminderApp(context: android.content.Context, note: NoteItem, triggerTime: Long) {
+    var launched = false
+    if (note.isStarred) {
+        val tasksPackages = listOf(
+            "com.google.android.apps.tasks",
+            "com.google.adnroid.app.tasks"
+        )
+        for (pkg in tasksPackages) {
+            try {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    setPackage(pkg)
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, note.text)
+                    putExtra(Intent.EXTRA_TITLE, note.text)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    launched = true
+                    break
+                }
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
+                if (launchIntent != null) {
+                    context.startActivity(launchIntent)
+                    launched = true
+                    break
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    if (!launched) {
+        try {
+            val calIntent = Intent(Intent.ACTION_INSERT).apply {
+                data = android.provider.CalendarContract.Events.CONTENT_URI
+                putExtra(android.provider.CalendarContract.Events.TITLE, note.text)
+                putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, triggerTime)
+                putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, triggerTime + 30 * 60 * 1000)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(calIntent)
+        } catch (_: Exception) {}
+    }
 }

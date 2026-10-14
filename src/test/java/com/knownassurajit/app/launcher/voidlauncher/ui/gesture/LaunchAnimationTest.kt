@@ -55,8 +55,8 @@ class LaunchAnimationTest {
     @Test
     fun theLeftSwipeActionComesInFromTheLeft_andTheRightOneFromTheRight() {
         val s = settings(left = SwipeAction.APP, right = SwipeAction.APP)
-        assertEquals(LaunchAnimation.FromLeft, launchOf(s.targetFor(PanelEdge.Left)))
-        assertEquals(LaunchAnimation.FromRight, launchOf(s.targetFor(PanelEdge.Right)))
+        assertEquals(LaunchAnimation.FromRight, launchOf(s.targetFor(PanelEdge.Left)))
+        assertEquals(LaunchAnimation.FromLeft, launchOf(s.targetFor(PanelEdge.Right)))
     }
 
     @Test

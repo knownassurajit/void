@@ -211,6 +211,30 @@ fun AppDrawerScreen(
         }
     }
 
+    val hasPrivateSpaceSettings by remember {
+        derivedStateOf { privateSettingsEntry != null || PrivateSpaceHelper.isPrivateSpaceSupported(context) }
+    }
+    val onOpenPrivateSpaceSettings: () -> Unit = remember {
+        {
+            val entry = privateSettingsEntry
+            if (entry != null) {
+                onAppClick(entry)
+            } else {
+                try {
+                    context.startActivity(Intent("android.settings.PRIVATE_SPACE_SETTINGS").apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    })
+                } catch (_: Exception) {
+                    try {
+                        context.startActivity(Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        })
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -228,10 +252,8 @@ fun AppDrawerScreen(
                 showPrivateSpaceControls = privateInSearchBar && hasPrivateSpace && prefs.privateSpaceEnabled,
                 isPrivateSpaceLocked = isPrivateSpaceLocked,
                 onTogglePrivateSpace = onTogglePrivateSpace,
-                hasPrivateSpaceSettings = privateSettingsEntry != null,
-                onOpenPrivateSpaceSettings = {
-                    privateSettingsEntry?.let(onAppClick)
-                }
+                hasPrivateSpaceSettings = hasPrivateSpaceSettings,
+                onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings
             )
 
             LaunchedEffect(Unit) {
@@ -256,11 +278,13 @@ fun AppDrawerScreen(
                 hasPrivateSpace = hasPrivateSpace,
                 filteredPrivateApps = filteredPrivateApps,
                 settingsEntry = privateSettingsEntry,
+                hasPrivateSpaceSettings = hasPrivateSpaceSettings,
                 privateSpaceEnabled = prefs.privateSpaceEnabled,
                 appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
                 showBottomPrivateHeader = !privateInSearchBar,
                 onAppClick = onAppClick,
-                onTogglePrivateSpace = onTogglePrivateSpace
+                onTogglePrivateSpace = onTogglePrivateSpace,
+                onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings
             )
         }
     }
@@ -353,11 +377,13 @@ private fun ColumnScope.AppDrawerAppList(
     hasPrivateSpace: Boolean,
     filteredPrivateApps: List<AppModel>,
     settingsEntry: AppModel?,
+    hasPrivateSpaceSettings: Boolean,
     privateSpaceEnabled: Boolean,
     appDrawerTextSizeScale: Float,
     showBottomPrivateHeader: Boolean,
     onAppClick: (AppModel) -> Unit,
-    onTogglePrivateSpace: () -> Unit
+    onTogglePrivateSpace: () -> Unit,
+    onOpenPrivateSpaceSettings: () -> Unit
 ) {
     val privateOnly = filteredPrivateApps.filterNot { PrivateSpaceHelper.isAddEntry(it) }
     val showPrivateSection = privateSpaceEnabled && hasPrivateSpace
@@ -438,8 +464,8 @@ private fun ColumnScope.AppDrawerAppList(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (PrivateSpaceUi.settingsActionVisible(isPrivateSpaceLocked, settingsEntry != null)) {
-                        IconButton(onClick = { settingsEntry?.let(onAppClick) }) {
+                    if (PrivateSpaceUi.settingsActionVisible(isPrivateSpaceLocked, hasPrivateSpaceSettings)) {
+                        IconButton(onClick = onOpenPrivateSpaceSettings) {
                             Icon(
                                 imageVector = Icons.Outlined.Settings,
                                 contentDescription = stringResource(R.string.private_space_settings),

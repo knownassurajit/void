@@ -3,8 +3,8 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.gesture
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.MonotonicFrameClock
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAlpha
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidMotion
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidMotionScheme
 import kotlinx.coroutines.CoroutineScope
@@ -152,30 +152,210 @@ class HomeSwipeStateTest {
         assertEquals(0f, state.offsetPx, 0f)
     }
 
-    // ---- the spring a committed swipe settles on ----
+    // ---- resetting: whatever the swipe left behind is undone at once ----
+
+    @Test
+    fun resettingWhileTheFingerIsDown_putsHomeBackAtRestWithoutAnimation() {
+        // Cancel, navigation in the middle of a drag, resume: the finger's pull is dropped.
+        state.follow(SwipeAxis.Horizontal, -40f)
+        assertTrue("it was out of place", state.reset())
+        assertEquals(0f, state.offsetPx, 0f)
+        assertEquals(1f, state.alpha, 0f)
+        assertFalse(state.isSettling)
+        assertFalse(state.isDeparted)
+    }
+
+    @Test
+    fun resettingHomeThatIsAtRest_saysNothingWasOutOfPlace() {
+        assertFalse(state.reset())
+        state.follow(SwipeAxis.Vertical, 10f)
+        state.settle(scope, spring, velocity = 0f)
+        playUntilAtRest()
+        assertFalse("a spring that has finished leaves nothing behind", state.reset())
+    }
+
+    @Test
+    fun resettingWhileASpringRuns_stopsItForGood() {
+        state.follow(SwipeAxis.Horizontal, -40f)
+        state.settle(scope, spring, velocity = 0f)
+        repeat(3) { clock.tick() }
+        assertTrue(state.isSettling)
+
+        assertTrue(state.reset())
+        assertFalse(state.isSettling)
+        assertEquals(0f, state.offsetPx, 0f)
+        // The cancelled spring must not write another value into the state.
+        clock.tick()
+        clock.tick()
+        assertEquals(0f, state.offsetPx, 0f)
+    }
+
+    @Test
+    fun aSwipeAfterAReset_startsFromRestWithNothingLeftOfTheOneBefore() {
+        state.follow(SwipeAxis.Horizontal, -40f)
+        state.settle(scope, spring, velocity = 0f)
+        repeat(3) { clock.tick() }
+        state.reset()
+
+        state.follow(SwipeAxis.Horizontal, -10f)
+        assertEquals(-10f, state.offsetPx, 0f)
+        state.settle(scope, spring, velocity = 0f)
+        playUntilAtRest()
+        assertEquals(0f, state.offsetPx, 0f)
+    }
+
+    @Test
+    fun anInterruptedLock_resetsAndTheNextSwipeLocksTheOtherAxisFromZero() {
+        // The axis locked and Home followed, then the swipe was cut off (the screen changed under it).
+        state.follow(SwipeAxis.Horizontal, 22f)
+        state.reset()
+        state.follow(SwipeAxis.Vertical, 8f)
+        assertEquals(SwipeAxis.Vertical, state.axis)
+        assertEquals(8f, state.offsetPx, 0f)
+    }
+
+    @Test
+    fun navigationInTheMiddleOfADrag_endsWithHomeAlreadyResetAndNothingLeftToSettle() {
+        // Navigation in the middle of a drag: the pointer loop stops and settles Home, but the
+        // screen has been resumed (reset) in between, so there is nothing left to bring back.
+        state.follow(SwipeAxis.Horizontal, -30f)
+        state.reset()
+        state.settle(scope, spring, velocity = 300f)
+        assertFalse(state.isSettling)
+        assertEquals(0f, state.offsetPx, 0f)
+    }
+
+    @Test
+    fun aCancelledSwipe_springsBackToExactlyRestAndLeavesNoDeparture() {
+        state.follow(SwipeAxis.Vertical, 30f)
+        state.settle(scope, spring, velocity = -200f)
+        playUntilAtRest()
+        assertEquals(0f, state.offsetPx, 0f)
+        assertEquals(1f, state.alpha, 0f)
+        assertFalse(state.isDeparted)
+    }
+
+    // ---- departing for an app that is launching ----
+
+    private val parked = 324f
+
+    @Test
+    fun departing_carriesHomeOnToTheParkedPlaceAndDimsItWithoutAJump() {
+        state.follow(SwipeAxis.Horizontal, 40f)
+        state.depart(scope, spring, toPx = parked, velocity = 0f)
+        assertTrue(state.isDeparted)
+        assertTrue(state.isSettling)
+        // Not moved yet, so neither the offset nor the opacity jumps when the finger lets go.
+        assertEquals(40f, state.offsetPx, 0f)
+        assertEquals(1f, state.alpha, 0f)
+
+        clock.tick()
+        clock.tick()
+        clock.tick()
+        assertTrue("moving on, in the direction of the swipe", state.offsetPx > 40f && state.offsetPx < parked)
+        assertTrue("dimming on the way", state.alpha < 1f && state.alpha > VoidAlpha.coveredByPanel)
+
+        playUntilAtRest()
+        assertEquals(parked, state.offsetPx, 0f)
+        assertEquals(VoidAlpha.coveredByPanel, state.alpha, 0.0001f)
+        assertTrue("it stays departed until it is reset", state.isDeparted)
+    }
+
+    @Test
+    fun departingThePullOfALeftEdgeSwipeAndOfARightEdgeSwipe_goTheirOwnWay() {
+        state.follow(SwipeAxis.Horizontal, -25f)
+        state.depart(scope, spring, toPx = -parked, velocity = -500f)
+        playUntilAtRest()
+        assertEquals(-parked, state.offsetPx, 0f)
+        assertEquals(VoidAlpha.coveredByPanel, state.alpha, 0.0001f)
+    }
+
+    @Test
+    fun resettingADepartedHome_putsItBackAtRestOpaqueAndWithoutAnimation() {
+        // VOID is resumed after the app: Home must be in its place before the first frame.
+        state.follow(SwipeAxis.Horizontal, 40f)
+        state.depart(scope, spring, toPx = parked, velocity = 0f)
+        playUntilAtRest()
+
+        assertTrue(state.reset())
+        assertEquals(0f, state.offsetPx, 0f)
+        assertEquals(1f, state.alpha, 0f)
+        assertFalse(state.isDeparted)
+        assertFalse(state.isSettling)
+    }
+
+    @Test
+    fun resettingWhileHomeIsStillDeparting_cancelsTheSpring() {
+        state.follow(SwipeAxis.Horizontal, 40f)
+        state.depart(scope, spring, toPx = parked, velocity = 0f)
+        repeat(3) { clock.tick() }
+        state.reset()
+        repeat(3) { clock.tick() }
+        assertEquals(0f, state.offsetPx, 0f)
+        assertEquals(1f, state.alpha, 0f)
+        assertFalse(state.isDeparted)
+    }
+
+    @Test
+    fun settlingADepartedHome_bringsItBackOpaqueAndNoLongerDeparted() {
+        // The launch did not take VOID off the screen: Home springs back by itself.
+        state.follow(SwipeAxis.Horizontal, 40f)
+        state.depart(scope, spring, toPx = parked, velocity = 0f)
+        playUntilAtRest()
+
+        state.settle(scope, spring, velocity = 0f)
+        assertTrue("still departed while it comes back", state.isDeparted)
+        repeat(3) { clock.tick() }
+        assertTrue(state.offsetPx < parked && state.offsetPx > 0f)
+        assertTrue("lighter again on the way back", state.alpha > VoidAlpha.coveredByPanel)
+
+        playUntilAtRest()
+        assertEquals(0f, state.offsetPx, 0f)
+        assertEquals(1f, state.alpha, 0f)
+        assertFalse(state.isDeparted)
+    }
+
+    @Test
+    fun aDepartureThatHasNowhereToGo_isStillDeparted_andResetClearsIt() {
+        state.depart(scope, spring, toPx = 0f, velocity = 0f)
+        assertTrue(state.isDeparted)
+        assertTrue(state.reset())
+        assertFalse(state.isDeparted)
+    }
+
+    // ---- what Home moves on after a commit ----
 
     private val standard = VoidMotionScheme(Prefs.AnimationSpeed.STANDARD)
 
     @Test
-    fun aPanelCommit_settlesOnTheSpringTheNavHostMovesHomeOn() {
-        val panel = commitSettleSpec(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Left), standard)
-        assertEquals(VoidMotion.spatialSlowStiffness, panel.stiffness, 0f)
-        assertEquals(VoidMotion.spatialSlowDamping, panel.dampingRatio, 0f)
-        val notifications = commitSettleSpec(SwipeTarget.Notifications, standard)
-        assertEquals(VoidMotion.spatialSlowStiffness, notifications.stiffness, 0f)
+    fun aPanelOrTheNotificationList_handsOverOnTheSpringTheNavHostMovesHomeOn() {
+        val handOff = afterCommitSpec(HomeAfterCommit.HandOff, standard)
+        assertEquals(VoidMotion.spatialSlowStiffness, handOff.stiffness, 0f)
+        assertEquals(VoidMotion.spatialSlowDamping, handOff.dampingRatio, 0f)
     }
 
     @Test
-    fun anAppCommit_settlesFast_becauseNoComposeTransitionMovesHome() {
-        val app = commitSettleSpec(SwipeTarget.App("an.app", PanelEdge.Left), standard)
-        assertEquals(VoidMotion.spatialFastStiffness, app.stiffness, 0f)
-        assertEquals(VoidMotion.spatialFastDamping, app.dampingRatio, 0f)
+    fun anAppMovedByTheSystemWindowAnimation_settlesFast_becauseNoComposeTransitionMovesHome() {
+        val quick = afterCommitSpec(HomeAfterCommit.SettleQuickly, standard)
+        assertEquals(VoidMotion.spatialFastStiffness, quick.stiffness, 0f)
+        assertEquals(VoidMotion.spatialFastDamping, quick.dampingRatio, 0f)
+    }
+
+    @Test
+    fun anAppDeparture_andASpringBackAfterAFailure_useSpatialDefault() {
+        listOf(HomeAfterCommit.Depart(PanelEdge.Left), HomeAfterCommit.SpringBack).forEach { exit ->
+            val spec = afterCommitSpec(exit, standard)
+            assertEquals("$exit", VoidMotion.spatialDefaultStiffness, spec.stiffness, 0f)
+            assertEquals("$exit", VoidMotion.spatialDefaultDamping, spec.dampingRatio, 0f)
+        }
     }
 
     @Test
     fun theCommitSpring_followsTheAnimationSpeedSetting() {
         val slow = VoidMotionScheme(Prefs.AnimationSpeed.SLOW)
-        val panel = commitSettleSpec(SwipeTarget.Panel(NavRouteKind.Widgets, PanelEdge.Right), slow)
-        assertEquals(VoidMotion.stiffnessFor(Prefs.AnimationSpeed.SLOW, VoidMotion.spatialSlowStiffness), panel.stiffness, 0.001f)
+        val handOff = afterCommitSpec(HomeAfterCommit.HandOff, slow)
+        assertEquals(VoidMotion.stiffnessFor(Prefs.AnimationSpeed.SLOW, VoidMotion.spatialSlowStiffness), handOff.stiffness, 0.001f)
+        val depart = afterCommitSpec(HomeAfterCommit.Depart(PanelEdge.Right), slow)
+        assertEquals(VoidMotion.stiffnessFor(Prefs.AnimationSpeed.SLOW, VoidMotion.spatialDefaultStiffness), depart.stiffness, 0.001f)
     }
 }

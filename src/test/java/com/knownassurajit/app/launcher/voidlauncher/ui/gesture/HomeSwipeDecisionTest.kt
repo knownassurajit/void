@@ -115,17 +115,18 @@ class HomeSwipeDecisionTest {
 
     @Test
     fun targetFor_leftEdgeIsTheLeftActionAndRightEdgeIsTheRightAction() {
-        // The left swipe action is the one where the finger moves right and the panel comes from the left.
+        // Swiping from right edge brings the screen from left to right (PanelEdge.Left)
+        // Swiping from left edge brings the screen from right to left (PanelEdge.Right)
         val s = settings()
-        assertEquals(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Left), s.targetFor(PanelEdge.Left))
-        assertEquals(SwipeTarget.Panel(NavRouteKind.Widgets, PanelEdge.Right), s.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Right), s.targetFor(PanelEdge.Left))
+        assertEquals(SwipeTarget.Panel(NavRouteKind.Widgets, PanelEdge.Left), s.targetFor(PanelEdge.Right))
     }
 
     @Test
     fun targetFor_eachSideUsesItsOwnAppAndIsLaunchedFromItsOwnEdge() {
         val s = settings(left = SwipeAction.APP, right = SwipeAction.APP)
-        assertEquals(SwipeTarget.App("left.app", PanelEdge.Left), s.targetFor(PanelEdge.Left))
-        assertEquals(SwipeTarget.App("right.app", PanelEdge.Right), s.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.App("left.app", PanelEdge.Right), s.targetFor(PanelEdge.Left))
+        assertEquals(SwipeTarget.App("right.app", PanelEdge.Left), s.targetFor(PanelEdge.Right))
     }
 
     @Test

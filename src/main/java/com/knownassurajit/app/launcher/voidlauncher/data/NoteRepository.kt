@@ -18,6 +18,7 @@ class NoteRepository(context: Context) {
         val json = prefs.getString(KEY_NOTES, "[]") ?: "[]"
         return parseNotes(json).sortedWith(
             compareBy<NoteItem> { it.isCompleted }
+                .thenByDescending { it.isStarred }
                 .thenByDescending { it.priority }
                 .thenByDescending { it.createdAt }
         )
@@ -40,6 +41,15 @@ class NoteRepository(context: Context) {
         val index = notes.indexOfFirst { it.id == id }
         if (index != -1) {
             notes[index] = notes[index].copy(isCompleted = !notes[index].isCompleted)
+            saveNotes(notes)
+        }
+    }
+
+    fun toggleStarred(id: Long) {
+        val notes = getAllNotesRaw().toMutableList()
+        val index = notes.indexOfFirst { it.id == id }
+        if (index != -1) {
+            notes[index] = notes[index].copy(isStarred = !notes[index].isStarred)
             saveNotes(notes)
         }
     }
@@ -80,6 +90,7 @@ class NoteRepository(context: Context) {
             obj.put("id", note.id)
             obj.put("text", note.text)
             obj.put("isCompleted", note.isCompleted)
+            obj.put("isStarred", note.isStarred)
             obj.put("priority", note.priority)
             obj.put("createdAt", note.createdAt)
             if (note.reminderTime != null) {
@@ -101,6 +112,7 @@ class NoteRepository(context: Context) {
                         id = obj.getLong("id"),
                         text = obj.getString("text"),
                         isCompleted = obj.getBoolean("isCompleted"),
+                        isStarred = if (obj.has("isStarred")) obj.getBoolean("isStarred") else false,
                         priority = obj.getInt("priority"),
                         createdAt = obj.getLong("createdAt"),
                         reminderTime = if (obj.has("reminderTime")) obj.getLong("reminderTime") else null

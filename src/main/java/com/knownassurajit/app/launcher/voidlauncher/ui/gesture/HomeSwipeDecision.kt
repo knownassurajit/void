@@ -76,9 +76,9 @@ data class HomeSwipeSettings(
      */
     fun targetFor(edge: PanelEdge): SwipeTarget = when (edge) {
         PanelEdge.Left ->
-            if (gesturesEnabled) resolveSwipe(leftAction, edge, flags, leftAppPackage) else SwipeTarget.None
+            if (gesturesEnabled) resolveSwipe(leftAction, PanelEdge.Right, flags, leftAppPackage) else SwipeTarget.None
         PanelEdge.Right ->
-            if (gesturesEnabled) resolveSwipe(rightAction, edge, flags, rightAppPackage) else SwipeTarget.None
+            if (gesturesEnabled) resolveSwipe(rightAction, PanelEdge.Left, flags, rightAppPackage) else SwipeTarget.None
         PanelEdge.Bottom -> SwipeTarget.Panel(NavRouteKind.AppDrawer, edge)
         PanelEdge.Top -> if (swipeDownEnabled) SwipeTarget.Notifications else SwipeTarget.None
         PanelEdge.None -> SwipeTarget.None

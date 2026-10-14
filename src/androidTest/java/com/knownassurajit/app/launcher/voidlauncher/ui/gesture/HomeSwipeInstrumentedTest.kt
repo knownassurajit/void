@@ -1,5 +1,6 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.gesture
 
+import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,11 +19,15 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavTravel
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAlpha
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,7 +68,7 @@ class HomeSwipeInstrumentedTest {
                     .size(300.dp)
                     .homeSwipe(
                         state = state,
-                        enabled = enabled.value,
+                        gate = if (enabled.value) HomeSwipeGate.Open else HomeSwipeGate.Busy,
                         motion = motion,
                         isReordering = { false },
                         targetFor = targetFor,
@@ -276,6 +281,67 @@ class HomeSwipeInstrumentedTest {
         setHome()
         swipeBy(dx = -80f, dy = 0f, durationMillis = 300)
         assertEquals(0, clicks)
+    }
+
+    // ---- an app that a swipe launches: Home carries on in the swipe direction (Android 12 and later) ----
+
+    private fun everyEdgeLaunchesAnApp(edge: PanelEdge): SwipeTarget = SwipeTarget.App("an.app", edge)
+
+    private fun homeWidthPx(): Float = rule.onNodeWithTag(HOME).fetchSemanticsNode().size.width.toFloat()
+
+    @Test
+    fun anAppCommit_carriesHomeOnInTheSwipeDirectionToTheParkedPlaceAndKeepsItThere() {
+        // The system's own animation moves the Home window up to Android 11, so Home just settles there.
+        assumeTrue(!LaunchAnimation.playsOn(Build.VERSION.SDK_INT))
+        setHome(targetFor = ::everyEdgeLaunchesAnApp)
+        val restLeft = contentLeft()
+        holdLeft(firstDp = 14f, secondDp = 50f)
+        lift()
+        assertEquals(1, opened.size)
+        // The finger moved left, so the right swipe action ran and Home goes left by 30% of the width.
+        assertEquals(restLeft - homeWidthPx() * NavTravel.horizontalParallax, contentLeft(), 2f)
+        assertTrue(state.isDeparted)
+        assertEquals(VoidAlpha.coveredByPanel, state.alpha, 0.01f)
+    }
+
+    @Test
+    fun aDepartedHome_isBackAtRestAtOnceWhenReset_asWhenVoidIsResumed() {
+        assumeTrue(!LaunchAnimation.playsOn(Build.VERSION.SDK_INT))
+        setHome(targetFor = ::everyEdgeLaunchesAnApp)
+        val restLeft = contentLeft()
+        holdLeft(firstDp = 14f, secondDp = 50f)
+        lift()
+        assertTrue(state.isDeparted)
+        rule.runOnIdle { state.reset() }
+        rule.waitForIdle()
+        assertEquals(restLeft, contentLeft(), 0.5f)
+        assertEquals(1f, state.alpha, 0f)
+        assertFalse(state.isDeparted)
+    }
+
+    @Test
+    fun aSwipeWhileHomeIsDeparted_isSwallowedAndLaunchesNothingElse() {
+        assumeTrue(!LaunchAnimation.playsOn(Build.VERSION.SDK_INT))
+        setHome(targetFor = ::everyEdgeLaunchesAnApp)
+        holdLeft(firstDp = 14f, secondDp = 50f)
+        lift()
+        assertEquals(1, opened.size)
+        swipeBy(dx = 80f, dy = 0f, durationMillis = 300)
+        assertEquals(1, opened.size)
+        assertEquals(0, clicks)
+    }
+
+    @Test
+    fun anAppThatCouldNotBeLaunched_springsHomeBackInsteadOfDeparting() {
+        assumeTrue(!LaunchAnimation.playsOn(Build.VERSION.SDK_INT))
+        setHome(targetFor = ::everyEdgeLaunchesAnApp)
+        commitResult = false
+        val restLeft = contentLeft()
+        holdLeft(firstDp = 14f, secondDp = 50f)
+        lift()
+        assertEquals(1, opened.size)
+        assertFalse(state.isDeparted)
+        assertEquals(restLeft, contentLeft(), 0.5f)
     }
 
     @Test

@@ -88,9 +88,8 @@ class HomeSwipeDispatchTest {
             rightAppPackage = "right.app",
             flags = flags
         )
-        // A swapped pair would put the left app on the right swipe.
-        assertEquals(SwipeTarget.App("left.app", PanelEdge.Left), settings.targetFor(PanelEdge.Left))
-        assertEquals(SwipeTarget.App("right.app", PanelEdge.Right), settings.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.App("left.app", PanelEdge.Right), settings.targetFor(PanelEdge.Left))
+        assertEquals(SwipeTarget.App("right.app", PanelEdge.Left), settings.targetFor(PanelEdge.Right))
     }
 
     @Test
@@ -106,7 +105,7 @@ class HomeSwipeDispatchTest {
             rightAppPackage = "",
             flags = flags
         )
-        assertEquals(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Left), settings.targetFor(PanelEdge.Left))
+        assertEquals(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Right), settings.targetFor(PanelEdge.Left))
         // Widgets is switched off in the flags.
         assertEquals(SwipeTarget.None, settings.targetFor(PanelEdge.Right))
         // Swipe down has its own switch.

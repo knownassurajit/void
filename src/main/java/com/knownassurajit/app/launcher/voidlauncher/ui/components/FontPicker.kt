@@ -18,8 +18,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -98,6 +100,7 @@ fun FontPicker(
     selectedId: String,
     onFontSelected: (String) -> Unit,
     onDismiss: () -> Unit,
+    onPreviewFont: ((String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -175,6 +178,7 @@ fun FontPicker(
                                     rowState = states.rowState(spec.id),
                                     sampleReady = states.isReady(spec.id, FontCoverage.Sample),
                                     onSampleWanted = { session.prefetchSample(spec) },
+                                    onPreviewFont = onPreviewFont,
                                     onClick = { session.select(spec) }
                                 )
                             }
@@ -296,6 +300,7 @@ private fun FontRow(
     rowState: FontRowState,
     sampleReady: Boolean,
     onSampleWanted: () -> Unit,
+    onPreviewFont: ((String?) -> Unit)? = null,
     onClick: () -> Unit
 ) {
     // Fonts that need a download show the name in their own face only once it is safe to compose them.
@@ -325,7 +330,16 @@ private fun FontRow(
             }
         ),
         modifier = Modifier
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .pointerInput(spec.id) {
+                detectTapGestures(
+                    onPress = {
+                        onPreviewFont?.invoke(spec.id)
+                        tryAwaitRelease()
+                        onPreviewFont?.invoke(null)
+                    },
+                    onTap = { onClick() }
+                )
+            }
             .semantics { stateDescription = stateText }
     )
 }

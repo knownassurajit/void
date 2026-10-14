@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.view.WindowCompat
@@ -25,7 +26,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -37,6 +40,7 @@ import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.helper.NotificationService
 import com.knownassurajit.app.launcher.voidlauncher.helper.getUserHandleFromString
 import com.knownassurajit.app.launcher.voidlauncher.helper.openCalendar
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.homeSwipeGate
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.AppDrawerScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.HomeScreen
 import com.knownassurajit.app.launcher.voidlauncher.ui.screen.NotesScreen
@@ -51,7 +55,6 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelOrigin
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.isAtRest
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.shouldPopPanel
 
@@ -234,18 +237,25 @@ class MainActivity : ComponentActivity() {
                             NavMotion.predictivePopExit(swipeEdge, motion, predictiveBackEdgeMarginPx)
                         }
                     ) {
-                        composable<HomeRoute> {
-                            // Home is at rest once no transition moves it any more: a swipe that starts
-                            // while a panel is still leaving would stack a second panel on top.
-                            val atRest = isAtRest(transition.currentState, transition.targetState)
+                        composable<HomeRoute> { homeEntry ->
+                            // What the navigation controller says about this entry, read here and
+                            // not captured from the outer composition (the builder lambda of the graph
+                            // is not necessarily called again for a destination that is composed):
+                            // on top of the back stack, and resumed once no transition moves it any
+                            // more. A swipe that starts while a panel is still leaving would stack a
+                            // second panel on top.
+                            val topEntry by navController.currentBackStackEntryFlow.collectAsState(navController.currentBackStackEntry)
+                            val homeLifecycle by homeEntry.lifecycle.currentStateAsState()
                             HomeScreen(
                                 state = uiState,
-                                isCurrentDestination = currentRoute == NavRouteKind.Home,
-                                isSettled = atRest,
+                                swipeGate = homeSwipeGate(
+                                    isOnTop = topEntry?.id == homeEntry.id,
+                                    isResumed = homeLifecycle.isAtLeast(Lifecycle.State.RESUMED)
+                                ),
                                 onOpenApps = { navController.navigate(AppDrawerRoute) { launchSingleTop = true } },
                                 onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
                                 onOpenNotifications = {
-                                    navController.navigate(NotificationPanelRoute) { launchSingleTop = true }
+                                    StatusBarPanelOpener.expandNotificationsPanel(this@MainActivity)
                                 },
                                 onOpenNotificationSummary = { navController.navigate(NotificationSummaryRoute) { launchSingleTop = true } },
                                 onOpenWidgets = { navController.navigate(WidgetsRoute) { launchSingleTop = true } },

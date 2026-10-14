@@ -4,7 +4,7 @@ VOID retypesets the whole app through `VoidAppTheme(appFont = ...)`. The pref `A
 
 ## Catalog
 
-36 selectable families: 6 bundled, 29 downloadable, plus the platform font.
+46 selectable families: 6 bundled, 39 downloadable, plus the platform font.
 
 ### Bundled (work offline, no flash of another face)
 
