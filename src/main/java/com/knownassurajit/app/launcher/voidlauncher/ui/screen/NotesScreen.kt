@@ -5,10 +5,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.view.Gravity
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -36,11 +33,9 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -72,6 +67,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.ListItemShapes
+import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -297,42 +299,43 @@ fun NotesScreen(onBack: () -> Unit) {
                     )
                 }
             } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(items = notes.toList(), key = { it.id }) { note ->
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = { value ->
-                                if (value != SwipeToDismissBoxValue.Settled) {
-                                    deleteNote(note)
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                        )
-                        SwipeToDismissBox(
-                            state = dismissState,
-                            enableDismissFromStartToEnd = deleteFromStartToEnd,
-                            enableDismissFromEndToStart = !deleteFromStartToEnd,
-                            // Only a tint while the row is actually moving: nothing sits behind a resting row.
-                            backgroundContent = {
-                                if (dismissState.dismissDirection != SwipeToDismissBoxValue.Settled) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.errorContainer, MaterialTheme.shapes.small)
+                val active = notes.filterNot { it.isCompleted }
+                val completed = notes.filter { it.isCompleted }
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(NOTE_SEGMENT_GAP)
+                ) {
+                    noteGroup(
+                        notes = active,
+                        deleteFromStartToEnd = deleteFromStartToEnd,
+                        onDelete = ::deleteNote,
+                        onAction = ::perform,
+                        onEdit = { editing = it },
+                        onOptions = { optionsFor = it }
+                    )
+                    if (completed.isNotEmpty()) {
+                        item(key = "completed_header") {
+                            Text(
+                                text = stringResource(R.string.notes_completed_header, completed.size),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .animateItem()
+                                    .padding(
+                                        start = VoidDimens.sectionSpacing,
+                                        top = VoidDimens.sectionSpacing,
+                                        bottom = VoidDimens.rowSpacing - NOTE_SEGMENT_GAP
                                     )
-                                }
-                            }
-                        ) {
-                            NoteRow(
-                                note = note,
-                                onToggle = { perform(note, NoteAction.ToggleDone) },
-                                onToggleStar = { perform(note, NoteAction.ToggleStar) },
-                                onClick = { editing = note },
-                                onLongClick = { optionsFor = note },
-                                onDelete = { deleteNote(note) }
                             )
                         }
+                        noteGroup(
+                            notes = completed,
+                            deleteFromStartToEnd = deleteFromStartToEnd,
+                            onDelete = ::deleteNote,
+                            onAction = ::perform,
+                            onEdit = { editing = it },
+                            onOptions = { optionsFor = it }
+                        )
                     }
                 }
             }
@@ -387,10 +390,61 @@ fun NotesScreen(onBack: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/** Gap between the segments of a notes group, the same hairline as Settings groups. */
+private val NOTE_SEGMENT_GAP = 2.dp
+
+/**
+ * One segmented group of notes (Material 3 Expressive list, like every Settings section): the first
+ * and last cards round their outer corners, the ones between keep small corners, 2 dp apart. Each
+ * card swipes to delete toward [deleteFromStartToEnd] and opens its options on a long press.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+private fun LazyListScope.noteGroup(
+    notes: List<NoteItem>,
+    deleteFromStartToEnd: Boolean,
+    onDelete: (NoteItem) -> Unit,
+    onAction: (NoteItem, NoteAction) -> Unit,
+    onEdit: (NoteItem) -> Unit,
+    onOptions: (NoteItem) -> Unit
+) {
+    itemsIndexed(items = notes, key = { _, note -> note.id }) { index, note ->
+        val shapes = ListItemDefaults.segmentedShapes(index, notes.size)
+        val dismissState = rememberSwipeToDismissBoxState()
+        SwipeToDismissBox(
+            state = dismissState,
+            modifier = Modifier.animateItem(),
+            enableDismissFromStartToEnd = deleteFromStartToEnd,
+            enableDismissFromEndToStart = !deleteFromStartToEnd,
+            onDismiss = { onDelete(note) },
+            // Only a tint while the card is actually moving: nothing sits behind a resting card.
+            backgroundContent = {
+                if (dismissState.dismissDirection != SwipeToDismissBoxValue.Settled) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.errorContainer, shapes.shape)
+                    )
+                }
+            }
+        ) {
+            NoteCard(
+                note = note,
+                shapes = shapes,
+                onToggle = { onAction(note, NoteAction.ToggleDone) },
+                onToggleStar = { onAction(note, NoteAction.ToggleStar) },
+                onClick = { onEdit(note) },
+                onLongClick = { onOptions(note) },
+                onDelete = { onDelete(note) }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun NoteRow(
+private fun NoteCard(
     note: NoteItem,
+    shapes: ListItemShapes,
     onToggle: () -> Unit,
     onToggleStar: () -> Unit,
     onClick: () -> Unit,
@@ -400,89 +454,64 @@ private fun NoteRow(
     val haptic = LocalHapticFeedback.current
     val deleteLabel = stringResource(R.string.delete_note)
     val optionsLabel = stringResource(R.string.note_options)
-    Column(
-        // An opaque row: the swipe background must never show through a resting row.
-        modifier = Modifier.background(MaterialTheme.colorScheme.background)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClickLabel = optionsLabel,
-                    onLongClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onLongClick()
-                    }
-                )
-                // The swipe is not reachable with TalkBack or Switch Access, so delete is also an action.
-                .semantics {
-                    customActions = listOf(
-                        CustomAccessibilityAction(deleteLabel) {
-                            onDelete()
-                            true
-                        }
-                    )
+    val reminderTime = note.reminderTime
+    SegmentedListItem(
+        onClick = onClick,
+        shapes = shapes,
+        onLongClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onLongClick()
+        },
+        onLongClickLabel = optionsLabel,
+        // The swipe is not reachable with TalkBack or Switch Access, so delete is also an action.
+        modifier = Modifier.semantics {
+            customActions = listOf(
+                CustomAccessibilityAction(deleteLabel) {
+                    onDelete()
+                    true
                 }
-                .padding(vertical = VoidDimens.rowSpacing),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = note.isCompleted,
-                onCheckedChange = { onToggle() },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.onSurface,
-                    uncheckedColor = MaterialTheme.colorScheme.outline,
-                    checkmarkColor = MaterialTheme.colorScheme.surface
-                )
             )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = VoidDimens.rowSpacing)
-            ) {
-                Text(
-                    text = note.text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (note.isCompleted) {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = VoidAlpha.muted)
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    textDecoration = if (note.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                val reminderTime = note.reminderTime
-                if (reminderTime != null && reminderTime > 0L) {
-                    val formatted = remember(reminderTime) {
-                        java.text.SimpleDateFormat("EEE d MMM · h:mm a", java.util.Locale.getDefault())
-                            .format(java.util.Date(reminderTime))
-                    }
-                    Text(
-                        text = formatted.uppercase(),
-                        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = VoidAlpha.muted),
-                        modifier = Modifier.padding(top = VoidDimens.compactSpacing)
-                    )
+        },
+        leadingContent = {
+            Checkbox(checked = note.isCompleted, onCheckedChange = { onToggle() })
+        },
+        supportingContent = if (reminderTime != null && reminderTime > 0L) {
+            {
+                val formatted = remember(reminderTime) {
+                    java.text.SimpleDateFormat("EEE d MMM · h:mm a", java.util.Locale.getDefault())
+                        .format(java.util.Date(reminderTime))
                 }
+                Text(
+                    text = formatted,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-
-            IconButton(onClick = onToggleStar) {
+        } else {
+            null
+        },
+        trailingContent = {
+            IconToggleButton(checked = note.isStarred, onCheckedChange = { onToggleStar() }) {
                 Icon(
                     imageVector = if (note.isStarred) Icons.Filled.Star else Icons.Outlined.StarBorder,
                     contentDescription = stringResource(if (note.isStarred) R.string.note_unstar else R.string.note_star),
-                    tint = if (note.isStarred) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = VoidAlpha.disabled)
-                    }
+                    tint = if (note.isStarred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = VoidAlpha.divider))
+    ) {
+        Text(
+            text = note.text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (note.isCompleted) {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = VoidAlpha.muted)
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            textDecoration = if (note.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

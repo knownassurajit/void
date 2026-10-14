@@ -176,8 +176,8 @@
     <string name="swipe_action_notification_summary">Notification Summary</string>
     <string name="swipe_action_widgets">Widgets</string>
     <string name="swipe_action_notes">Notes</string>
-    <string name="left_swipe_action">Left swipe action</string>
-    <string name="right_swipe_action">Right swipe action</string>
+    <string name="left_swipe_action">Swipe left</string>
+    <string name="right_swipe_action">Swipe right</string>
     <string name="show_clock">Show clock</string>
     <string name="clock_alignment">Clock alignment</string>
 
@@ -187,7 +187,6 @@
     <string name="done">Done</string>
     <string name="set_time">Set time</string>
     <string name="set_reminder">Set reminder</string>
-    <string name="widget_add">Add</string>
     <string name="widget_empty">No widgets yet</string>
     <string name="widget_empty_hint">Add widgets from your apps</string>
     <string name="widget_picker_title">Add widgets</string>
@@ -252,7 +251,6 @@
     <string name="settings_search_hint">Search settings</string>
     <string name="settings_no_matches">No matching settings</string>
     <string name="settings_group_home">Home</string>
-    <string name="settings_group_gestures_motion">Gestures &amp; motion</string>
     <string name="settings_group_features">Features</string>
     <string name="manage_default_home_settings">Manage default home app settings</string>
     <string name="animation_speed">Animation speed</string>
@@ -332,7 +330,6 @@
     <string name="settings_side_padding">Side margins</string>
     <string name="settings_side_padding_subtitle">Space between the screen edge and Home text</string>
     <string name="settings_usage_access_redirected">Redirected to Usage Access settings</string>
-    <string name="settings_usage_access_failed">Could not open settings automatically</string>
     <string name="settings_screen_time_enabled">Screen time enabled</string>
     <string name="settings_24_hour">24-hour format</string>
     <string name="settings_24_hour_subtitle">Show the time as 13:00 instead of 1:00 PM</string>
@@ -342,14 +339,9 @@
     <string name="settings_clock_vertical">Clock vertical alignment</string>
     <string name="settings_apps_horizontal">Apps horizontal alignment</string>
     <string name="settings_apps_vertical">Apps vertical alignment</string>
-    <string name="settings_horizontal_subtitle">Left, center, or right</string>
-    <string name="settings_vertical_subtitle">Top, middle, or bottom</string>
     <string name="settings_clock_size_subtitle">Time only</string>
     <string name="settings_date_size_subtitle">Date line only</string>
     <string name="settings_screen_time_size_subtitle">Screen time line only</string>
-    <string name="settings_font_weight">Font weight</string>
-    <string name="settings_text_color">Text color</string>
-    <string name="settings_opacity">Opacity</string>
     <string name="settings_max_home_apps">Max apps on home screen</string>
     <string name="settings_max_home_apps_subtitle">Limit applications shown</string>
     <string name="settings_app_spacing">App spacing</string>
@@ -375,4 +367,49 @@
 
     <!-- Widgets -->
     <string name="widget_picker_hint">Tap to add, or hold and drag onto the grid</string>
+
+    <!-- Round 2: settings structure, color picker, gestures, widgets, notes -->
+    <string name="settings_title_subtitle">Launcher settings</string>
+    <string name="settings_system_settings">System settings</string>
+    <string name="settings_section_motion">Motion</string>
+    <string name="settings_clock_weight">Clock weight</string>
+    <string name="settings_clock_color">Clock color</string>
+    <string name="settings_clock_opacity">Clock opacity</string>
+    <string name="settings_apps_weight">App label weight</string>
+    <string name="settings_apps_color">App label color</string>
+    <string name="settings_apps_opacity">App label opacity</string>
+    <string name="settings_private_space_icon_color">Icon color</string>
+    <string name="settings_private_space_icon_color_subtitle">Lock, settings and shield icons</string>
+    <string name="settings_enable_gestures">Side swipes</string>
+    <string name="settings_enable_gestures_subtitle">Swipe left or right on Home to run an action</string>
+    <string name="swipe_left_hint">Finger moves left; opens from the right edge</string>
+    <string name="swipe_right_hint">Finger moves right; opens from the left edge</string>
+    <string name="swipe_action_system_notifications">System notifications</string>
+    <string name="swipe_action_open_app">Open an app</string>
+    <string name="swipe_action_none">Nothing</string>
+    <string name="settings_section_swipes">Swipes</string>
+    <string name="settings_section_navigation">Navigation</string>
+    <string name="settings_section_panels">Panels</string>
+    <string name="settings_summary_subtitle">On-device digest of your notifications</string>
+    <string name="settings_summary_needs_access">Allow notification access, then turn the summary on</string>
+    <string name="settings_widgets_subtitle">A grid of your widgets</string>
+    <string name="settings_notes_subtitle">Quick checklist with reminders</string>
+    <string name="settings_notes_title_alignment">Notes title alignment</string>
+    <string name="settings_app_info">App info &amp; permissions</string>
+    <string name="settings_app_info_subtitle">Manage every permission and default in Android settings</string>
+    <string name="credits_made_by">Made with care by</string>
+    <string name="credits_author">Surajit Das</string>
+    <string name="credits_repository">GitHub repository</string>
+    <string name="decrease">Decrease</string>
+    <string name="increase">Increase</string>
+    <string name="color_hex">Hex code</string>
+    <string name="color_hex_invalid">Use 3, 6 or 8 hex digits</string>
+    <string name="color_theme_colors">Theme colors</string>
+    <string name="color_presets">Presets</string>
+    <string name="color_saturation_value">Saturation and brightness</string>
+    <string name="color_hue">Hue</string>
+    <string name="widget_edit_hint">Drag to move · drag the corner dot to resize · tap Done when finished</string>
+    <string name="widget_search_hint">Search widgets</string>
+    <string name="widget_already_added">Already added</string>
+    <string name="notes_completed_header">Completed (%1$d)</string>
 </resources>

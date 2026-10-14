@@ -34,7 +34,7 @@ import com.knownassurajit.app.launcher.voidlauncher.MainUiState
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.helper.HomeLayoutHelper
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeTextColor
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeColor
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAppTheme
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolve
@@ -95,7 +95,7 @@ fun HomePreviewContent(state: MainUiState, modifier: Modifier = Modifier) {
 
 @Composable
 private fun ColumnScope.PreviewClockSection(state: MainUiState, weight: Float) {
-    val clockColor = HomeTextColor.fromKey(state.clockColor)
+    val clockColor = HomeColor.parse(state.clockColor)
     val base = clockColor.resolve()
     val textAlign = gravityTextAlign(state.clockHorizontalAlignment)
     // The configuration locale is observable: the samples follow a language change.
@@ -145,7 +145,7 @@ private fun ColumnScope.PreviewClockSection(state: MainUiState, weight: Float) {
                 Text(
                     text = stringResource(R.string.preview_screen_time).uppercase(locale),
                     style = HomeStyle.screenTimeStyle(MaterialTheme.typography, state.screenTimeSizeScale),
-                    color = (if (clockColor == HomeTextColor.Default) MaterialTheme.colorScheme.onSurfaceVariant else base)
+                    color = (if (clockColor == HomeColor.Default) MaterialTheme.colorScheme.onSurfaceVariant else base)
                         .copy(alpha = 0.45f * state.clockOpacity),
                     textAlign = textAlign
                 )
@@ -160,7 +160,7 @@ private fun ColumnScope.PreviewAppsSection(state: MainUiState, weight: Float) {
     val labels = stringPreviewApps()
     val shown = labels.take(state.homeAppsCount.coerceIn(1, PREVIEW_APP_COUNT))
     val spacing = HomeStyle.appSpacingDp(configuration.screenHeightDp, shown.size, state.appSpacingDp)
-    val base = HomeTextColor.fromKey(state.homeAppsColor).resolve()
+    val base = HomeColor.parse(state.homeAppsColor).resolve()
     val textAlign = gravityTextAlign(state.appHorizontalAlignment)
     // Same structure as Home's apps section: the list in the remaining space, the battery line below.
     Column(

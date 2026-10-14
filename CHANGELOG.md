@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- Material 3 Expressive throughout: `MaterialExpressiveTheme` with the expressive motion scheme for components, the full shape scale (adds 20/32/48 dp corners) and emphasized type roles in the launcher's own font; Settings and Notes use segmented list items, choices use connected toggle-button groups, switches show a check thumb, loading uses the Expressive loading indicator (material3 1.5.0-beta01 on Compose BOM 2026.09.00)
+- Color picker for Home and icon colors: saturation/brightness panel, hue bar, hex input (3, 6 or 8 digits, paste-friendly) with validation, theme-color swatches that follow dynamic color, and a preset palette; colors are stored as a theme role or `#RRGGBB` (`HomeColor`)
+- Private Space icon color (lock, settings, shield and private-app icons and the control pill)
+- App drawer: scrolling hides the keyboard (also when it opened by itself), and pulling down past the top of the list (or releasing a pull fast) closes the drawer
+- Widgets: pinned widgets glide to their new cell after a drop, a snapshot of the real widget follows the finger, the picker has search and lazy previews, and edit mode explains itself
 - Notes: long-press a note for its options (edit, star, mark done, set/change/clear reminder, copy, share, delete); a tap edits the note; deleting (swipe or menu) shows an Undo snackbar and TalkBack gets a Delete action
 - Widgets: hold a widget in the picker and drag it onto the grid; the grid shows its cells and the cell the widget will land on (the nearest free one), a tap still adds it to the first free cell. A pinned widget is held and dragged to move it, and resized from its corner handle in whole cells, only in the directions its provider allows and never over another widget. Positions are saved per widget (`WidgetGrid`, `WIDGET_POSITIONS`); layouts saved before keep their order
 - Home customization: clock and home-app font weight, text color (theme roles: default, accent, secondary, tertiary, muted, so it follows dynamic color) and opacity, plus side margins, next to the existing sizes, spacing and clock/apps split (`HomeStyle`)
@@ -19,6 +24,10 @@
 - Swipes that start at a screen edge: while Home is the screen on top, two full-height strips along the left and right edges (only for an edge that has an action) ask the system to leave them to the app (`systemGestureExclusion`, width `max(system gesture inset, 30 dp) + 8 dp`), so the edge swipe is an ordinary swipe; the system Back gesture is untouched on every other screen
 
 ### Changed
+- Settings regrouped and rebuilt as Expressive segmented sections: Appearance (font & style, system bars, motion), Home screen (live preview, layout, clock & date, home apps), App drawer (app list, Private Space), Gestures (swipes, navigation), Features (panels), Permissions; each Home text block has its own weight, color and opacity rows with explicit labels
+- Swipe settings are named after the finger ("Swipe left" moves the finger left and opens content from the right edge); stored settings are migrated once so every gesture keeps its action; the non-functional "Accessibility action" is no longer offered
+- Notes are Expressive segmented cards (same family as Settings), split into active and completed groups
+- Compose BOM 2025.05.01 → 2026.09.00 (Compose 1.12), material3 pinned to 1.5.0-beta01; `ui-text-google-fonts` follows the BOM; `resourceConfigurations` replaced by `androidResources.localeFilters`
 - Settings regrouped: Appearance (font, system display and wallpaper, status bar), Home screen (live preview, Layout, Clock & date, Home apps), App drawer (app list, Private Space), Gestures & motion, Features, Permissions; the search index follows the new groups and the visible labels moved to string resources
 - Private Space controls are one component in both placements: a tonal pill with the lock toggle and, while unlocked, a shield-badged settings action that slides in inside the pill, so unlocking no longer shifts the search bar and the action no longer looks like the launcher-settings gear; with the search-bar placement the private apps keep a labelled section
 - Home and the Settings previews share one set of text styles and spacing math, so the preview draws exactly what Home draws (it used other sizes, weights and a different spacing formula)
@@ -36,6 +45,10 @@
 - Privacy policy discloses that downloadable fonts are fetched by Google Play services
 
 ### Fixed
+- Widgets were slow and not interactive: every recomposition (each scroll and drag frame, because layout positions were Compose state) re-sent size options to every widget provider, which re-rendered the widgets and dropped touches; options now go out only when a widget's size changes, positions are plain fields, and provider previews load lazily per card instead of all before the screen shows anything
+- Widgets: a scroll that rested past the long-press time turned into a drag (the long press did not give up when the finger moved)
+- An app opened by a side swipe slid in, and Home departed, against the finger (the base commit flipped the edge in `HomeSwipeSettings.targetFor` but not in `PanelOrigin`)
+- `NavMotionTest` parsed transitions line by line; Compose 1.12 prints them on one line
 - Notes: the delete icon showed through every resting row (the swipe background was always drawn behind a transparent row); it is gone and only a tint shows while a row is swiped
 - Notes: a reminder picked for a date was set one day early west of UTC (the date picker returns midnight UTC); reminders fall back to an inexact alarm when exact alarms are not granted instead of silently never firing (`SCHEDULE_EXACT_ALARM` declared); deleting a note or clearing its reminder cancels the alarm; a reminder for a deleted or completed note no longer fires; request codes no longer collide for ids that share their low 32 bits
 - Notes: one corrupted entry no longer drops every note after it (which the next save made permanent)

@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
 import com.knownassurajit.app.launcher.voidlauncher.helper.HomeLayoutHelper
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeColor
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeTextColor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -148,6 +149,7 @@ class Prefs private constructor(context: Context) {
     private val HOME_APPS_FONT_WEIGHT = "HOME_APPS_FONT_WEIGHT"
     private val HOME_SIDE_PADDING_DP = "HOME_SIDE_PADDING_DP"
     private val WIDGET_POSITIONS = "WIDGET_POSITIONS"
+    private val PRIVATE_SPACE_ICON_COLOR = "PRIVATE_SPACE_ICON_COLOR"
 
     private val APP_NAME_1 = "APP_NAME_1"
     private val APP_NAME_2 = "APP_NAME_2"
@@ -302,10 +304,32 @@ class Prefs private constructor(context: Context) {
         prefs = newPrefs
 
         ensureMaxHomeAppsResolved()
+        migrateSwipeSides()
 
         _homescreenPreferences = MutableStateFlow(readHomescreenPreferences())
         homescreenPreferences = _homescreenPreferences.asStateFlow()
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
+    /** One-time rename of the swipe sides to the direction of the finger; see [SwipeSideMigration]. */
+    private fun migrateSwipeSides() {
+        if (prefs.getBoolean(SwipeSideMigration.DONE_KEY, false)) return
+        val swapped = SwipeSideMigration.swapped(prefs.all)
+        prefs.edit {
+            swapped.forEach { (key, value) ->
+                when (value) {
+                    null -> remove(key)
+                    is String -> putString(key, value)
+                    is Boolean -> putBoolean(key, value)
+                    is Int -> putInt(key, value)
+                    is Long -> putLong(key, value)
+                    is Float -> putFloat(key, value)
+                    else -> android.util.Log.w("Prefs", "swipe_side_migration_skipped key=$key")
+                }
+            }
+            putBoolean(SwipeSideMigration.DONE_KEY, true)
+        }
+        android.util.Log.i("Prefs", "swipe_side_migration state=done")
     }
 
     private fun emitHomescreenPrefs() {
@@ -336,8 +360,8 @@ class Prefs private constructor(context: Context) {
             appDrawerTextSizeScale = prefs.getFloat(APP_DRAWER_TEXT_SIZE_SCALE, prefs.getFloat(TEXT_SIZE_SCALE, 1.0f)),
             appSpacingDp = prefs.getFloat(APP_SPACING_DP, 16f),
             showStatusBar = prefs.getBoolean(STATUS_BAR, false),
-            leftSwipeAction = prefs.getString(LEFT_SWIPE_ACTION, SwipeAction.NOTIFICATION_SUMMARY) ?: SwipeAction.NOTIFICATION_SUMMARY,
-            rightSwipeAction = prefs.getString(RIGHT_SWIPE_ACTION, SwipeAction.WIDGETS) ?: SwipeAction.WIDGETS,
+            leftSwipeAction = prefs.getString(LEFT_SWIPE_ACTION, SwipeAction.WIDGETS) ?: SwipeAction.WIDGETS,
+            rightSwipeAction = prefs.getString(RIGHT_SWIPE_ACTION, SwipeAction.NOTIFICATION_SUMMARY) ?: SwipeAction.NOTIFICATION_SUMMARY,
             enableGestures = prefs.getBoolean(ENABLE_GESTURES, true),
             enableSwipeDownNotifications = prefs.getBoolean(ENABLE_SWIPE_DOWN_NOTIFICATIONS, true),
             appFont = prefs.getString(APP_FONT, "google_sans") ?: "google_sans",
@@ -371,12 +395,17 @@ class Prefs private constructor(context: Context) {
         set(value) = prefs.edit { putFloat(HOME_APPS_OPACITY, HomeStyle.coerceOpacity(value)) }
 
     var clockColor: String
-        get() = HomeTextColor.fromKey(prefs.getString(CLOCK_COLOR, null)).key
-        set(value) = prefs.edit { putString(CLOCK_COLOR, HomeTextColor.fromKey(value).key) }
+        get() = HomeColor.parse(prefs.getString(CLOCK_COLOR, null)).key
+        set(value) = prefs.edit { putString(CLOCK_COLOR, HomeColor.parse(value).key) }
 
     var homeAppsColor: String
-        get() = HomeTextColor.fromKey(prefs.getString(HOME_APPS_COLOR, null)).key
-        set(value) = prefs.edit { putString(HOME_APPS_COLOR, HomeTextColor.fromKey(value).key) }
+        get() = HomeColor.parse(prefs.getString(HOME_APPS_COLOR, null)).key
+        set(value) = prefs.edit { putString(HOME_APPS_COLOR, HomeColor.parse(value).key) }
+
+    /** Tint of the Private Space icons in the drawer: a theme role key or a hex color. */
+    var privateSpaceIconColor: String
+        get() = HomeColor.parse(prefs.getString(PRIVATE_SPACE_ICON_COLOR, null)).key
+        set(value) = prefs.edit { putString(PRIVATE_SPACE_ICON_COLOR, HomeColor.parse(value).key) }
 
     var clockFontWeight: Int
         get() = HomeStyle.coerceWeight(prefs.getInt(CLOCK_FONT_WEIGHT, HomeStyle.DEFAULT_CLOCK_WEIGHT), HomeStyle.DEFAULT_CLOCK_WEIGHT)
@@ -1223,12 +1252,12 @@ class Prefs private constructor(context: Context) {
 
     /** Left swipe action: "notification_summary", "widgets", or "notes". */
     var leftSwipeAction: String
-        get() = prefs.getString(LEFT_SWIPE_ACTION, SwipeAction.NOTIFICATION_SUMMARY).toString()
+        get() = prefs.getString(LEFT_SWIPE_ACTION, SwipeAction.WIDGETS).toString()
         set(value) = prefs.edit { putString(LEFT_SWIPE_ACTION, value) }
 
     /** Right swipe action: "notification_summary", "widgets", or "notes". */
     var rightSwipeAction: String
-        get() = prefs.getString(RIGHT_SWIPE_ACTION, SwipeAction.WIDGETS).toString()
+        get() = prefs.getString(RIGHT_SWIPE_ACTION, SwipeAction.NOTIFICATION_SUMMARY).toString()
         set(value) = prefs.edit { putString(RIGHT_SWIPE_ACTION, value) }
 
     /** Set of pinned widget provider component names (flattenToString). */

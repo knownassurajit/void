@@ -48,6 +48,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeColor
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.privateSpaceColors
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -96,6 +106,7 @@ fun AppDrawerScreen(
     var isPrivateSpaceLocked by remember { mutableStateOf(true) }
     var hasPrivateSpace by remember { mutableStateOf(false) }
     val showAlphabetCategories = remember { prefs.showAlphabetCategories }
+    val privateIconColor = remember { HomeColor.parse(prefs.privateSpaceIconColor) }
     val focusRequester = remember { FocusRequester() }
 
     val privateSpaceActive = PrivateSpaceHelper.isEnabled(context, prefs)
@@ -255,7 +266,8 @@ fun AppDrawerScreen(
                 isPrivateSpaceLocked = isPrivateSpaceLocked,
                 onTogglePrivateSpace = onTogglePrivateSpace,
                 hasPrivateSpaceSettings = hasPrivateSpaceSettings,
-                onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings
+                onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings,
+                privateIconColor = privateIconColor
             )
 
             LaunchedEffect(Unit) {
@@ -286,7 +298,9 @@ fun AppDrawerScreen(
                 showBottomPrivateHeader = !privateInSearchBar,
                 onAppClick = onAppClick,
                 onTogglePrivateSpace = onTogglePrivateSpace,
-                onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings
+                onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings,
+                privateIconColor = privateIconColor,
+                onCloseByPull = onBack
             )
         }
     }
@@ -302,7 +316,8 @@ private fun AppDrawerSearchBar(
     isPrivateSpaceLocked: Boolean,
     onTogglePrivateSpace: () -> Unit,
     hasPrivateSpaceSettings: Boolean,
-    onOpenPrivateSpaceSettings: () -> Unit
+    onOpenPrivateSpaceSettings: () -> Unit,
+    privateIconColor: HomeColor
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -342,7 +357,8 @@ private fun AppDrawerSearchBar(
                     isLocked = isPrivateSpaceLocked,
                     hasSettings = hasPrivateSpaceSettings,
                     onToggle = onTogglePrivateSpace,
-                    onOpenSettings = onOpenPrivateSpaceSettings
+                    onOpenSettings = onOpenPrivateSpaceSettings,
+                    iconColor = privateIconColor
                 )
             }
             IconButton(onClick = onOpenSettings) {
@@ -372,15 +388,34 @@ private fun ColumnScope.AppDrawerAppList(
     showBottomPrivateHeader: Boolean,
     onAppClick: (AppModel) -> Unit,
     onTogglePrivateSpace: () -> Unit,
-    onOpenPrivateSpaceSettings: () -> Unit
+    onOpenPrivateSpaceSettings: () -> Unit,
+    privateIconColor: HomeColor,
+    onCloseByPull: () -> Unit
 ) {
     val privateOnly = filteredPrivateApps.filterNot { PrivateSpaceHelper.isAddEntry(it) }
     val showPrivateSection = privateSpaceEnabled && hasPrivateSpace
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val density = LocalDensity.current
+    val closeLatest = rememberUpdatedState(onCloseByPull)
+    val scrollConnection = remember(density) {
+        DrawerScrollConnection(
+            closePullPx = with(density) { VoidDimens.drawerClosePull.toPx() },
+            closeVelocityPx = with(density) { VoidDimens.drawerCloseVelocity.toPx() },
+            onUserScroll = {
+                // Scrolling means browsing, not typing: the keyboard goes away even when it opened by itself.
+                keyboard?.hide()
+                focusManager.clearFocus()
+            },
+            onClose = { closeLatest.value() }
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
             .weight(1f)
+            .nestedScroll(scrollConnection)
             .padding(horizontal = VoidDimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
@@ -388,6 +423,7 @@ private fun ColumnScope.AppDrawerAppList(
             item(key = "private_search_result") {
                 AppDrawerPrivateSpaceSearchRow(
                     isLocked = isPrivateSpaceLocked,
+                    iconColor = privateIconColor,
                     onClick = onTogglePrivateSpace
                 )
                 VoidSectionDivider()
@@ -428,13 +464,15 @@ private fun ColumnScope.AppDrawerAppList(
                 }
                 item(key = "private_header") {
                     PrivateSpaceHeader(
+                        iconColor = privateIconColor,
                         controls = if (showBottomPrivateHeader) {
                             {
                                 PrivateSpaceControls(
                                     isLocked = isPrivateSpaceLocked,
                                     hasSettings = hasPrivateSpaceSettings,
                                     onToggle = onTogglePrivateSpace,
-                                    onOpenSettings = onOpenPrivateSpaceSettings
+                                    onOpenSettings = onOpenPrivateSpaceSettings,
+                                    iconColor = privateIconColor
                                 )
                             }
                         } else {
@@ -452,6 +490,7 @@ private fun ColumnScope.AppDrawerAppList(
                         app = app,
                         textSizeScale = appDrawerTextSizeScale,
                         isPrivate = true,
+                        privateIconColor = privateIconColor,
                         onClick = { onAppClick(app) }
                     )
                 }
@@ -465,6 +504,7 @@ private fun AppDrawerItem(
     app: AppModel,
     textSizeScale: Float,
     isPrivate: Boolean = false,
+    privateIconColor: HomeColor = HomeColor.Default,
     onClick: () -> Unit
 ) {
     Row(
@@ -489,7 +529,7 @@ private fun AppDrawerItem(
             Icon(
                 imageVector = Icons.Outlined.Lock,
                 contentDescription = stringResource(R.string.private_app),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = privateSpaceColors(privateIconColor).accent
             )
         }
     }
@@ -498,8 +538,10 @@ private fun AppDrawerItem(
 @Composable
 private fun AppDrawerPrivateSpaceSearchRow(
     isLocked: Boolean,
+    iconColor: HomeColor,
     onClick: () -> Unit
 ) {
+    val accent = privateSpaceColors(iconColor).accent
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -510,7 +552,7 @@ private fun AppDrawerPrivateSpaceSearchRow(
         Icon(
             imageVector = Icons.Outlined.Shield,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.tertiary
+            tint = accent
         )
         Spacer(modifier = Modifier.width(VoidDimens.rowSpacing))
         Column {
@@ -529,9 +571,49 @@ private fun AppDrawerPrivateSpaceSearchRow(
         Icon(
             imageVector = if (isLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = accent
         )
     }
 }
 
 // ── Private Space helpers moved to PrivateSpaceHelper ──
+
+/**
+ * Hides the keyboard as soon as the user scrolls the list, and closes the drawer when the user pulls
+ * down past the top of the list: farther than [closePullPx], or released fast downward after pulling
+ * at the top. A fling that only reaches the top on its own never closes it, because only a drag at
+ * the top counts as a pull.
+ */
+internal class DrawerScrollConnection(
+    private val closePullPx: Float,
+    private val closeVelocityPx: Float,
+    private val onUserScroll: () -> Unit,
+    private val onClose: () -> Unit
+) : NestedScrollConnection {
+    private var pullPx = 0f
+
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source == NestedScrollSource.UserInput && available.y != 0f) onUserScroll()
+        return Offset.Zero
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        // Down movement the list could not use: the list is at its top and the finger keeps pulling.
+        if (source == NestedScrollSource.UserInput) {
+            pullPx = if (available.y > 0f) pullPx + available.y else 0f
+        }
+        return Offset.Zero
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity {
+        val pulled = pullPx
+        pullPx = 0f
+        if (shouldClose(pulled, available.y, closePullPx, closeVelocityPx)) onClose()
+        return Velocity.Zero
+    }
+
+    companion object {
+        fun shouldClose(pulledPx: Float, releaseVelocityY: Float, closePullPx: Float, closeVelocityPx: Float): Boolean =
+            pulledPx >= closePullPx || (pulledPx > 0f && releaseVelocityY >= closeVelocityPx)
+    }
+}

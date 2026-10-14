@@ -26,9 +26,13 @@ class NavMotionTest {
     ): PanelEdge = PanelOrigin.resolve(route, left, right)
 
     // The text of one transition part ("Fade", "Slide", "Scale"), or null when the part is absent.
+    // Compose prints the parts one per line up to 1.8 and on one line from 1.12
+    // ("EnterTransition: Fade - …, Slide - …"), so a part ends where the next "<Name> - " starts.
     private fun part(transition: Any, name: String): String? {
-        val line = transition.toString().lines().first { it.startsWith("$name - ") }
-        return line.removePrefix("$name - ").removeSuffix(",").takeUnless { it == "null" }
+        val text = transition.toString().replace('\n', ' ')
+        val match = Regex("""\b$name - (.*?)(?=,\s+[A-Z][A-Za-z]+ - |,?\s*$)""").find(text)
+            ?: throw NoSuchElementException("no $name part in $text")
+        return match.groupValues[1].trim().removeSuffix(",").takeUnless { it == "null" }
     }
 
     // `SpringSpec` has a value-based hashCode and no toString of its own, so a transition prints it
@@ -62,26 +66,27 @@ class NavMotionTest {
     }
 
     @Test
-    fun panelAssignedToTheLeftSwipe_entersFromTheLeftEdge() {
-        // As PanelOrigin, docs/architecture/motion.md and the Notes delete direction define it.
+    fun panelAssignedToTheLeftSwipe_entersFromTheRightEdge() {
+        // The finger moves left, so the panel comes in from the right and follows it.
         assertEquals(
-            PanelEdge.Left,
+            PanelEdge.Right,
             resolve(NavRouteKind.Notes, left = NavRouteKind.Notes, right = NavRouteKind.Widgets)
         )
     }
 
     @Test
-    fun panelAssignedToTheRightSwipe_entersFromTheRightEdge() {
+    fun panelAssignedToTheRightSwipe_entersFromTheLeftEdge() {
         assertEquals(
-            PanelEdge.Right,
+            PanelEdge.Left,
             resolve(NavRouteKind.Widgets, left = NavRouteKind.Notes, right = NavRouteKind.Widgets)
         )
     }
 
     @Test
-    fun panelAssignedToBothSwipes_entersFromTheLeftEdge() {
+    fun panelAssignedToBothSwipes_entersFromTheRightEdge() {
+        // The left swipe wins, and its panel comes in from the right.
         assertEquals(
-            PanelEdge.Left,
+            PanelEdge.Right,
             resolve(NavRouteKind.Widgets, left = NavRouteKind.Widgets, right = NavRouteKind.Widgets)
         )
     }

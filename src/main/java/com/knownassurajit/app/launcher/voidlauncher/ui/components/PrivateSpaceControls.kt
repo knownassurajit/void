@@ -22,6 +22,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.Color
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeColor
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolve
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -43,13 +47,15 @@ fun PrivateSpaceControls(
     hasSettings: Boolean,
     onToggle: () -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconColor: HomeColor = HomeColor.Default
 ) {
     val lockState = stringResource(if (isLocked) R.string.private_space_locked else R.string.private_space_unlocked)
+    val colors = privateSpaceColors(iconColor)
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        color = colors.container,
+        contentColor = colors.content,
         modifier = modifier.semantics { stateDescription = lockState }
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -85,6 +91,7 @@ fun PrivateSpaceControls(
 @Composable
 fun PrivateSpaceHeader(
     modifier: Modifier = Modifier,
+    iconColor: HomeColor = HomeColor.Default,
     controls: (@Composable () -> Unit)? = null
 ) {
     Row(
@@ -96,7 +103,7 @@ fun PrivateSpaceHeader(
         Icon(
             imageVector = Icons.Outlined.Shield,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.tertiary
+            tint = privateSpaceColors(iconColor).accent
         )
         Spacer(modifier = Modifier.width(VoidDimens.rowSpacing))
         Text(
@@ -108,3 +115,26 @@ fun PrivateSpaceHeader(
         controls?.invoke()
     }
 }
+
+/** The colors of the Private Space controls for the chosen icon [color]. */
+@Immutable
+data class PrivateSpaceColors(val container: Color, val content: Color, val accent: Color)
+
+/**
+ * The theme default keeps the tertiary tonal pair; any other choice tints the icons with it and
+ * draws the pill in a translucent wash of the same color, so it stays apart from the plain gear.
+ */
+@Composable
+fun privateSpaceColors(color: HomeColor): PrivateSpaceColors {
+    if (color == HomeColor.Default) {
+        return PrivateSpaceColors(
+            container = MaterialTheme.colorScheme.tertiaryContainer,
+            content = MaterialTheme.colorScheme.onTertiaryContainer,
+            accent = MaterialTheme.colorScheme.tertiary
+        )
+    }
+    val tint = color.resolve()
+    return PrivateSpaceColors(container = tint.copy(alpha = PILL_WASH_ALPHA), content = tint, accent = tint)
+}
+
+private const val PILL_WASH_ALPHA = 0.18f

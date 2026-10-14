@@ -2,8 +2,10 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
@@ -50,15 +52,19 @@ private val VoidDarkColorScheme = darkColorScheme(
     surfaceDim = VoidBlack
 )
 
-// MD3 Expressive — recommended shape tokens
+// Material 3 Expressive shape scale (corner radii in dp: 4, 8, 12, 16, 20, 28, 32, 48).
 private val VoidExpressiveShapes = Shapes(
     extraSmall = RoundedCornerShape(4.dp),
     small = RoundedCornerShape(8.dp),
     medium = RoundedCornerShape(12.dp),
     large = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    extraLarge = RoundedCornerShape(28.dp),
+    largeIncreased = RoundedCornerShape(20.dp),
+    extraLargeIncreased = RoundedCornerShape(32.dp),
+    extraExtraLarge = RoundedCornerShape(48.dp)
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun VoidAppTheme(
     appFont: String = FontCatalog.DEFAULT_ID,
@@ -75,10 +81,13 @@ fun VoidAppTheme(
     val font = rememberFontResolution(appFont).spec
     val typography = remember(font) { getTypography(font) }
 
-    MaterialTheme(
+    // Expressive motion drives component springs (buttons, toggles, list items, indicators). Full-screen
+    // panel transitions keep the standard springs in VoidMotion: an overshoot there reveals the screen edge.
+    MaterialExpressiveTheme(
         colorScheme = colorScheme,
-        typography = typography,
+        motionScheme = MotionScheme.expressive(),
         shapes = VoidExpressiveShapes,
+        typography = typography,
         content = content
     )
 }

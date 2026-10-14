@@ -32,7 +32,8 @@
 - **On-Device AI Summarization**: Uses Gemini Nano (via ML Kit) to summarize your notifications locally, ensuring privacy and speed.
 - **Integrated Quick Notes**: Fast, text-based checklist with stars, reminders and undoable swipe-to-delete; long-press a note for edit, reminder, copy, share and delete.
 - **Widget Grid**: Hold a widget in the picker and drag it onto a 4-column grid; move and resize pinned widgets in whole cells without overlaps.
-- **Granular Home Styling**: Per-block (clock, home apps) size, weight, theme color and opacity, plus spacing, side margins and the clock/apps split, with a live preview in Settings.
+- **Granular Home Styling**: Per-block (clock, home apps) size, weight, any color (spectrum picker, hex codes, theme colors) and opacity, plus spacing, side margins and the clock/apps split, with a live preview in Settings.
+- **Material 3 Expressive**: Expressive theme, motion, shapes and type; segmented Settings and Notes; connected button groups.
 - **Deep Android 15 Integration**: Full support for Private Space, allowing you to access hidden and secure apps directly from the drawer.
 - **Digital Wellbeing**: Screen time and unlock counts are integrated directly into the home screen for at-a-glance awareness.
 - **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions. Panels move the way you swipe: swipe right and the panel slides in from the left edge, swipe up and the drawer rises from the bottom, while Home follows your finger and moves the same way underneath. Letting go after 56 dp or a quick flick opens it, moving back cancels it, swipes that start right at a screen edge work, and an app set as a swipe action opens at once while Home carries the swipe on, pushed aside and dimmed (Android 11 and earlier also slide the app in from the same side). Motion uses Material 3 spring physics that the animation-speed setting scales. The system back gesture (Android 14+) shows the Material predictive-back preview on every screen, and a swipe inside a screen toward its edge also leaves it (56 dp or a quick flick). See [`docs/architecture/motion.md`](docs/architecture/motion.md).
@@ -48,8 +49,8 @@ Navigate your device with a simple, gesture-based mental model:
 ```mermaid
 graph TD
     A[Home Screen] -- Swipe Up --> B[App Drawer]
-    A -- Swipe Left --> D[Custom Action: Notes/Widgets]
-    A -- Swipe Right --> E[Custom Action: Summary/Notes]
+    A -- Swipe Left (finger moves left) --> D[Custom Action, enters from the right]
+    A -- Swipe Right (finger moves right) --> E[Custom Action, enters from the left]
     A -- Double Tap --> F[Lock Screen]
     B -- Settings icon --> C[Settings]
     C -- Back --> B

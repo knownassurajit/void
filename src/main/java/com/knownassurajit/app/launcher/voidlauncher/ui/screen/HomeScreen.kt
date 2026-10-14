@@ -105,7 +105,7 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeTextColor
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeColor
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolve
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
@@ -416,7 +416,7 @@ private fun ColumnScope.HomeClockSection(
             horizontalAlignment = clockAlign,
             verticalArrangement = Arrangement.spacedBy(VoidDimens.compactSpacing)
         ) {
-            val clockColor = HomeTextColor.fromKey(state.clockColor)
+            val clockColor = HomeColor.parse(state.clockColor)
             val clockBase = clockColor.resolve()
             // ── Time ──
             if (state.showClock) {
@@ -465,7 +465,7 @@ private fun ColumnScope.HomeClockSection(
                 Text(
                     text = state.screenTime.uppercase(),
                     style = HomeStyle.screenTimeStyle(MaterialTheme.typography, state.screenTimeSizeScale),
-                    color = (if (clockColor == HomeTextColor.Default) MaterialTheme.colorScheme.onSurfaceVariant else clockBase)
+                    color = (if (clockColor == HomeColor.Default) MaterialTheme.colorScheme.onSurfaceVariant else clockBase)
                         .copy(alpha = 0.45f * state.clockOpacity),
                     textAlign = clockTextAlign,
                     modifier = Modifier
@@ -495,7 +495,7 @@ private fun ColumnScope.HomeAppsSection(
     val configuration = LocalConfiguration.current
     val screenHeightDp = configuration.screenHeightDp
     val computedSpacing = HomeStyle.appSpacingDp(screenHeightDp, state.homeApps.size, state.appSpacingDp)
-    val appBase = HomeTextColor.fromKey(state.homeAppsColor).resolve()
+    val appBase = HomeColor.parse(state.homeAppsColor).resolve()
 
     // ── Drag-to-reorder state ──
     val reorderList = remember { mutableStateListOf<HomeApp>() }

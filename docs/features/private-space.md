@@ -47,3 +47,7 @@ Pixel_8a AVD with a secure screen lock (PIN), VOID set as the home app, and a pr
 ## Controls (both placements)
 
 `PrivateSpaceControls` is used in the search bar and in the bottom header alike: a tonal pill with the lock toggle and, only while unlocked, the Private Space settings action (shield-badged `AdminPanelSettings` icon, never the launcher-settings gear). The action expands inside the pill, so unlocking does not move the search field. With the search-bar placement the unlocked private apps keep a labelled "Private Space" section at the bottom.
+
+## Icon color
+
+Settings → App drawer → Private Space → Icon color tints the lock, settings and shield icons and the private-app markers, and washes the control pill in the same color. The theme default keeps the tertiary tonal pair.

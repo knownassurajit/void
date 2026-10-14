@@ -40,4 +40,38 @@ class HomeStyleTest {
         assertEquals(HomeTextColor.Default, HomeTextColor.fromKey("#FF00FF"))
         assertEquals(HomeTextColor.Default, HomeTextColor.fromKey(null))
     }
+
+    @Test
+    fun hex_acceptsShortLongAndAlphaFormsWithOrWithoutHash() {
+        assertEquals(0xFFFFFFFF.toInt(), HomeColors.parseHex("#fff"))
+        assertEquals(0xFF336699.toInt(), HomeColors.parseHex("336699"))
+        assertEquals(0x80336699.toInt(), HomeColors.parseHex("#80336699"))
+        assertEquals(null, HomeColors.parseHex("#12345"))
+        assertEquals(null, HomeColors.parseHex("#GGGGGG"))
+        assertEquals(null, HomeColors.parseHex(""))
+        assertEquals(null, HomeColors.parseHex(null))
+    }
+
+    @Test
+    fun hex_formatsOpaqueColorsWithoutAlpha() {
+        assertEquals("#336699", HomeColors.toHex(0xFF336699.toInt()))
+        assertEquals("#80336699", HomeColors.toHex(0x80336699.toInt()))
+    }
+
+    @Test
+    fun hsv_roundTripsPrimaryAndGrayColors() {
+        listOf(0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFF808080, 0xFFFFFFFF, 0xFF000000, 0xFF336699).forEach { raw ->
+            val argb = raw.toInt()
+            val hsv = HomeColors.argbToHsv(argb)
+            assertEquals(HomeColors.toHex(argb), HomeColors.toHex(HomeColors.hsvToArgb(hsv[0], hsv[1], hsv[2])))
+        }
+    }
+
+    @Test
+    fun homeColor_storesRolesByKeyAndCustomColorsAsHex() {
+        assertEquals(HomeColor.Role(HomeTextColor.Primary), HomeColor.parse("primary"))
+        assertEquals(HomeColor.Custom(0xFF90CAF9.toInt()), HomeColor.parse("#90CAF9"))
+        assertEquals("#90CAF9", HomeColor.parse("#90caf9").key)
+        assertEquals(HomeColor.Default, HomeColor.parse("not-a-color"))
+    }
 }

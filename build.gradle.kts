@@ -22,8 +22,12 @@ android {
         versionCode = major * 1_000_000 + minor * 10_000 + patch * 100 + build
         versionName = "$major.$minor.$patch.$build"
 
-        resourceConfigurations += listOf("en", "ar", "de", "es-rES", "es-rUS", "fr", "he", "hr", "hu", "in", "it", "ja", "nl", "pl", "pt-rBR", "ru-rRU", "sv", "tr", "uk", "zh")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Replaces the deprecated defaultConfig.resourceConfigurations (removed in a future AGP).
+    androidResources {
+        localeFilters += listOf("en", "ar", "de", "es-rES", "es-rUS", "fr", "he", "hr", "hu", "in", "it", "ja", "nl", "pl", "pt-rBR", "ru-rRU", "sv", "tr", "uk", "zh")
     }
 
     compileOptions {
