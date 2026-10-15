@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
-import android.os.UserManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,6 +48,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeColor
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.privateSpaceColors
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -60,20 +69,25 @@ import androidx.compose.ui.unit.dp
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
-import com.knownassurajit.app.launcher.voidlauncher.ui.components.ChildScreenBackHandler
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.Collator
 import kotlin.math.abs
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.knownassurajit.app.launcher.voidlauncher.helper.AppCacheManager
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceControls
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceHeader
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
-import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.helper.ToggleOutcome
+import com.knownassurajit.app.launcher.voidlauncher.helper.showToast
 
 @Composable
 fun AppDrawerScreen(
@@ -92,79 +106,88 @@ fun AppDrawerScreen(
     var isPrivateSpaceLocked by remember { mutableStateOf(true) }
     var hasPrivateSpace by remember { mutableStateOf(false) }
     val showAlphabetCategories = remember { prefs.showAlphabetCategories }
+    val privateIconColor = remember { HomeColor.parse(prefs.privateSpaceIconColor) }
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
-        try {
-            if (FeatureAvailability.isPrivateSpaceAvailable(context) &&
-                prefs.privateSpaceEnabled &&
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
-            ) {
-                val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
-                hasPrivateSpace = profile != null
-                if (profile != null) {
-                    isPrivateSpaceLocked = PrivateSpaceHelper.queryLocked(context) ?: true
-                    scope.launch {
-                        try {
-                            val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                            privateApps.clear()
-                            privateApps.addAll(pApps)
-                        } catch (_: Exception) {
-                            privateApps.clear()
-                        }
-                    }
+    val privateSpaceActive = PrivateSpaceHelper.isEnabled(context, prefs)
+    var refreshJob by remember { mutableStateOf<Job?>(null) }
+    var toggleJob by remember { mutableStateOf<Job?>(null) }
+
+    // The system's quiet mode is the only source of truth for the lock state: every trigger (open,
+    // resume, broadcast, finished toggle) funnels through here and nothing else writes it. A newer
+    // refresh cancels the older one, and state is written only after the last suspension point, so
+    // a cancelled or overlapping load can never leave a stale or half-applied result behind.
+    val refreshPrivateSpace: () -> Unit = remember {
+        {
+            refreshJob?.cancel()
+            refreshJob = scope.launch {
+                val locked = if (PrivateSpaceHelper.isEnabled(context, prefs)) {
+                    PrivateSpaceHelper.queryLocked(context)
+                } else {
+                    null
                 }
-            } else {
-                hasPrivateSpace = false
+                val apps = if (locked == false) {
+                    PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
+                } else {
+                    emptyList()
+                }
+                hasPrivateSpace = locked != null
+                isPrivateSpaceLocked = locked ?: true
+                privateApps.clear()
+                privateApps.addAll(apps)
             }
-        } catch (_: Exception) {
-            hasPrivateSpace = false
-            privateApps.clear()
         }
     }
 
-    DisposableEffect(Unit) {
-        if (false) {
-            onDispose {}
-        } else {
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(ctx: Context?, intent: Intent?) {
-                    if (!prefs.privateSpaceEnabled) return
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                        val profile = PrivateSpaceHelper.getPrivateSpaceProfile(context)
-                        if (profile != null) {
-                            val um = context.getSystemService(Context.USER_SERVICE) as UserManager
-                            isPrivateSpaceLocked = um.isQuietModeEnabled(profile)
-                            if (!isPrivateSpaceLocked) {
-                                scope.launch {
-                                    val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                                    privateApps.clear()
-                                    privateApps.addAll(pApps)
-                                }
-                            } else {
-                                privateApps.clear()
-                            }
-                        } else {
-                            isPrivateSpaceLocked = true
-                            privateApps.clear()
-                            hasPrivateSpace = false
-                        }
+    // A lock/unlock request only asks the system; it never decides what the UI shows. An unlock
+    // that needs credentials returns without changing anything (the system prompt is the feedback),
+    // so the outcome is used only to report a refused request, then the real state is re-read.
+    val onTogglePrivateSpace: () -> Unit = remember {
+        {
+            if (toggleJob?.isActive != true) {
+                toggleJob = scope.launch {
+                    val outcome = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                        PrivateSpaceHelper.togglePrivateSpace(context)
+                    } else {
+                        ToggleOutcome.FAILED
                     }
+                    if (outcome == ToggleOutcome.FAILED) {
+                        context.showToast(R.string.private_space_toggle_failed)
+                    }
+                    refreshPrivateSpace()
                 }
             }
-            val filter = IntentFilter().apply {
-                addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
-                addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
-                addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
-                if (Build.VERSION.SDK_INT >= 35) {
-                    addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
-                    addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
-                }
+        }
+    }
+
+    LaunchedEffect(Unit) { refreshPrivateSpace() }
+
+    // Profile broadcasts are deferred while the process is cached, so also re-query on resume.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refreshPrivateSpace() }
+
+    DisposableEffect(privateSpaceActive) {
+        // Nothing is registered below API 35 or when the feature is off, so there is nothing to
+        // unregister either.
+        if (!privateSpaceActive || Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return@DisposableEffect onDispose {}
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                refreshPrivateSpace()
             }
-            androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
-            onDispose {
-                context.unregisterReceiver(receiver)
-            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PROFILE_AVAILABLE)
+            addAction(Intent.ACTION_PROFILE_UNAVAILABLE)
+            addAction(Intent.ACTION_PROFILE_ACCESSIBLE)
+            addAction(Intent.ACTION_PROFILE_INACCESSIBLE)
+            addAction(Intent.ACTION_PROFILE_ADDED)
+            addAction(Intent.ACTION_PROFILE_REMOVED)
+        }
+        // Profile broadcasts come from the system, which still reaches a non-exported receiver.
+        androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose {
+            runCatching { context.unregisterReceiver(receiver) }
         }
     }
 
@@ -185,6 +208,10 @@ fun AppDrawerScreen(
             else list.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
         }
     }
+    // Derived from the unfiltered list so a search query never hides the settings action.
+    val privateSettingsEntry by remember {
+        derivedStateOf { privateApps.firstOrNull { PrivateSpaceHelper.isAddEntry(it) } }
+    }
     val showPrivateSpaceInSearch by remember {
         derivedStateOf {
             hasPrivateSpace && searchQuery.isNotBlank() &&
@@ -197,7 +224,29 @@ fun AppDrawerScreen(
         }
     }
 
-    ChildScreenBackHandler(onBack)
+    val hasPrivateSpaceSettings by remember {
+        derivedStateOf { privateSettingsEntry != null || PrivateSpaceHelper.isPrivateSpaceSupported(context) }
+    }
+    val onOpenPrivateSpaceSettings: () -> Unit = remember {
+        {
+            val entry = privateSettingsEntry
+            if (entry != null) {
+                onAppClick(entry)
+            } else {
+                try {
+                    context.startActivity(Intent("android.settings.PRIVATE_SPACE_SETTINGS").apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    })
+                } catch (_: Exception) {
+                    try {
+                        context.startActivity(Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        })
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -215,18 +264,10 @@ fun AppDrawerScreen(
                 onOpenSettings = onOpenSettings,
                 showPrivateSpaceControls = privateInSearchBar && hasPrivateSpace && prefs.privateSpaceEnabled,
                 isPrivateSpaceLocked = isPrivateSpaceLocked,
-                onTogglePrivateSpace = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                        scope.launch {
-                            PrivateSpaceHelper.togglePrivateSpace(context)
-                            isPrivateSpaceLocked = PrivateSpaceHelper.queryLocked(context) ?: !isPrivateSpaceLocked
-                        }
-                    }
-                },
-                onOpenPrivateSpaceSettings = {
-                    val addEntry = privateApps.firstOrNull { PrivateSpaceHelper.isAddEntry(it) }
-                    if (addEntry != null) onAppClick(addEntry)
-                }
+                onTogglePrivateSpace = onTogglePrivateSpace,
+                hasPrivateSpaceSettings = hasPrivateSpaceSettings,
+                onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings,
+                privateIconColor = privateIconColor
             )
 
             LaunchedEffect(Unit) {
@@ -250,25 +291,16 @@ fun AppDrawerScreen(
                 isPrivateSpaceLocked = isPrivateSpaceLocked,
                 hasPrivateSpace = hasPrivateSpace,
                 filteredPrivateApps = filteredPrivateApps,
+                settingsEntry = privateSettingsEntry,
+                hasPrivateSpaceSettings = hasPrivateSpaceSettings,
                 privateSpaceEnabled = prefs.privateSpaceEnabled,
                 appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
                 showBottomPrivateHeader = !privateInSearchBar,
                 onAppClick = onAppClick,
-                onTogglePrivateSpace = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                        scope.launch {
-                            PrivateSpaceHelper.togglePrivateSpace(context)
-                            isPrivateSpaceLocked = PrivateSpaceHelper.queryLocked(context) ?: !isPrivateSpaceLocked
-                            if (!isPrivateSpaceLocked) {
-                                val pApps = PrivateSpaceHelper.loadPrivateSpaceApps(context, prefs)
-                                privateApps.clear()
-                                privateApps.addAll(pApps)
-                            } else {
-                                privateApps.clear()
-                            }
-                        }
-                    }
-                }
+                onTogglePrivateSpace = onTogglePrivateSpace,
+                onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings,
+                privateIconColor = privateIconColor,
+                onCloseByPull = onBack
             )
         }
     }
@@ -283,7 +315,9 @@ private fun AppDrawerSearchBar(
     showPrivateSpaceControls: Boolean,
     isPrivateSpaceLocked: Boolean,
     onTogglePrivateSpace: () -> Unit,
-    onOpenPrivateSpaceSettings: () -> Unit
+    hasPrivateSpaceSettings: Boolean,
+    onOpenPrivateSpaceSettings: () -> Unit,
+    privateIconColor: HomeColor
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -319,23 +353,13 @@ private fun AppDrawerSearchBar(
                 )
             )
             if (showPrivateSpaceControls) {
-                IconButton(onClick = onTogglePrivateSpace) {
-                    Icon(
-                        imageVector = if (isPrivateSpaceLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
-                        contentDescription = stringResource(
-                            if (isPrivateSpaceLocked) R.string.unlock_private_space
-                            else R.string.lock_private_space
-                        ),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = onOpenPrivateSpaceSettings) {
-                    Icon(
-                        imageVector = Icons.Outlined.Shield,
-                        contentDescription = stringResource(R.string.private_space_settings),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                PrivateSpaceControls(
+                    isLocked = isPrivateSpaceLocked,
+                    hasSettings = hasPrivateSpaceSettings,
+                    onToggle = onTogglePrivateSpace,
+                    onOpenSettings = onOpenPrivateSpaceSettings,
+                    iconColor = privateIconColor
+                )
             }
             IconButton(onClick = onOpenSettings) {
                 Icon(
@@ -357,20 +381,41 @@ private fun ColumnScope.AppDrawerAppList(
     isPrivateSpaceLocked: Boolean,
     hasPrivateSpace: Boolean,
     filteredPrivateApps: List<AppModel>,
+    settingsEntry: AppModel?,
+    hasPrivateSpaceSettings: Boolean,
     privateSpaceEnabled: Boolean,
     appDrawerTextSizeScale: Float,
     showBottomPrivateHeader: Boolean,
     onAppClick: (AppModel) -> Unit,
-    onTogglePrivateSpace: () -> Unit
+    onTogglePrivateSpace: () -> Unit,
+    onOpenPrivateSpaceSettings: () -> Unit,
+    privateIconColor: HomeColor,
+    onCloseByPull: () -> Unit
 ) {
-    val addEntry = filteredPrivateApps.firstOrNull { PrivateSpaceHelper.isAddEntry(it) }
     val privateOnly = filteredPrivateApps.filterNot { PrivateSpaceHelper.isAddEntry(it) }
     val showPrivateSection = privateSpaceEnabled && hasPrivateSpace
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val density = LocalDensity.current
+    val closeLatest = rememberUpdatedState(onCloseByPull)
+    val scrollConnection = remember(density) {
+        DrawerScrollConnection(
+            closePullPx = with(density) { VoidDimens.drawerClosePull.toPx() },
+            closeVelocityPx = with(density) { VoidDimens.drawerCloseVelocity.toPx() },
+            onUserScroll = {
+                // Scrolling means browsing, not typing: the keyboard goes away even when it opened by itself.
+                keyboard?.hide()
+                focusManager.clearFocus()
+            },
+            onClose = { closeLatest.value() }
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
             .weight(1f)
+            .nestedScroll(scrollConnection)
             .padding(horizontal = VoidDimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
@@ -378,6 +423,7 @@ private fun ColumnScope.AppDrawerAppList(
             item(key = "private_search_result") {
                 AppDrawerPrivateSpaceSearchRow(
                     isLocked = isPrivateSpaceLocked,
+                    iconColor = privateIconColor,
                     onClick = onTogglePrivateSpace
                 )
                 VoidSectionDivider()
@@ -410,50 +456,30 @@ private fun ColumnScope.AppDrawerAppList(
         }
 
         if (showPrivateSection) {
-            if (showBottomPrivateHeader) {
-            item(key = "private_divider") {
-                VoidSectionDivider()
-            }
-            item(key = "private_header") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = VoidDimens.rowSpacing),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Shield,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(VoidDimens.rowSpacing))
-                    Text(
-                        text = stringResource(R.string.private_space),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onTogglePrivateSpace) {
-                        Icon(
-                            imageVector = if (isPrivateSpaceLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
-                            contentDescription = stringResource(
-                                if (isPrivateSpaceLocked) R.string.unlock_private_space
-                                else R.string.lock_private_space
-                            ),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (addEntry != null) {
-                        IconButton(onClick = { onAppClick(addEntry) }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Settings,
-                                contentDescription = stringResource(R.string.private_space_settings),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+            // Bottom placement: the header carries the controls. Search-bar placement: the controls sit
+            // next to the search field and the header only labels the private apps while they show.
+            if (showBottomPrivateHeader || !isPrivateSpaceLocked) {
+                item(key = "private_divider") {
+                    VoidSectionDivider()
                 }
-            }
+                item(key = "private_header") {
+                    PrivateSpaceHeader(
+                        iconColor = privateIconColor,
+                        controls = if (showBottomPrivateHeader) {
+                            {
+                                PrivateSpaceControls(
+                                    isLocked = isPrivateSpaceLocked,
+                                    hasSettings = hasPrivateSpaceSettings,
+                                    onToggle = onTogglePrivateSpace,
+                                    onOpenSettings = onOpenPrivateSpaceSettings,
+                                    iconColor = privateIconColor
+                                )
+                            }
+                        } else {
+                            null
+                        }
+                    )
+                }
             }
             if (!isPrivateSpaceLocked) {
                 itemsIndexed(
@@ -464,6 +490,7 @@ private fun ColumnScope.AppDrawerAppList(
                         app = app,
                         textSizeScale = appDrawerTextSizeScale,
                         isPrivate = true,
+                        privateIconColor = privateIconColor,
                         onClick = { onAppClick(app) }
                     )
                 }
@@ -477,6 +504,7 @@ private fun AppDrawerItem(
     app: AppModel,
     textSizeScale: Float,
     isPrivate: Boolean = false,
+    privateIconColor: HomeColor = HomeColor.Default,
     onClick: () -> Unit
 ) {
     Row(
@@ -500,8 +528,8 @@ private fun AppDrawerItem(
         if (isPrivate) {
             Icon(
                 imageVector = Icons.Outlined.Lock,
-                contentDescription = "Private App",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                contentDescription = stringResource(R.string.private_app),
+                tint = privateSpaceColors(privateIconColor).accent
             )
         }
     }
@@ -510,8 +538,10 @@ private fun AppDrawerItem(
 @Composable
 private fun AppDrawerPrivateSpaceSearchRow(
     isLocked: Boolean,
+    iconColor: HomeColor,
     onClick: () -> Unit
 ) {
+    val accent = privateSpaceColors(iconColor).accent
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -522,9 +552,9 @@ private fun AppDrawerPrivateSpaceSearchRow(
         Icon(
             imageVector = Icons.Outlined.Shield,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = accent
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(VoidDimens.rowSpacing))
         Column {
             Text(
                 text = stringResource(R.string.private_space),
@@ -532,7 +562,7 @@ private fun AppDrawerPrivateSpaceSearchRow(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (isLocked) "Tap to unlock" else "Tap to lock",
+                text = stringResource(if (isLocked) R.string.private_space_tap_to_unlock else R.string.private_space_tap_to_lock),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -541,9 +571,49 @@ private fun AppDrawerPrivateSpaceSearchRow(
         Icon(
             imageVector = if (isLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = accent
         )
     }
 }
 
 // ── Private Space helpers moved to PrivateSpaceHelper ──
+
+/**
+ * Hides the keyboard as soon as the user scrolls the list, and closes the drawer when the user pulls
+ * down past the top of the list: farther than [closePullPx], or released fast downward after pulling
+ * at the top. A fling that only reaches the top on its own never closes it, because only a drag at
+ * the top counts as a pull.
+ */
+internal class DrawerScrollConnection(
+    private val closePullPx: Float,
+    private val closeVelocityPx: Float,
+    private val onUserScroll: () -> Unit,
+    private val onClose: () -> Unit
+) : NestedScrollConnection {
+    private var pullPx = 0f
+
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source == NestedScrollSource.UserInput && available.y != 0f) onUserScroll()
+        return Offset.Zero
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        // Down movement the list could not use: the list is at its top and the finger keeps pulling.
+        if (source == NestedScrollSource.UserInput) {
+            pullPx = if (available.y > 0f) pullPx + available.y else 0f
+        }
+        return Offset.Zero
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity {
+        val pulled = pullPx
+        pullPx = 0f
+        if (shouldClose(pulled, available.y, closePullPx, closeVelocityPx)) onClose()
+        return Velocity.Zero
+    }
+
+    companion object {
+        fun shouldClose(pulledPx: Float, releaseVelocityY: Float, closePullPx: Float, closeVelocityPx: Float): Boolean =
+            pulledPx >= closePullPx || (pulledPx > 0f && releaseVelocityY >= closeVelocityPx)
+    }
+}
