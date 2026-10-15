@@ -20,12 +20,12 @@ This is the reading of the request "the next screen follows the gesture directio
 |---|---|---|---|
 | App drawer | `Bottom` | swipe up | swipe down |
 | Notification list | `Top` | swipe down | swipe up |
-| Panel assigned to the left swipe action | `Left` | finger moves right | finger moves left |
-| Panel assigned to the right swipe action | `Right` | finger moves left | finger moves right |
+| Panel assigned to **Swipe left** | `Right` | finger moves left | finger moves right |
+| Panel assigned to **Swipe right** | `Left` | finger moves right | finger moves left |
 | Settings | `None` | the settings icon in the drawer header | swipe down |
 | Home, unassigned panels | `None` | | |
 
-A panel assigned to both swipe actions takes the left edge (the left action wins). The notification list always enters from the top, even when a horizontal swipe opens it.
+Swipe sides are named after the finger, as on every Android surface: the content follows the finger in, and the screen closes by swiping back toward the edge it came from. An app opened by a swipe (window animation on Android 11 and earlier, Home's departure on 12 and later) uses the same edge. Preferences saved under the old edge-based naming are migrated once (`SwipeSideMigration`), so every gesture keeps its action. A panel assigned to both swipes takes the right edge (Swipe left wins). The notification list always enters from the top, even when a horizontal swipe opens it.
 
 Settings is reachable only from the drawer today (`HomeScreen.onOpenSettings` is declared and wired but never called), so the screen under Settings is always the drawer, never Home. Every other panel closes as the table says; Notes has no exception: it closes like any panel from its edge. What changed is the note row. A row is a swipe-to-dismiss box that deletes the note for good and consumes the drag first, so a swipe that closes Notes with a finger over a note would delete it. The delete swipe therefore goes the other way from the close swipe (`noteDeleteFromStartToEnd` in `NotesScreen.kt`): Notes on the left swipe closes with a swipe left, so there a note is deleted with a swipe right; on the right swipe it closes with a swipe right and a note is deleted with a swipe left. Start and end flip in right-to-left layouts, the close swipe does not, and the function takes that into account.
 
