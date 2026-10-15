@@ -28,6 +28,7 @@
 - Swipe settings are named after the finger ("Swipe left" moves the finger left and opens content from the right edge); stored settings are migrated once so every gesture keeps its action; the non-functional "Accessibility action" is no longer offered
 - Notes are Expressive segmented cards (same family as Settings), split into active and completed groups
 - Compose BOM 2025.05.01 → 2026.09.00 (Compose 1.12), material3 pinned to 1.5.0-beta01; `ui-text-google-fonts` follows the BOM; `resourceConfigurations` replaced by `androidResources.localeFilters`
+- Dependabot updates: bump AGP to 9.4.1, Gradle wrapper to 9.8.1, `androidx.core:core-ktx` to 1.19.1, and `androidx.navigation:navigation-compose` to 2.10.2
 - Settings regrouped: Appearance (font, system display and wallpaper, status bar), Home screen (live preview, Layout, Clock & date, Home apps), App drawer (app list, Private Space), Gestures & motion, Features, Permissions; the search index follows the new groups and the visible labels moved to string resources
 - Private Space controls are one component in both placements: a tonal pill with the lock toggle and, while unlocked, a shield-badged settings action that slides in inside the pill, so unlocking no longer shifts the search bar and the action no longer looks like the launcher-settings gear; with the search-bar placement the private apps keep a labelled section
 - Home and the Settings previews share one set of text styles and spacing math, so the preview draws exactly what Home draws (it used other sizes, weights and a different spacing formula)
