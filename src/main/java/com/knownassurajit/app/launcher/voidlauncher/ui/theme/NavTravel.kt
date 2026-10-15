@@ -51,16 +51,17 @@ fun shouldPopPanel(panelIsTop: Boolean, hasEntryBelow: Boolean): Boolean = panel
 object PanelOrigin {
     /**
      * The drawer rises from the bottom, the notification list drops from the top, and Settings
-     * has no edge. The panel assigned to the left swipe action enters from the left (the finger
-     * moves right), the one assigned to the right swipe action from the right. A destination
-     * assigned to both sides enters from the left. Anything else, Home included, has no edge.
+     * has no edge. The panel assigned to the left swipe (the finger moves left) enters from the
+     * right edge and follows the finger; the one assigned to the right swipe enters from the left.
+     * A destination assigned to both sides enters from the right. Anything else, Home included, has
+     * no edge.
      */
     fun resolve(route: NavRouteKind?, leftRoute: NavRouteKind?, rightRoute: NavRouteKind?): PanelEdge = when {
         route == NavRouteKind.AppDrawer -> PanelEdge.Bottom
         route == NavRouteKind.NotificationPanel -> PanelEdge.Top
         route == NavRouteKind.Settings -> PanelEdge.None
-        route != null && route == leftRoute -> PanelEdge.Left
-        route != null && route == rightRoute -> PanelEdge.Right
+        route != null && route == leftRoute -> PanelEdge.Right
+        route != null && route == rightRoute -> PanelEdge.Left
         else -> PanelEdge.None
     }
 }
