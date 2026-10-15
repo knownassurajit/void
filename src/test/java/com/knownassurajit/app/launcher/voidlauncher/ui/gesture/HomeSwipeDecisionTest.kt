@@ -114,19 +114,19 @@ class HomeSwipeDecisionTest {
     ) = HomeSwipeSettings(gestures, swipeDown, left, right, leftApp, rightApp, flags)
 
     @Test
-    fun targetFor_leftEdgeIsTheLeftActionAndRightEdgeIsTheRightAction() {
-        // Swiping from right edge brings the screen from left to right (PanelEdge.Left)
-        // Swiping from left edge brings the screen from right to left (PanelEdge.Right)
+    fun targetFor_theLeftSwipeBringsContentFromTheRightAndTheRightSwipeFromTheLeft() {
+        // Sides are named after the finger: a swipe left (content from the right edge) runs the left action.
         val s = settings()
-        assertEquals(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Right), s.targetFor(PanelEdge.Left))
-        assertEquals(SwipeTarget.Panel(NavRouteKind.Widgets, PanelEdge.Left), s.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Right), s.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.Panel(NavRouteKind.Widgets, PanelEdge.Left), s.targetFor(PanelEdge.Left))
     }
 
     @Test
-    fun targetFor_eachSideUsesItsOwnAppAndIsLaunchedFromItsOwnEdge() {
+    fun targetFor_anAppComesInFromTheSideTheFingerBringsItFrom() {
+        // Regression: a swipe right launched the app (and sent Home) toward the opposite edge, against the finger.
         val s = settings(left = SwipeAction.APP, right = SwipeAction.APP)
-        assertEquals(SwipeTarget.App("left.app", PanelEdge.Right), s.targetFor(PanelEdge.Left))
-        assertEquals(SwipeTarget.App("right.app", PanelEdge.Left), s.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.App("left.app", PanelEdge.Right), s.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.App("right.app", PanelEdge.Left), s.targetFor(PanelEdge.Left))
     }
 
     @Test
