@@ -23,6 +23,7 @@ local.properties
 *.apk
 *.aab
 output.json
+release/
 
 # Signing / Keystore
 *.jks
@@ -64,6 +65,7 @@ fastlane/test_output
 /*.zip
 /*.tar.gz
 /*.rar
+/sync-branches.sh
 
 # ── Always Track ──
 !.gitignore
