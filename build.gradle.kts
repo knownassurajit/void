@@ -1,30 +1,33 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.knownassurajit.app.launcher.voidlauncher"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.knownassurajit.app.launcher.voidlauncher"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
 
         // Deterministic versioning formula
         val major = 0
         val minor = 0
         val patch = 0
-        val build = 10
+        val build = 11
         
         versionCode = major * 1_000_000 + minor * 10_000 + patch * 100 + build
         versionName = "$major.$minor.$patch.$build"
 
-        resourceConfigurations += listOf("en", "ar", "de", "es-rES", "es-rUS", "fr", "he", "hr", "hu", "in", "it", "ja", "nl", "pl", "pt-rBR", "ru-rRU", "sv", "tr", "uk", "zh")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Replaces the deprecated defaultConfig.resourceConfigurations (removed in a future AGP).
+    androidResources {
+        localeFilters += listOf("en", "ar", "de", "es-rES", "es-rUS", "fr", "he", "hr", "hu", "in", "it", "ja", "nl", "pl", "pt-rBR", "ru-rRU", "sv", "tr", "uk", "zh")
     }
 
     compileOptions {
@@ -32,8 +35,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
     }
 
     buildTypes {

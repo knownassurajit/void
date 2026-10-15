@@ -49,6 +49,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 
 @Composable
 fun NotificationsScreen(
@@ -58,28 +59,12 @@ fun NotificationsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val listenerEnabled = FeatureAvailability.isNotificationListenerEnabled(context)
 
-    // A lightweight vertical swipe affordance lets users return without an explicit back button.
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragEnd = {
-                        if (dragOffset.y < -180f && abs(dragOffset.y) > abs(dragOffset.x)) {
-                            onBack()
-                        }
-                        dragOffset = Offset.Zero
-                    },
-                    onDragCancel = { dragOffset = Offset.Zero },
-                    onDrag = { _, dragAmount ->
-                        dragOffset += dragAmount
-                    }
-                )
-            }
+            .screenBackSwipe(onBack)
     ) {
     Column(
         modifier = Modifier

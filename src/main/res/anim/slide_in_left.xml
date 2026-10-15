@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    The app a Home swipe launches comes in from the left edge over its whole width
+    (LaunchAnimation.FromLeft), while Home leaves to the right (slide_out_right). Played by the
+    system, so the in-app animation speed does not scale it, only the system animation scale does.
+    All eight slide_* files share the duration and the interpolator.
+-->
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:shareInterpolator="false">
     <translate
         android:fromXDelta="-100%p"
         android:toXDelta="0"
-        android:duration="280"
-        android:interpolator="@android:interpolator/fast_out_slow_in" />
-    <alpha
-        android:fromAlpha="0.9"
-        android:toAlpha="1.0"
-        android:duration="280"
-        android:interpolator="@android:interpolator/fast_out_slow_in" />
+        android:duration="300"
+        android:interpolator="@interpolator/emphasized_decelerate" />
 </set>

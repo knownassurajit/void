@@ -5,13 +5,16 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationManagerCompat
+import com.knownassurajit.app.launcher.voidlauncher.data.font.GoogleFontsProvider
 
 /**
  * Runtime capability gates for the single-variant OSS build.
  * These are not Play Store SKU stubs — they reflect device/OS/permission readiness.
  */
 object FeatureAvailability {
+    private const val TAG = "FeatureAvailability"
 
     fun isWidgetsAvailable(context: Context): Boolean {
         return try {
@@ -52,6 +55,29 @@ object FeatureAvailability {
         } catch (_: Exception) {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
         }
+    }
+
+    /**
+     * Downloadable fonts need the Google Play services font provider. Without it (no Play services, a stripped
+     * ROM) the Google Fonts families are hidden and the bundled ones keep working. Signature checks happen when a
+     * font is actually requested and surface as a failed load.
+     */
+    fun isGoogleFontsProviderAvailable(context: Context): Boolean = GoogleFontsProvider.isAvailable(
+        ownerOf = { googleFontsProviderOwner(context.packageManager) },
+        onError = { Log.w(TAG, "font_provider_check_failed reason=${it.javaClass.simpleName}") }
+    )
+
+    private fun googleFontsProviderOwner(packageManager: PackageManager): String? {
+        val provider = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            packageManager.resolveContentProvider(
+                GoogleFontsProvider.AUTHORITY,
+                PackageManager.ComponentInfoFlags.of(0)
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.resolveContentProvider(GoogleFontsProvider.AUTHORITY, 0)
+        }
+        return provider?.packageName
     }
 
     fun isUsageAccessGranted(context: Context): Boolean {

@@ -54,3 +54,19 @@ val VoidInverseOnSurface = Color(0xFF1A1A1A)
 val VoidInversePrimary = Color(0xFF333333)
 
 val VoidScrim = Color(0xFF000000)
+
+// Color picker presets: light tones that stay legible on VOID's black surfaces.
+val VoidColorPresets: List<Color> = listOf(
+    Color(0xFFFFFFFF),
+    Color(0xFFE0E0E0),
+    Color(0xFF9E9E9E),
+    Color(0xFFFFE0B2),
+    Color(0xFFEF9A9A),
+    Color(0xFFFFCC80),
+    Color(0xFFFFF59D),
+    Color(0xFFA5D6A7),
+    Color(0xFF80CBC4),
+    Color(0xFF90CAF9),
+    Color(0xFFB39DDB),
+    Color(0xFFF48FB1)
+)

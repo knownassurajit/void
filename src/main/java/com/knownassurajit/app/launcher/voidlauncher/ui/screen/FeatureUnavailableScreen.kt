@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +30,7 @@ fun FeatureUnavailableScreen(
     onBack: () -> Unit
 ) {
     Scaffold(
+        modifier = Modifier.screenBackSwipe(onBack),
         topBar = {
             TopAppBar(
                 title = { Text(title) },

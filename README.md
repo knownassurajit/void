@@ -30,11 +30,15 @@
 - **Text-Only Home Screen**: Pin up to 10 of your most essential apps as clean text labels. No icons, no distractions.
 - **Smart Notification Grouping**: A dedicated screen that groups system notifications by app with smart summaries, categorized by conversation.
 - **On-Device AI Summarization**: Uses Gemini Nano (via ML Kit) to summarize your notifications locally, ensuring privacy and speed.
-- **Integrated Quick Notes**: Fast, text-based checklist for capturing thoughts instantly with priority ordering and reminders.
+- **Integrated Quick Notes**: Fast, text-based checklist with stars, reminders and undoable swipe-to-delete; long-press a note for edit, reminder, copy, share and delete.
+- **Widget Grid**: Hold a widget in the picker and drag it onto a 4-column grid; move and resize pinned widgets in whole cells without overlaps.
+- **Granular Home Styling**: Per-block (clock, home apps) size, weight, any color (spectrum picker, hex codes, theme colors) and opacity, plus spacing, side margins and the clock/apps split, with a live preview in Settings.
+- **Material 3 Expressive**: Expressive theme, motion, shapes and type; segmented Settings and Notes; connected button groups.
 - **Deep Android 15 Integration**: Full support for Private Space, allowing you to access hidden and secure apps directly from the drawer.
 - **Digital Wellbeing**: Screen time and unlock counts are integrated directly into the home screen for at-a-glance awareness.
-- **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions.
-- **Modern UI**: Built with 100% Jetpack Compose and Material 3, providing smooth animations and dynamic theme support.
+- **Fluid Gestures**: Swipe up for apps, swipe down for the in-app notification list (toggle in Settings), and custom left/right actions. Panels move the way you swipe: swipe right and the panel slides in from the left edge, swipe up and the drawer rises from the bottom, while Home follows your finger and moves the same way underneath. Letting go after 56 dp or a quick flick opens it, moving back cancels it, swipes that start right at a screen edge work, and an app set as a swipe action opens at once while Home carries the swipe on, pushed aside and dimmed (Android 11 and earlier also slide the app in from the same side). Motion uses Material 3 spring physics that the animation-speed setting scales. The system back gesture (Android 14+) shows the Material predictive-back preview on every screen, and a swipe inside a screen toward its edge also leaves it (56 dp or a quick flick). See [`docs/architecture/motion.md`](docs/architecture/motion.md).
+- **Modern UI**: Built with 100% Jetpack Compose and Material 3. Choose from 36 launcher fonts in a searchable picker: six bundled families that work offline (Google Sans default, DM Sans, Geist, Inter, Manrope, Plus Jakarta Sans), 29 Google Fonts families downloaded on demand by Google Play services (Poppins, Work Sans, Karla, Raleway, Inconsolata, Roboto, Source Serif 4, and more), and the system font. See [`docs/features/fonts.md`](docs/features/fonts.md).
+- **Searchable settings**: Grouped Look / Home / App library / Gestures & motion / Features / Permissions, with animation speed and content swipe-to-back.
 
 ---
 
@@ -45,11 +49,11 @@ Navigate your device with a simple, gesture-based mental model:
 ```mermaid
 graph TD
     A[Home Screen] -- Swipe Up --> B[App Drawer]
-    A -- Long Press --> C[Settings]
-    A -- Swipe Left --> D[Custom Action: Notes/Widgets]
-    A -- Swipe Right --> E[Custom Action: Summary/Notes]
+    A -- Swipe Left (finger moves left) --> D[Custom Action, enters from the right]
+    A -- Swipe Right (finger moves right) --> E[Custom Action, enters from the left]
     A -- Double Tap --> F[Lock Screen]
-    C -- Back --> A
+    B -- Settings icon --> C[Settings]
+    C -- Back --> B
     B -- Click App --> G[Launch App]
     B -- Back --> A
 ```
@@ -102,7 +106,38 @@ Output APKs land under `build/outputs/apk/debug/` or `build/outputs/apk/release/
 
 See [`docs/`](docs/) for architecture, features, settings, testing guides, and bug fix notes.
 
+### Known limitations
+
+- **Downloadable fonts need Google Play services.** The 29 Google Fonts families are fetched by the Play services font provider, not by VOID's own code. Without it, or offline before the first download, those families are unavailable and the picker says so; the six bundled families and the system font always work. A saved downloadable font renders in the default font until its download has finished in the current session.
+- **Swipes inside a screen only close it from regions that do not scroll or slide.** A swipe toward a screen's edge closes it from headers, gaps and empty areas, but the drawer, the notification list and Settings lists scroll instead, and a note row slides to delete. The system back gesture (a preview of the screen underneath on Android 14+), the Back key and TalkBack's back or Dismiss action are the reliable ways out of scrolling screens. See [`docs/architecture/motion.md`](docs/architecture/motion.md).
+- **The launch animation of a swipe app depends on the Android version.** On Android 12 and later the app's own entrance animation is system-owned and a third-party launcher cannot choose its direction (the public API has no way to; a custom window animation is ignored for a launch in a new task), so an app opened by a swipe uses the system's own animation there; VOID starts the launch the moment you let go and Home keeps moving in the direction of the swipe, pushed aside and dimmed, until the app takes over. Android 11 and earlier slide the app in from the side of the swipe. See [`docs/architecture/motion.md`](docs/architecture/motion.md).
+- **Edge-origin swipes depend on the system.** A swipe that starts right at a screen edge reaches VOID because Home asks the system to leave those strips to it (`systemGestureExclusion`). Android grants this for the home activity (VOID as the default launcher) and may still relax it, and some OEM gesture implementations ignore it; a swipe the system keeps arrives cancelled and does nothing, while a swipe starting a little further in always works. The panel itself appears on release, not under the finger: Home follows the finger and the panel springs in after the commit. See [`docs/architecture/motion.md`](docs/architecture/motion.md).
+- Six requested names (Brogman, Volkga, Disttopian, Stanza, Vangura Sans, Noria) are commercial or personal-use fonts and are not offered; see [`docs/features/fonts.md`](docs/features/fonts.md) for alternatives.
+
 > **Note:** The former `integrated` / `disintegrated` product flavors were removed. VOID ships as one OSS build with runtime capability gates. See [`docs/architecture/flavor-decision.md`](docs/architecture/flavor-decision.md).
+
+---
+
+## 🔄 CI/CD
+
+Three workflows cover the branch pipeline, each scoped to a single concern:
+
+| File | Trigger | Purpose |
+|---|---|---|
+| `.github/workflows/ci-cd.yml` | push to `develop`/`master`, PRs targeting `master` | develop/master pipeline (see below) |
+| `.github/workflows/stage.yml` | push to `stage` | debug build → GitHub pre-release (unchanged, split out verbatim from the old `build.yml`) |
+
+**`ci-cd.yml` jobs:**
+- **`test`** — `testDebugUnitTest` + `lintDebug`, containerized (`eclipse-temurin:17-jdk-jammy`). Runs on every push to `develop`/`master` and on every pull request targeting `master`.
+- **`debug-release`** (push to `develop` only, needs `test`) — re-runs tests/lint, then builds and uploads a debug APK as a GitHub pre-release tagged `develop-v$version-$run_number`.
+- **`pr-summary`** (pull requests targeting `master`, needs `test`) — re-runs checks and posts a `$GITHUB_STEP_SUMMARY` plus a sticky PR comment with test/lint results and a changelog preview since the last stable release tag.
+- **`stable-release`** (push to `master` only, needs `test`) — **the single release path**: unit tests + lint, `assembleRelease` + `bundleRelease`, signs via `r0adkll/sign-android-release@v1` (the only signing step — no unused keystore-decode step), renames to `void-release-v$version.{apk,aab}`, creates/pushes a `release/void/$version` branch for rollback tracking, publishes a GitHub stable release tagged `v$version`, and optionally publishes to the Google Play internal track.
+
+Jobs run inside `container: image: eclipse-temurin:17-jdk-jammy`; each job installs `unzip`/`curl`/`git` via `apt-get` and sets up the Android SDK with `android-actions/setup-android@v3` before invoking Gradle.
+
+**Google Play publishing** is gated on `secrets.PLAY_CONSOLE_JSON` being present. This fixes a bug in the old `play-release.yml`, which gated on `env.PLAY_CONSOLE_JSON != ''` — an env var that was never actually set before that condition was evaluated, making the gate either a permanent no-op or (if evaluated differently) capable of firing an unintended production Play publish on every push to `develop`. The fixed workflow resolves the secret in an earlier `play_console_check` step (a step's own `env:` is visible to its `run:`, just not to its own `if:`) and downstream steps gate on that step's output, so the Play publish step is a safe no-op with no `PLAY_CONSOLE_JSON` secret configured, and only runs on push to `master` when it is.
+
+Required secrets for `stable-release`: `SIGNING_KEY`, `ALIAS`, `KEY_STORE_PASSWORD`, `KEY_PASSWORD` (APK/AAB signing, required), `PLAY_CONSOLE_JSON` (optional — enables Play Console publish).
 
 ---
 
@@ -121,7 +156,7 @@ VOID is a heavily restructured and modernized fork of **Olauncher**. We credit t
 
 - **License**: This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html).
 - **Original Base**: [Olauncher](https://github.com/tanujnotes/olauncher) by Tanuj.
-- **Typography**: Inter (RSMS) and Google Sans.
+- **Typography**: all six bundled families are under the SIL Open Font License 1.1, with the copyright notice kept in each font file: Google Sans (Copyright 2025 The Google Sans Project Authors), DM Sans (Copyright 2014 The DM Sans Project Authors, https://github.com/googlefonts/dm-fonts), Geist (Copyright 2024 The Geist Project Authors, https://github.com/vercel/geist-font), Inter (Copyright 2016 The Inter Project Authors), Manrope (Copyright 2019 The Manrope Project Authors, https://github.com/sharanda/manrope), and Plus Jakarta Sans (Copyright 2020 The Plus Jakarta Sans Project Authors, https://github.com/tokotype/PlusJakartaSans). The bundled Google Sans is a Latin/Cyrillic variable subset of the Google Fonts release and Geist is the unmodified upstream variable font (see [`docs/features/fonts.md`](docs/features/fonts.md); licence texts in [`docs/licenses/fonts/`](docs/licenses/fonts/)). The downloadable families come from Google Fonts, are licensed under the OFL by their authors, and are delivered by Google Play services; they are not part of the APK.
 - **Icons**: Material Symbols (Google).
 
 ---
