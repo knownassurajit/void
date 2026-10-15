@@ -41,8 +41,8 @@ data class SwipeFeatureFlags(val notes: Boolean, val widgets: Boolean, val notif
 
 /**
  * What the swipe [action] assigned to a side does when the finger moves so that content comes in
- * from [edge] (the left action: from the left, with the finger moving right). [appPackage] is the
- * app chosen for that side.
+ * from [edge] (the left swipe: the finger moves left, content comes in from the right). [appPackage]
+ * is the app chosen for that side.
  *
  * A panel action is nothing while its feature is off. `ACCESSIBILITY` and unknown values are
  * nothing too: the picker offers the first, but no code runs it yet.
@@ -70,14 +70,16 @@ data class HomeSwipeSettings(
     val flags: SwipeFeatureFlags
 ) {
     /**
-     * What a drag that brings content in from [edge] opens: the left action for the left edge (the
-     * finger moves right), the right action for the right edge (the finger moves left), the drawer
-     * from the bottom (swipe up) and the notification list from the top (swipe down).
+     * What a drag that brings content in from [edge] opens. Sides are named after the finger, as on
+     * every Android surface: "swipe left" moves the finger left, so its content comes in from the
+     * right edge and follows the finger; "swipe right" brings content in from the left edge. The
+     * target keeps that same [edge], so the panel, an app's launch animation and Home's departure all
+     * move with the finger. Swipe up opens the drawer from the bottom, swipe down the notifications.
      */
     fun targetFor(edge: PanelEdge): SwipeTarget = when (edge) {
-        PanelEdge.Left ->
-            if (gesturesEnabled) resolveSwipe(leftAction, PanelEdge.Right, flags, leftAppPackage) else SwipeTarget.None
         PanelEdge.Right ->
+            if (gesturesEnabled) resolveSwipe(leftAction, PanelEdge.Right, flags, leftAppPackage) else SwipeTarget.None
+        PanelEdge.Left ->
             if (gesturesEnabled) resolveSwipe(rightAction, PanelEdge.Left, flags, rightAppPackage) else SwipeTarget.None
         PanelEdge.Bottom -> SwipeTarget.Panel(NavRouteKind.AppDrawer, edge)
         PanelEdge.Top -> if (swipeDownEnabled) SwipeTarget.Notifications else SwipeTarget.None
@@ -312,40 +314,3 @@ object GestureEdgeStrip {
         max(systemGestureInsetPx, VoidDimens.edgeExclusionMinWidth.value * density) +
             VoidDimens.edgeExclusionMargin.value * density
 }
-
-fun homeSwipeSettings(
-    state: com.knownassurajit.app.launcher.voidlauncher.MainUiState,
-    leftAppPackage: String,
-    rightAppPackage: String,
-    flags: SwipeFeatureFlags
-): HomeSwipeSettings = HomeSwipeSettings(
-    gesturesEnabled = state.enableGestures,
-    swipeDownEnabled = state.enableSwipeDownNotifications,
-    leftAction = state.leftSwipeAction,
-    rightAction = state.rightSwipeAction,
-    leftAppPackage = leftAppPackage,
-    rightAppPackage = rightAppPackage,
-    flags = flags
-)
-
-fun dispatchSwipeTarget(
-    target: SwipeTarget,
-    onOpenApps: () -> Unit,
-    onOpenNotificationSummary: () -> Unit,
-    onOpenWidgets: () -> Unit,
-    onOpenNotes: () -> Unit,
-    onOpenNotifications: () -> Unit,
-    onLaunchApp: (packageName: String, edge: PanelEdge) -> Boolean
-): Boolean = when (target) {
-    is SwipeTarget.Panel -> when (target.route) {
-        NavRouteKind.AppDrawer -> { onOpenApps(); true }
-        NavRouteKind.NotificationSummary -> { onOpenNotificationSummary(); true }
-        NavRouteKind.Widgets -> { onOpenWidgets(); true }
-        NavRouteKind.Notes -> { onOpenNotes(); true }
-        else -> false
-    }
-    SwipeTarget.Notifications -> { onOpenNotifications(); true }
-    is SwipeTarget.App -> onLaunchApp(target.packageName, target.edge)
-    SwipeTarget.None -> false
-}
-

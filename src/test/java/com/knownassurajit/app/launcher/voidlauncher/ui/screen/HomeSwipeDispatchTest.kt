@@ -4,8 +4,6 @@ import com.knownassurajit.app.launcher.voidlauncher.MainUiState
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeFeatureFlags
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeTarget
-import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.dispatchSwipeTarget
-import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.homeSwipeSettings
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import org.junit.Assert.assertEquals
@@ -90,8 +88,8 @@ class HomeSwipeDispatchTest {
             rightAppPackage = "right.app",
             flags = flags
         )
-        assertEquals(SwipeTarget.App("left.app", PanelEdge.Right), settings.targetFor(PanelEdge.Left))
-        assertEquals(SwipeTarget.App("right.app", PanelEdge.Left), settings.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.App("left.app", PanelEdge.Right), settings.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.App("right.app", PanelEdge.Left), settings.targetFor(PanelEdge.Left))
     }
 
     @Test
@@ -107,9 +105,9 @@ class HomeSwipeDispatchTest {
             rightAppPackage = "",
             flags = flags
         )
-        assertEquals(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Right), settings.targetFor(PanelEdge.Left))
+        assertEquals(SwipeTarget.Panel(NavRouteKind.Notes, PanelEdge.Right), settings.targetFor(PanelEdge.Right))
         // Widgets is switched off in the flags.
-        assertEquals(SwipeTarget.None, settings.targetFor(PanelEdge.Right))
+        assertEquals(SwipeTarget.None, settings.targetFor(PanelEdge.Left))
         // Swipe down has its own switch.
         assertEquals(SwipeTarget.None, settings.targetFor(PanelEdge.Top))
         assertEquals(SwipeTarget.Panel(NavRouteKind.AppDrawer, PanelEdge.Bottom), settings.targetFor(PanelEdge.Bottom))

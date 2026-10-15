@@ -9,14 +9,8 @@ import android.provider.CalendarContract
 import android.view.Gravity
 import android.widget.Toast
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.drag
-import androidx.compose.ui.input.pointer.positionChange
-import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,14 +87,27 @@ import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppSlot
 import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppsCap
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
-import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
 import com.knownassurajit.app.launcher.voidlauncher.helper.HomeLayoutHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.HomeReorderHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.getAppsList
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeEdgeExclusionStrips
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeGate
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeRestore
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeSettings
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.HomeSwipeState
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeFeatureFlags
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeTarget
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.homeSwipe
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.homeSwipeOffset
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.rememberVoidMotionScheme
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeColor
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.resolve
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import androidx.activity.compose.BackHandler
 
 // ── Alignment helpers ──
@@ -211,20 +218,20 @@ private fun openScreenTimeDestination(context: android.content.Context) {
 @Composable
 fun HomeScreen(
     state: MainUiState,
-    isCurrentDestination: Boolean = true,
+    swipeGate: HomeSwipeGate = HomeSwipeGate.Open,
     onOpenApps: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenNotificationSummary: () -> Unit,
     onOpenWidgets: () -> Unit,
     onOpenNotes: () -> Unit,
+    onLaunchSwipeApp: (packageName: String, enterFrom: PanelEdge) -> Boolean,
     onAppClick: (HomeApp) -> Unit,
     onClockClick: () -> Unit,
     onDateClick: () -> Unit,
     onHomeAppsChanged: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val density = LocalDensity.current
     val prefs = remember { Prefs.get(context) }
     val haptic = LocalHapticFeedback.current
     val clockAlign = remember(state.clockHorizontalAlignment) { gravityToAlignment(state.clockHorizontalAlignment) }
@@ -236,81 +243,58 @@ fun HomeScreen(
     val appTextAlign = remember(state.appHorizontalAlignment) { gravityToTextAlign(state.appHorizontalAlignment) }
 
     // ── Swipe gesture state ──
-    val swipeThreshold = 120f
     var showAppPicker by remember { mutableStateOf(false) }
 
     var isDraggingGlobal by remember { mutableStateOf(false) }
     val isDraggingGlobalLatest = rememberUpdatedState(isDraggingGlobal)
-    val swipeDownEnabledLatest = rememberUpdatedState(state.enableSwipeDownNotifications)
+    val latestState = rememberUpdatedState(state)
+    val swipeState = remember { HomeSwipeState() }
+    val motion = rememberVoidMotionScheme(state.animationSpeed)
+
+    // Swipes start only while Home is the screen on top and nothing moves it (see HomeSwipeGate).
+    val swipesActive = swipeGate.isOpen
+    // The edge strips are asked for again whenever Home becomes the current screen, so a change made in
+    // Settings (a swipe app, a feature switch) is picked up; the gesture itself reads the preferences afresh.
+    val edgeSettings = remember(
+        swipesActive,
+        state.leftSwipeAction,
+        state.rightSwipeAction,
+        state.enableGestures,
+        state.enableSwipeDownNotifications
+    ) { homeSwipeSettings(state, prefs) }
 
     // Consume back press only while home is the current destination.
-    BackHandler(enabled = isCurrentDestination) { /* home is the root */ }
+    BackHandler(enabled = swipeGate.isOnTop) { /* home is the root */ }
+
+    HomeSwipeRestore(state = swipeState, gate = swipeGate, motion = motion)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
-            // Stable keys — do NOT key on isDraggingGlobal (restarts cancel child reorder).
-            // Yield to long-press (reorder / picker) instead of consuming the pointer immediately.
-            .pointerInput(
-                state.leftSwipeAction,
-                state.rightSwipeAction,
-                state.enableGestures,
-                state.enableSwipeDownNotifications
-            ) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    if (isDraggingGlobalLatest.value) {
-                        return@awaitEachGesture
-                    }
-                    val edge = with(density) { 24.dp.toPx() }
-                    val atSystemEdge = down.position.x < edge || down.position.x > size.width - edge
-                    val slop = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis.toLong()) {
-                        awaitTouchSlopOrCancellation(down.id) { change, _ ->
-                            if (!atSystemEdge) change.consume()
-                        }
-                    }
-                    if (slop == null || isDraggingGlobalLatest.value) {
-                        return@awaitEachGesture
-                    }
-                    var total = slop.positionChange()
-                    drag(slop.id) { change ->
-                        if (isDraggingGlobalLatest.value) return@drag
-                        total += change.positionChange()
-                        if (!atSystemEdge) change.consume()
-                    }
-                    if (isDraggingGlobalLatest.value) return@awaitEachGesture
-                    val absX = abs(total.x)
-                    val absY = abs(total.y)
-                    if (atSystemEdge && absX > absY) {
-                        return@awaitEachGesture
-                    }
-                    if (absX > swipeThreshold || absY > swipeThreshold) {
-                        if (absX > absY) {
-                            if (state.enableGestures) {
-                                if (total.x > 0) {
-                                    dispatchSwipeAction("left", state.leftSwipeAction, context, prefs,
-                                        onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
-                                } else {
-                                    dispatchSwipeAction("right", state.rightSwipeAction, context, prefs,
-                                        onOpenNotificationSummary, onOpenWidgets, onOpenNotes, onOpenNotifications)
-                                }
-                            }
-                        } else {
-                            if (total.y > 0) {
-                                if (swipeDownEnabledLatest.value) {
-                                    onOpenNotifications()
-                                }
-                            } else {
-                                onOpenApps()
-                            }
-                        }
-                    }
+            // Chained after the padding, so a swipe never starts in the status or navigation bar area.
+            // Home itself does not move under the finger: only the content below follows it.
+            .homeSwipe(
+                state = swipeState,
+                gate = swipeGate,
+                motion = motion,
+                isReordering = { isDraggingGlobalLatest.value },
+                targetFor = { edge -> homeSwipeSettings(latestState.value, prefs).targetFor(edge) },
+                onCommit = { target ->
+                    dispatchSwipeTarget(
+                        target = target,
+                        onOpenApps = onOpenApps,
+                        onOpenNotificationSummary = onOpenNotificationSummary,
+                        onOpenWidgets = onOpenWidgets,
+                        onOpenNotes = onOpenNotes,
+                        onOpenNotifications = onOpenNotifications,
+                        onLaunchApp = onLaunchSwipeApp
+                    )
                 }
-            }
+            )
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().homeSwipeOffset(swipeState)) {
             val clockEnabled = state.showClock || state.showDate ||
                 (state.showScreenTime && state.screenTime.isNotBlank())
             val appsEnabled = state.showHomeApps
@@ -357,7 +341,7 @@ fun HomeScreen(
             @Composable
             fun Divider() {
                 HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = VoidDimens.screenPadding),
+                    modifier = Modifier.padding(horizontal = state.homeSidePaddingDp.dp),
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f)
                 )
@@ -373,6 +357,11 @@ fun HomeScreen(
                 if (appsEnabled) Apps()
             }
         }
+
+        HomeEdgeExclusionStrips(
+            left = swipesActive && edgeSettings.targetFor(PanelEdge.Left) != SwipeTarget.None,
+            right = swipesActive && edgeSettings.targetFor(PanelEdge.Right) != SwipeTarget.None
+        )
     }
 
     // ── App picker sheet ──
@@ -423,24 +412,25 @@ private fun ColumnScope.HomeClockSection(
                         else -> Alignment.Center
                     }
                 )
-                .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing),
+                .padding(horizontal = state.homeSidePaddingDp.dp, vertical = VoidDimens.sectionSpacing),
             horizontalAlignment = clockAlign,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(VoidDimens.compactSpacing)
         ) {
+            val clockColor = HomeColor.parse(state.clockColor)
+            val clockBase = clockColor.resolve()
             // ── Time ──
             if (state.showClock) {
                 Text(
                     text = state.currentTime,
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = MaterialTheme.typography.displayLarge.fontSize *
-                            state.clockSizeScale *
-                            (if (state.showSeconds) 0.7f else 1.0f),
-                        letterSpacing = (-1.5).sp
+                    style = HomeStyle.clockStyle(
+                        MaterialTheme.typography,
+                        state.clockSizeScale,
+                        state.showSeconds,
+                        state.clockFontWeight
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = clockBase.copy(alpha = state.clockOpacity),
                     textAlign = clockTextAlign,
                     modifier = Modifier.clickable {
                             try {
@@ -456,12 +446,8 @@ private fun ColumnScope.HomeClockSection(
             if (state.showDate) {
                 Text(
                     text = state.currentDate.uppercase(),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 2.sp,
-                        fontSize = MaterialTheme.typography.bodySmall.fontSize * state.dateSizeScale
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.87f),
+                    style = HomeStyle.dateStyle(MaterialTheme.typography, state.dateSizeScale),
+                    color = clockBase.copy(alpha = 0.87f * state.clockOpacity),
                     textAlign = clockTextAlign,
                     modifier = Modifier.clickable {
                             try {
@@ -478,12 +464,9 @@ private fun ColumnScope.HomeClockSection(
             if (state.showScreenTime && state.screenTime.isNotBlank()) {
                 Text(
                     text = state.screenTime.uppercase(),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Normal,
-                        letterSpacing = 1.5.sp,
-                        fontSize = 11.sp * state.screenTimeSizeScale
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                    style = HomeStyle.screenTimeStyle(MaterialTheme.typography, state.screenTimeSizeScale),
+                    color = (if (clockColor == HomeColor.Default) MaterialTheme.colorScheme.onSurfaceVariant else clockBase)
+                        .copy(alpha = 0.45f * state.clockOpacity),
                     textAlign = clockTextAlign,
                     modifier = Modifier
                         .padding(top = 2.dp)
@@ -511,10 +494,8 @@ private fun ColumnScope.HomeAppsSection(
     // ── Dynamic app spacing based on screen real-estate ──
     val configuration = LocalConfiguration.current
     val screenHeightDp = configuration.screenHeightDp
-    val displayedCount = state.homeApps.size.coerceAtLeast(1)
-    val dynamicBaseSpacing = ((screenHeightDp * 0.75f) / (displayedCount + 3)).coerceIn(4f, 32f)
-    val spacingMultiplier = if (state.appSpacingDp <= 0f) 0f else state.appSpacingDp / 24f
-    val computedSpacing = (dynamicBaseSpacing * spacingMultiplier).coerceIn(0f, 64f)
+    val computedSpacing = HomeStyle.appSpacingDp(screenHeightDp, state.homeApps.size, state.appSpacingDp)
+    val appBase = HomeColor.parse(state.homeAppsColor).resolve()
 
     // ── Drag-to-reorder state ──
     val reorderList = remember { mutableStateListOf<HomeApp>() }
@@ -626,7 +607,7 @@ private fun ColumnScope.HomeAppsSection(
         modifier = Modifier
             .fillMaxWidth()
             .weight(weight)
-            .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.rowSpacing)
+            .padding(horizontal = state.homeSidePaddingDp.dp, vertical = VoidDimens.rowSpacing)
     ) {
         Box(
             modifier = Modifier
@@ -684,15 +665,15 @@ private fun ColumnScope.HomeAppsSection(
                     ) {
                         Text(
                             text = app.label,
-                            style = MaterialTheme.typography.headlineLarge.copy(
-                                fontWeight = FontWeight.Normal,
-                                fontSize = MaterialTheme.typography.headlineLarge.fontSize * state.homeTextSizeScale,
-                                letterSpacing = (-0.5).sp
+                            style = HomeStyle.appLabelStyle(
+                                MaterialTheme.typography,
+                                state.homeTextSizeScale,
+                                state.homeAppsFontWeight
                             ),
                             color = when {
                                 isThisDragged -> MaterialTheme.colorScheme.primary
-                                isDragging -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f)
-                                else -> MaterialTheme.colorScheme.onBackground
+                                isDragging -> appBase.copy(alpha = 0.35f * state.homeAppsOpacity)
+                                else -> appBase.copy(alpha = state.homeAppsOpacity)
                             },
                             textAlign = appTextAlign,
                             modifier = Modifier
@@ -753,7 +734,7 @@ private fun ColumnScope.HomeAppsSection(
 
             if (isDragging) {
                 Text(
-                    text = "Release to confirm",
+                    text = stringResource(R.string.home_reorder_release_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
                     textAlign = TextAlign.Center,
@@ -1014,39 +995,65 @@ private fun HomeAppPickerSheet(
     }
 }
 
-private fun dispatchSwipeAction(
-    direction: String,
-    action: String,
-    context: android.content.Context,
-    prefs: Prefs,
-    onSummary: () -> Unit,
-    onWidgets: () -> Unit,
-    onNotes: () -> Unit,
-    onNotifications: () -> Unit
-) {
-    when (action) {
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATION_SUMMARY -> {
-            if (prefs.enableNotificationSummary) onSummary()
+/**
+ * What each direction of a Home swipe opens, from the screen state and the preferences that are
+ * not part of it (the optional screens' switches and the apps chosen for the sides). Read afresh
+ * for every swipe, so a change made in Settings applies to the next one.
+ */
+private fun homeSwipeSettings(state: MainUiState, prefs: Prefs): HomeSwipeSettings = homeSwipeSettings(
+    state = state,
+    leftAppPackage = prefs.leftSwipeAppPackage,
+    rightAppPackage = prefs.rightSwipeAppPackage,
+    flags = SwipeFeatureFlags(
+        notes = prefs.enableNotes,
+        widgets = prefs.enableWidgets,
+        notificationSummary = prefs.enableNotificationSummary
+    )
+)
+
+/** [homeSwipeSettings] with the preferences already read, so the mapping itself can be unit tested. */
+internal fun homeSwipeSettings(
+    state: MainUiState,
+    leftAppPackage: String,
+    rightAppPackage: String,
+    flags: SwipeFeatureFlags
+): HomeSwipeSettings = HomeSwipeSettings(
+    gesturesEnabled = state.enableGestures,
+    swipeDownEnabled = state.enableSwipeDownNotifications,
+    leftAction = state.leftSwipeAction,
+    rightAction = state.rightSwipeAction,
+    leftAppPackage = leftAppPackage,
+    rightAppPackage = rightAppPackage,
+    flags = flags
+)
+
+/**
+ * Runs what a committed swipe resolved to ([HomeSwipeSettings.targetFor]) and says whether it
+ * could, which decides between the confirming and the rejecting haptic cue. The panels start their
+ * transition from the edge of their route, the app is launched with [SwipeTarget.App.edge] for the
+ * window animation of the Android versions that play one (see `LaunchAnimation`).
+ */
+internal fun dispatchSwipeTarget(
+    target: SwipeTarget,
+    onOpenApps: () -> Unit,
+    onOpenNotificationSummary: () -> Unit,
+    onOpenWidgets: () -> Unit,
+    onOpenNotes: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onLaunchApp: (packageName: String, enterFrom: PanelEdge) -> Boolean
+): Boolean {
+    when (target) {
+        is SwipeTarget.Panel -> when (target.route) {
+            NavRouteKind.AppDrawer -> onOpenApps()
+            NavRouteKind.NotificationSummary -> onOpenNotificationSummary()
+            NavRouteKind.Widgets -> onOpenWidgets()
+            NavRouteKind.Notes -> onOpenNotes()
+            // Never the target of a swipe (see HomeSwipeSettings.targetFor).
+            NavRouteKind.Home, NavRouteKind.Settings, NavRouteKind.NotificationPanel -> return false
         }
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.WIDGETS -> {
-            if (prefs.enableWidgets) onWidgets()
-        }
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTES -> {
-            if (prefs.enableNotes) onNotes()
-        }
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.NOTIFICATIONS -> onNotifications()
-        com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction.APP -> {
-            val pkg = if (direction == "left") prefs.leftSwipeAppPackage else prefs.rightSwipeAppPackage
-            if (pkg.isNotEmpty()) {
-                try {
-                    val intent = context.packageManager.getLaunchIntentForPackage(pkg)
-                    if (intent != null) {
-                        context.startActivity(intent)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
+        is SwipeTarget.App -> return onLaunchApp(target.packageName, target.edge)
+        SwipeTarget.Notifications -> onOpenNotifications()
+        SwipeTarget.None -> return false
     }
+    return true
 }
