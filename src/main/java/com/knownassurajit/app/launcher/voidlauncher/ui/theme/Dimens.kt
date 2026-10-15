@@ -37,6 +37,12 @@ object VoidDimens {
     /** The narrowest strip along a screen edge asked to stay out of the system back gesture: the platform's back gesture inset. */
     val edgeExclusionMinWidth = 30.dp
 
+    /** How far a pull past the top of the app list closes the drawer (an overscroll of about two rows). */
+    val drawerClosePull = 96.dp
+
+    /** Release speed, per second, that closes the drawer after any pull past the top of its list. */
+    val drawerCloseVelocity = 1200.dp
+
     /** Extra width of that strip past the inset, so a swipe that starts just inside the system strip still reaches the app. */
     val edgeExclusionMargin = 8.dp
 }

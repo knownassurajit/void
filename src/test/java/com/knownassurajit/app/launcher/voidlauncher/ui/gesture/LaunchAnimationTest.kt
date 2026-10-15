@@ -53,10 +53,12 @@ class LaunchAnimationTest {
     }
 
     @Test
-    fun theLeftSwipeActionComesInFromTheLeft_andTheRightOneFromTheRight() {
+    fun theLeftSwipeAppComesInFromTheRight_andTheRightSwipeAppFromTheLeft() {
+        // Regression: the app slid in against the finger. A swipe left (content from the right edge)
+        // brings its app in from the right, a swipe right from the left, as the panels do.
         val s = settings(left = SwipeAction.APP, right = SwipeAction.APP)
-        assertEquals(LaunchAnimation.FromRight, launchOf(s.targetFor(PanelEdge.Left)))
-        assertEquals(LaunchAnimation.FromLeft, launchOf(s.targetFor(PanelEdge.Right)))
+        assertEquals(LaunchAnimation.FromRight, launchOf(s.targetFor(PanelEdge.Right)))
+        assertEquals(LaunchAnimation.FromLeft, launchOf(s.targetFor(PanelEdge.Left)))
     }
 
     @Test
