@@ -93,4 +93,31 @@ class WidgetGridTest {
         assertNull(WidgetGrid.parseCell("|1|2"))
         assertNull(WidgetGrid.parseCell("com.example/.W|-1|2"))
     }
+
+    @Test
+    fun moved_takesOneStepWhenTheCellIsFree() {
+        val mover = place("a", 1, 1, 2, 1)
+        val others = listOf(place("b", 0, 3, 4, 1))
+        assertEquals(Cell(0, 1), WidgetGrid.moved(others, mover, columns = -1, rows = 0))
+        assertEquals(Cell(2, 1), WidgetGrid.moved(others, mover, columns = 1, rows = 0))
+        assertEquals(Cell(1, 0), WidgetGrid.moved(others, mover, columns = 0, rows = -1))
+        assertEquals(Cell(1, 2), WidgetGrid.moved(others, mover, columns = 0, rows = 1))
+    }
+
+    @Test
+    fun moved_refusesToLeaveTheGridOrCoverAnotherWidget() {
+        val mover = place("a", 0, 0, 2, 1)
+        assertNull(WidgetGrid.moved(emptyList(), mover, columns = -1, rows = 0))
+        assertNull(WidgetGrid.moved(emptyList(), mover, columns = 0, rows = -1))
+        // Two columns wide in a four column grid: it can go to column 2 and no further.
+        assertEquals(Cell(2, 0), WidgetGrid.moved(emptyList(), place("a", 1, 0, 2, 1), columns = 1, rows = 0))
+        assertNull(WidgetGrid.moved(emptyList(), place("a", 2, 0, 2, 1), columns = 1, rows = 0))
+        assertNull(WidgetGrid.moved(listOf(place("b", 2, 0, 2, 1)), mover, columns = 1, rows = 0))
+    }
+
+    @Test
+    fun moved_downIsAlwaysPossibleBelowTheLastWidget() {
+        val mover = place("a", 0, 5, 4, 2)
+        assertEquals(Cell(0, 6), WidgetGrid.moved(emptyList(), mover, columns = 0, rows = 1))
+    }
 }

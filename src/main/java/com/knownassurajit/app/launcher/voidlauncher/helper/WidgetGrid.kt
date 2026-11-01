@@ -119,6 +119,22 @@ object WidgetGrid {
         return null
     }
 
+    /**
+     * The cell [placement] reaches when it moves [columns] columns and [rows] rows, or `null` when that
+     * cell is off the grid or covers another widget. It is one deliberate step (a screen reader's
+     * "Move left"), not a drop: it never slides to a nearby free cell the way [nearestFreeCell] does.
+     */
+    fun moved(
+        others: List<Placement>,
+        placement: Placement,
+        columns: Int,
+        rows: Int,
+        gridColumns: Int = WidgetLayoutHelper.GRID_COLUMNS
+    ): Cell? {
+        val candidate = placement.copy(cell = Cell(placement.cell.column + columns, placement.cell.row + rows))
+        return candidate.cell.takeIf { fits(others, candidate, gridColumns) }
+    }
+
     /** The cell whose top-left corner is nearest to a top-left at ([xDp], [yDp]), keeping [span] inside the columns. */
     fun cellAt(
         xDp: Float,
