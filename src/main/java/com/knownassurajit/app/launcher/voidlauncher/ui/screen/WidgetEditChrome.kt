@@ -39,6 +39,7 @@ import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetGrid
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetLayoutHelper
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidPanelTitle
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 
 // ── Edit bar ──
@@ -238,16 +239,7 @@ internal fun WidgetsHeader(onAddWidget: () -> Unit, modifier: Modifier = Modifie
                     bottom = VoidDimens.sectionSpacing
                 )
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = stringResource(R.string.widgets),
-                    style = MaterialTheme.typography.headlineSmallEmphasized,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            VoidPanelTitle(text = stringResource(R.string.widgets)) {
                 FilledTonalButton(onClick = onAddWidget) {
                     Icon(
                         Icons.Outlined.Add,

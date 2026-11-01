@@ -12,8 +12,8 @@
 4. Open Widgets: the grid has no top bar and the strip at the top (drag down or tap) brings in the header (title, Add widget); picker shows previews; first pin may show a system “create widgets” prompt; widget appears after allow; pinned widgets show a check; tap and hold customizes a widget (edit bar with Width/Height buttons) without opening the app; drag snaps to the grid
 5. Open Notes: swipe a note row to delete it (red arrow; the delete swipe is the opposite of the one that closes Notes, so it goes right when Notes is on the left swipe)
 6. Toggle homescreen components and verify reflow
-7. Long-press empty home space → picker; remove via chip X
-8. Swipe down → in-app notifications (grant listener if empty)
+7. Long-press empty home space → picker; tap a chip to remove the app
+8. Swipe down → in-app notifications: without notification access the panel explains why and Grant notification access opens the system page; coming back fills the list without reopening it
 9. Private Space path when OS-configured; otherwise graceful skip
 
 ## Back swipe (emulator only)
@@ -32,6 +32,15 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest \
 ```bash
 ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest \
   --tests "*RevealHeaderInstrumentedTest"
+```
+
+## Notification cards (emulator only)
+
+`NotificationCardsInstrumentedTest` drives `DismissibleCard` and `NotificationCard` with the Compose test rule: the Dismiss custom action and a swipe reach the same callback, an expandable header says "Collapsed" or "Expanded" and toggles on a tap and on the click action, the count badge is read as "3 notifications", and a card without a toggle has no click action. It compiles with the build but has not been run yet: run it on an emulator before relying on it.
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest \
+  --tests "*NotificationCardsInstrumentedTest"
 ```
 
 ## Home swipes (emulator only)

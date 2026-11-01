@@ -43,6 +43,7 @@
 - `TypographyPolicyTest` — one family for all 15 roles (the default is the full family the loader preloads), scaled line heights, mono letter spacing, no synthesis override
 - `GoogleFontsProviderTest` — only Google Play services may own the font provider; the availability check is false for no provider, a look-alike owner, and a lookup that throws
 - `WidgetGridTest` — cell placement, overlaps, the nearest free cell, resolving saved layouts, fitting a resize, `moved` (one deliberate step for a screen reader: a free neighbouring cell, never off the grid or onto another widget) and `resizeSteps` (one cell each way that fits, only the directions the provider allows, never off the grid, under one cell or onto another widget)
+- `SummaryBulletsTest` — the points of a notification summary: one per line, a leading `•`, `*` or `-` dropped only when it stands alone (a sign or emphasis touching the text stays), blank lines, spaces and a lone marker ignored, CRLF line endings
 - Widget id / order parse helpers where extracted
 
 Add a regression test for every bug fix affecting pure logic.
