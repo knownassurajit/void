@@ -17,7 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Remove
@@ -145,12 +146,27 @@ fun SettingsSection(
 @Composable
 private fun segmentShapes() = LocalSegmentPosition.current.let { ListItemDefaults.segmentedShapes(it.index, it.count) }
 
+/**
+ * Where a row's leading icon and trailing control sit. A row that is only text (title and subtitle)
+ * centers them on that block however many lines the subtitle wraps to, so icons and switches stay
+ * on one line down a group instead of jumping between rows (the list item's own default moves them
+ * to the title line once a row is three lines tall). A row with a control under its title (slider,
+ * choice buttons) keeps them on the title line at any height or font scale: the icon belongs to
+ * the title, not to the middle of the control.
+ */
+private val TextRowAlignment = Alignment.CenterVertically
+private val ControlRowAlignment = Alignment.Top
+
 @Composable
 private fun Subtitle(text: String) {
     if (text.isNotEmpty()) Text(text, maxLines = 3, overflow = TextOverflow.Ellipsis)
 }
 
-/** Opens something (a screen, a picker, system settings). */
+/**
+ * Opens something. A chevron says the row goes deeper inside VOID (a picker, a dialog); an
+ * [external] row leaves VOID for a page of Android's own settings and says so with an open-in-new
+ * icon.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingActionItem(
@@ -158,13 +174,19 @@ fun SettingActionItem(
     subtitle: String,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
+    external: Boolean = false,
     trailing: (@Composable () -> Unit)? = {
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        if (external) {
+            Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
+        } else {
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null)
+        }
     }
 ) {
     SegmentedListItem(
         onClick = onClick,
         shapes = segmentShapes(),
+        verticalAlignment = TextRowAlignment,
         leadingContent = icon,
         supportingContent = if (subtitle.isEmpty()) null else { { Subtitle(subtitle) } },
         trailingContent = trailing
@@ -190,6 +212,7 @@ fun SettingToggleItem(
         onCheckedChange = onCheckedChange,
         shapes = segmentShapes(),
         enabled = enabled,
+        verticalAlignment = TextRowAlignment,
         leadingContent = icon,
         supportingContent = if (subtitle.isEmpty()) null else { { Subtitle(subtitle) } },
         trailingContent = {
@@ -232,6 +255,7 @@ fun SettingSliderItem(
 
     SegmentedListItem(
         shapes = segmentShapes(),
+        verticalAlignment = ControlRowAlignment,
         leadingContent = icon,
         trailingContent = {
             Text(shownValue, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -267,6 +291,7 @@ fun <T> SettingChoiceItem(
 ) {
     SegmentedListItem(
         shapes = segmentShapes(),
+        verticalAlignment = ControlRowAlignment,
         leadingContent = icon,
         supportingContent = {
             Column {
@@ -329,6 +354,7 @@ fun SettingCounterItem(
 ) {
     SegmentedListItem(
         shapes = segmentShapes(),
+        verticalAlignment = TextRowAlignment,
         leadingContent = icon,
         supportingContent = if (subtitle.isEmpty()) null else { { Subtitle(subtitle) } },
         trailingContent = {

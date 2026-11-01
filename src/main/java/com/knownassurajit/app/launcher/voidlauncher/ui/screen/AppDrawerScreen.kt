@@ -35,8 +35,6 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -90,6 +88,7 @@ import com.knownassurajit.app.launcher.voidlauncher.helper.ScreenTimeMath
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalPanelSettled
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceControls
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceHeader
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSearchField
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.helper.ToggleOutcome
@@ -345,34 +344,26 @@ private fun AppDrawerSearchBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.rowSpacing + VoidDimens.compactSpacing),
+                // The Settings button draws its glyph inset in its target: less end padding puts the glyph
+                // on the same edge as the list below.
+                .padding(
+                    start = VoidDimens.screenPadding,
+                    end = VoidDimens.screenPadding - VoidDimens.iconButtonGlyphInset,
+                    top = VoidDimens.rowSpacing + VoidDimens.compactSpacing,
+                    bottom = VoidDimens.rowSpacing + VoidDimens.compactSpacing
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(VoidDimens.sectionSpacing)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
+            VoidSearchField(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                hint = stringResource(R.string.search),
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester),
-                placeholder = {
-                    Text(
-                        stringResource(R.string.search),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                singleLine = true,
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.outline,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                ),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                leadingIconDescription = stringResource(R.string.search),
+                clearDescription = stringResource(R.string.font_search_clear)
             )
             if (showPrivateSpaceControls) {
                 PrivateSpaceControls(

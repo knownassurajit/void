@@ -26,40 +26,47 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Animation
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Brightness4
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.FontDownload
-import androidx.compose.material.icons.filled.FormatBold
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.LinearScale
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Opacity
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.QueryStats
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SortByAlpha
-import androidx.compose.material.icons.filled.SpaceBar
-import androidx.compose.material.icons.filled.Summarize
-import androidx.compose.material.icons.filled.Swipe
-import androidx.compose.material.icons.filled.SwipeDown
-import androidx.compose.material.icons.filled.SwipeLeft
-import androidx.compose.material.icons.filled.SwipeRight
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Transform
-import androidx.compose.material.icons.filled.ViewDay
-import androidx.compose.material.icons.filled.Wallpaper
-import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.FormatAlignLeft
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.Animation
+import androidx.compose.material.icons.outlined.AppSettingsAlt
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Brightness4
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.FontDownload
+import androidx.compose.material.icons.outlined.FormatBold
+import androidx.compose.material.icons.outlined.FormatLineSpacing
+import androidx.compose.material.icons.outlined.FormatListNumbered
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.HorizontalSplit
+import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Opacity
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.QueryStats
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.SignalCellularAlt
+import androidx.compose.material.icons.outlined.SortByAlpha
+import androidx.compose.material.icons.outlined.Summarize
+import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.Swipe
+import androidx.compose.material.icons.outlined.SwipeDown
+import androidx.compose.material.icons.outlined.SwipeLeft
+import androidx.compose.material.icons.outlined.SwipeRight
+import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material.icons.outlined.Timelapse
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.VerticalAlignCenter
+import androidx.compose.material.icons.outlined.ViewList
+import androidx.compose.material.icons.outlined.Wallpaper
+import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material.icons.outlined.WidthNormal
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
@@ -306,7 +313,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 SettingActionItem(
                                     title = stringResource(R.string.change_default_launcher),
                                     subtitle = stringResource(R.string.manage_default_home_settings),
-                                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
+                                    external = true,
                                     onClick = {
                                         context.startSafely(
                                             Intent(android.provider.Settings.ACTION_HOME_SETTINGS),
@@ -328,7 +336,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 SettingToggleItem(
                                     title = stringResource(R.string.notification_bar),
                                     subtitle = stringResource(R.string.settings_status_bar_subtitle),
-                                    icon = { Icon(Icons.Default.SpaceBar, contentDescription = null) },
+                                    icon = { Icon(Icons.Outlined.SignalCellularAlt, contentDescription = null) },
                                     checked = showStatusBar,
                                     onCheckedChange = { showStatusBar = it; prefs.showStatusBar = it }
                                 )
@@ -340,7 +348,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 SettingChoiceItem(
                                     title = stringResource(R.string.animation_speed),
                                     subtitle = stringResource(R.string.animation_speed_subtitle),
-                                    icon = { Icon(Icons.Default.Animation, contentDescription = null) },
+                                    icon = { Icon(Icons.Outlined.Animation, contentDescription = null) },
                                     selected = animationSpeed,
                                     options = listOf(
                                         Prefs.AnimationSpeed.FAST to stringResource(R.string.animation_speed_fast),
@@ -393,7 +401,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             SettingToggleItem(
                                 title = stringResource(R.string.settings_24_hour),
                                 subtitle = stringResource(R.string.settings_24_hour_subtitle),
-                                icon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.AccessTime, contentDescription = null) },
                                 checked = use24HourClock,
                                 onCheckedChange = { use24HourClock = it; prefs.use24HourClock = it }
                             )
@@ -402,7 +410,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             SettingToggleItem(
                                 title = stringResource(R.string.settings_show_seconds),
                                 subtitle = stringResource(R.string.settings_show_seconds_subtitle),
-                                icon = { Icon(Icons.Default.Timer, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.Timer, contentDescription = null) },
                                 checked = showSeconds,
                                 onCheckedChange = { showSeconds = it; prefs.showClockSeconds = it }
                             )
@@ -410,7 +418,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         rows += {
                             SettingChoiceItem(
                                 title = stringResource(R.string.settings_clock_horizontal),
-                                icon = { Icon(Icons.Default.LinearScale, contentDescription = null) },
+                                icon = { Icon(Icons.AutoMirrored.Outlined.FormatAlignLeft, contentDescription = null) },
                                 selected = clockHorizontalAlignment,
                                 options = horizontalOptions(),
                                 onSelected = { clockHorizontalAlignment = it; prefs.clockAlignment = it }
@@ -419,7 +427,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         rows += {
                             SettingChoiceItem(
                                 title = stringResource(R.string.settings_clock_vertical),
-                                icon = { Icon(Icons.Default.Transform, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.VerticalAlignCenter, contentDescription = null) },
                                 selected = clockVerticalAlignment,
                                 options = verticalOptions(),
                                 onSelected = { clockVerticalAlignment = it; prefs.clockVerticalAlignment = it }
@@ -429,7 +437,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             SettingSliderItem(
                                 title = stringResource(R.string.clock_size),
                                 subtitle = stringResource(R.string.settings_clock_size_subtitle),
-                                icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
                                 value = clockSizeScale,
                                 range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
                                 valueText = ::scaleText,
@@ -441,7 +449,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             SettingSliderItem(
                                 title = stringResource(R.string.date_size),
                                 subtitle = stringResource(R.string.settings_date_size_subtitle),
-                                icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.DateRange, contentDescription = null) },
                                 value = dateSizeScale,
                                 range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
                                 valueText = ::scaleText,
@@ -468,7 +476,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             SettingCounterItem(
                                 title = stringResource(R.string.settings_max_home_apps),
                                 subtitle = stringResource(R.string.settings_max_home_apps_subtitle),
-                                icon = { Icon(Icons.Default.Apps, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.FormatListNumbered, contentDescription = null) },
                                 value = maxHomeApps,
                                 range = 1..10,
                                 onChange = { maxHomeApps = it; prefs.maxHomeApps = it }
@@ -477,7 +485,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         rows += {
                             SettingChoiceItem(
                                 title = stringResource(R.string.settings_apps_horizontal),
-                                icon = { Icon(Icons.Default.LinearScale, contentDescription = null) },
+                                icon = { Icon(Icons.AutoMirrored.Outlined.FormatAlignLeft, contentDescription = null) },
                                 selected = appHorizontalAlignment,
                                 options = horizontalOptions(),
                                 onSelected = { appHorizontalAlignment = it; prefs.homeAlignment = it }
@@ -486,7 +494,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         rows += {
                             SettingChoiceItem(
                                 title = stringResource(R.string.settings_apps_vertical),
-                                icon = { Icon(Icons.Default.Transform, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.VerticalAlignCenter, contentDescription = null) },
                                 selected = appVerticalAlignment,
                                 options = verticalOptions(),
                                 onSelected = { appVerticalAlignment = it; prefs.homeVerticalAlignment = it }
@@ -496,7 +504,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             SettingSliderItem(
                                 title = stringResource(R.string.settings_app_spacing),
                                 subtitle = stringResource(R.string.settings_app_spacing_subtitle),
-                                icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.FormatLineSpacing, contentDescription = null) },
                                 value = appSpacing,
                                 range = 0f..HomeStyle.MAX_APP_SPACING,
                                 valueText = { "${it.roundToInt()}" },
@@ -508,7 +516,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             SettingSliderItem(
                                 title = stringResource(R.string.home_text_size),
                                 subtitle = stringResource(R.string.settings_home_text_size_subtitle),
-                                icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
+                                icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
                                 value = homeTextSize,
                                 range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_APP_SIZE_SCALE,
                                 valueText = ::scaleText,
@@ -540,7 +548,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                     SettingToggleItem(
                                         title = stringResource(R.string.settings_show_alphabet),
                                         subtitle = stringResource(R.string.settings_show_alphabet_subtitle),
-                                        icon = { Icon(Icons.Default.SortByAlpha, contentDescription = null) },
+                                        icon = { Icon(Icons.Outlined.SortByAlpha, contentDescription = null) },
                                         checked = showAlphabetCategories,
                                         onCheckedChange = { showAlphabetCategories = it; prefs.showAlphabetCategories = it }
                                     )
@@ -549,7 +557,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                     SettingToggleItem(
                                         title = stringResource(R.string.auto_show_keyboard),
                                         subtitle = stringResource(R.string.settings_auto_keyboard_subtitle),
-                                        icon = { Icon(Icons.Default.Keyboard, contentDescription = null) },
+                                        icon = { Icon(Icons.Outlined.Keyboard, contentDescription = null) },
                                         checked = autoShowKeyboard,
                                         onCheckedChange = { autoShowKeyboard = it; prefs.autoShowKeyboard = it }
                                     )
@@ -558,7 +566,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                     SettingSliderItem(
                                         title = stringResource(R.string.app_drawer_text_size),
                                         subtitle = stringResource(R.string.settings_drawer_text_size_subtitle),
-                                        icon = { Icon(Icons.Default.TextFields, contentDescription = null) },
+                                        icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
                                         value = drawerTextSize,
                                         range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_APP_SIZE_SCALE,
                                         valueText = ::scaleText,
@@ -853,10 +861,10 @@ private fun DeveloperInfoDialog(onDismiss: () -> Unit) {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(VoidDimens.sectionSpacing)) {
                 Text(stringResource(R.string.credits_made_by), style = MaterialTheme.typography.bodyMedium)
-                CreditRow(Icons.Default.Person, stringResource(R.string.credits_author)) {
+                CreditRow(Icons.Outlined.Person, stringResource(R.string.credits_author)) {
                     context.startSafely(Intent(Intent.ACTION_VIEW, "https://www.linkedin.com/in/knownassurajit/".toUri()))
                 }
-                CreditRow(Icons.Default.Code, stringResource(R.string.credits_repository)) {
+                CreditRow(Icons.Outlined.Code, stringResource(R.string.credits_repository)) {
                     context.startSafely(Intent(Intent.ACTION_VIEW, "https://github.com/knownassurajit/void".toUri()))
                 }
             }
@@ -891,7 +899,13 @@ private fun SettingsHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = VoidDimens.compactSpacing, bottom = VoidDimens.sectionSpacing),
+            // A list row draws its trailing icon 16 dp inside its card, an icon button draws its glyph
+            // 12 dp inside its target: the difference as end padding puts both glyphs on one edge.
+            .padding(
+                start = VoidDimens.compactSpacing,
+                end = VoidDimens.sectionSpacing - VoidDimens.iconButtonGlyphInset,
+                bottom = VoidDimens.sectionSpacing
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // The name and the subtitle are one heading to a screen reader: "VOID, Settings".
@@ -942,7 +956,7 @@ private fun FontStyleSection(appFont: String, onOpenFontPicker: () -> Unit) {
                 SettingActionItem(
                     title = stringResource(R.string.settings_launcher_font),
                     subtitle = currentFontName,
-                    icon = { Icon(Icons.Default.FontDownload, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.FontDownload, contentDescription = null) },
                     onClick = onOpenFontPicker
                 )
             },
@@ -950,7 +964,8 @@ private fun FontStyleSection(appFont: String, onOpenFontPicker: () -> Unit) {
                 SettingActionItem(
                     title = stringResource(R.string.settings_system_display),
                     subtitle = stringResource(R.string.settings_system_display_subtitle),
-                    icon = { Icon(Icons.Default.Brightness4, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.Brightness4, contentDescription = null) },
+                    external = true,
                     onClick = { context.startSafely(Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)) }
                 )
             },
@@ -958,7 +973,8 @@ private fun FontStyleSection(appFont: String, onOpenFontPicker: () -> Unit) {
                 SettingActionItem(
                     title = stringResource(R.string.settings_system_wallpaper),
                     subtitle = stringResource(R.string.settings_system_wallpaper_subtitle),
-                    icon = { Icon(Icons.Default.Wallpaper, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.Wallpaper, contentDescription = null) },
+                    external = true,
                     onClick = { context.startSafely(Intent(Intent.ACTION_SET_WALLPAPER)) }
                 )
             }
@@ -1013,7 +1029,7 @@ private fun HomeLayoutSection(
                 SettingToggleItem(
                     title = stringResource(R.string.settings_show_clock),
                     subtitle = stringResource(R.string.settings_show_clock_subtitle),
-                    icon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.AccessTime, contentDescription = null) },
                     checked = showClock,
                     onCheckedChange = onShowClockChange
                 )
@@ -1022,7 +1038,7 @@ private fun HomeLayoutSection(
                 SettingToggleItem(
                     title = stringResource(R.string.show_date_time),
                     subtitle = stringResource(R.string.settings_show_date_subtitle),
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.DateRange, contentDescription = null) },
                     checked = showDate,
                     onCheckedChange = onShowDateChange
                 )
@@ -1031,7 +1047,7 @@ private fun HomeLayoutSection(
                 SettingToggleItem(
                     title = stringResource(R.string.settings_show_home_apps),
                     subtitle = stringResource(R.string.settings_show_home_apps_subtitle),
-                    icon = { Icon(Icons.Default.Apps, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.ViewList, contentDescription = null) },
                     checked = showHomeApps,
                     onCheckedChange = onShowHomeAppsChange
                 )
@@ -1039,7 +1055,7 @@ private fun HomeLayoutSection(
             {
                 SettingChoiceItem(
                     title = stringResource(R.string.settings_section_order),
-                    icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.SwapVert, contentDescription = null) },
                     selected = homeSectionOrder,
                     options = listOf(
                         "clock_first" to stringResource(R.string.clock_first),
@@ -1053,7 +1069,7 @@ private fun HomeLayoutSection(
                 SettingSliderItem(
                     title = stringResource(R.string.clock_section_weight),
                     subtitle = stringResource(R.string.settings_split_subtitle, clockPct, 100 - clockPct),
-                    icon = { Icon(Icons.Default.ViewDay, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.HorizontalSplit, contentDescription = null) },
                     value = clockSectionWeight,
                     range = HomeLayoutHelper.MIN_CLOCK_WEIGHT..HomeLayoutHelper.MAX_CLOCK_WEIGHT,
                     valueText = { "${(it * 100).roundToInt()}%" },
@@ -1065,7 +1081,7 @@ private fun HomeLayoutSection(
                 SettingSliderItem(
                     title = stringResource(R.string.settings_side_padding),
                     subtitle = stringResource(R.string.settings_side_padding_subtitle),
-                    icon = { Icon(Icons.Default.SpaceBar, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.WidthNormal, contentDescription = null) },
                     value = homeSidePadding,
                     range = HomeStyle.MIN_SIDE_PADDING_DP..HomeStyle.MAX_SIDE_PADDING_DP,
                     valueText = { "${it.roundToInt()} dp" },
@@ -1110,7 +1126,7 @@ private fun ScreenTimeSection(
                 SettingToggleItem(
                     title = stringResource(R.string.settings_screen_time_home),
                     subtitle = stringResource(R.string.settings_screen_time_subtitle),
-                    icon = { Icon(Icons.Default.QueryStats, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.Timelapse, contentDescription = null) },
                     checked = showScreenTime,
                     onCheckedChange = { enabled ->
                         onShowScreenTimeChange(enabled)
@@ -1129,7 +1145,7 @@ private fun ScreenTimeSection(
                 SettingToggleItem(
                     title = stringResource(R.string.settings_screen_time_apps),
                     subtitle = stringResource(R.string.settings_screen_time_apps_subtitle),
-                    icon = { Icon(Icons.Default.Apps, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.Apps, contentDescription = null) },
                     checked = showAppScreenTime,
                     enabled = showScreenTime,
                     onCheckedChange = onShowAppScreenTimeChange
@@ -1141,7 +1157,8 @@ private fun ScreenTimeSection(
                     subtitle = stringResource(
                         if (usageAccessGranted) R.string.settings_screen_time_access_granted else R.string.settings_screen_time_access_needed
                     ),
-                    icon = { Icon(Icons.Default.Security, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.QueryStats, contentDescription = null) },
+                    external = true,
                     onClick = { context.startSafely(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 )
             },
@@ -1149,7 +1166,7 @@ private fun ScreenTimeSection(
                 SettingSliderItem(
                     title = stringResource(R.string.screen_time_size),
                     subtitle = stringResource(R.string.settings_screen_time_size_subtitle),
-                    icon = { Icon(Icons.Default.QueryStats, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
                     value = screenTimeSizeScale,
                     range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
                     valueText = ::scaleText,
@@ -1178,7 +1195,7 @@ private fun addTextStyleRows(
     rows += {
         SettingChoiceItem(
             title = stringResource(style.weightTitle),
-            icon = { Icon(Icons.Default.FormatBold, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.FormatBold, contentDescription = null) },
             selected = fontWeight,
             options = HomeStyle.fontWeights.map { weight -> weight to stringResource(weight.weightLabelRes()) },
             onSelected = onFontWeightChange
@@ -1188,7 +1205,7 @@ private fun addTextStyleRows(
         SettingColorItem(
             title = stringResource(style.colorTitle),
             subtitle = "",
-            icon = { Icon(Icons.Default.Palette, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.Palette, contentDescription = null) },
             color = HomeColor.parse(color),
             onPick = { onColorChange(it.key) }
         )
@@ -1197,7 +1214,7 @@ private fun addTextStyleRows(
         SettingSliderItem(
             title = stringResource(style.opacityTitle),
             subtitle = "",
-            icon = { Icon(Icons.Default.Opacity, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.Opacity, contentDescription = null) },
             value = opacity,
             range = HomeStyle.MIN_OPACITY..HomeStyle.MAX_OPACITY,
             valueText = { "${(it * 100).roundToInt()}%" },
@@ -1231,7 +1248,7 @@ private fun PrivateSpaceSection(
             subtitle = stringResource(
                 if (isPrivateSpaceConfigured) R.string.settings_private_space_subtitle else R.string.settings_private_space_not_configured
             ),
-            icon = { Icon(Icons.Default.Security, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.Security, contentDescription = null) },
             checked = active,
             onCheckedChange = {
                 if (!isPrivateSpaceConfigured) {
@@ -1249,7 +1266,7 @@ private fun PrivateSpaceSection(
             SettingChoiceItem(
                 title = stringResource(R.string.private_space_placement),
                 subtitle = stringResource(R.string.private_space_placement_subtitle),
-                icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                icon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
                 selected = privateSpacePlacement,
                 options = listOf(
                     Prefs.PrivateSpacePlacement.BOTTOM to stringResource(R.string.private_space_placement_bottom),
@@ -1264,7 +1281,7 @@ private fun PrivateSpaceSection(
             SettingColorItem(
                 title = stringResource(R.string.settings_private_space_icon_color),
                 subtitle = stringResource(R.string.settings_private_space_icon_color_subtitle),
-                icon = { Icon(Icons.Default.Palette, contentDescription = null) },
+                icon = { Icon(Icons.Outlined.Palette, contentDescription = null) },
                 color = HomeColor.parse(iconColor),
                 onPick = { onIconColorChange(it.key) }
             )
@@ -1302,7 +1319,7 @@ private fun GesturesSection(
         SettingToggleItem(
             title = stringResource(R.string.settings_enable_gestures),
             subtitle = stringResource(R.string.settings_enable_gestures_subtitle),
-            icon = { Icon(Icons.Default.Swipe, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
             checked = enableGestures,
             onCheckedChange = onEnableGesturesChange
         )
@@ -1312,7 +1329,7 @@ private fun GesturesSection(
             SwipeActionSelector(
                 label = stringResource(R.string.left_swipe_action),
                 hint = stringResource(R.string.swipe_left_hint),
-                icon = { Icon(Icons.Default.SwipeLeft, contentDescription = null) },
+                icon = { Icon(Icons.Outlined.SwipeLeft, contentDescription = null) },
                 side = left,
                 excludeAction = right.action,
                 panels = panels,
@@ -1323,7 +1340,7 @@ private fun GesturesSection(
             SwipeActionSelector(
                 label = stringResource(R.string.right_swipe_action),
                 hint = stringResource(R.string.swipe_right_hint),
-                icon = { Icon(Icons.Default.SwipeRight, contentDescription = null) },
+                icon = { Icon(Icons.Outlined.SwipeRight, contentDescription = null) },
                 side = right,
                 excludeAction = left.action,
                 panels = panels,
@@ -1335,7 +1352,7 @@ private fun GesturesSection(
         SettingToggleItem(
             title = stringResource(R.string.swipe_down_notifications),
             subtitle = stringResource(R.string.swipe_down_notifications_subtitle),
-            icon = { Icon(Icons.Default.SwipeDown, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.SwipeDown, contentDescription = null) },
             checked = enableSwipeDownNotifications,
             onCheckedChange = { enabled ->
                 if (enabled && !FeatureAvailability.isNotificationListenerEnabled(context)) {
@@ -1353,7 +1370,7 @@ private fun GesturesSection(
             SettingToggleItem(
                 title = stringResource(R.string.content_swipe_to_back),
                 subtitle = stringResource(R.string.content_swipe_to_back_subtitle),
-                icon = { Icon(Icons.Default.Swipe, contentDescription = null) },
+                icon = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null) },
                 checked = contentSwipeToBack,
                 onCheckedChange = onContentSwipeToBackChange
             )
@@ -1379,7 +1396,7 @@ private fun FeaturesSection(
         SettingToggleItem(
             title = stringResource(R.string.swipe_action_notification_summary),
             subtitle = stringResource(R.string.settings_summary_subtitle),
-            icon = { Icon(Icons.Default.Summarize, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.Summarize, contentDescription = null) },
             checked = panels.summary,
             onCheckedChange = { enabled ->
                 // The summary reads notifications: without access it is turned on only after the user grants it.
@@ -1396,7 +1413,7 @@ private fun FeaturesSection(
         SettingToggleItem(
             title = stringResource(R.string.swipe_action_widgets),
             subtitle = stringResource(R.string.settings_widgets_subtitle),
-            icon = { Icon(Icons.Default.Widgets, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.Widgets, contentDescription = null) },
             checked = panels.widgets,
             onCheckedChange = onEnableWidgetsChange
         )
@@ -1405,7 +1422,7 @@ private fun FeaturesSection(
         SettingToggleItem(
             title = stringResource(R.string.swipe_action_notes),
             subtitle = stringResource(R.string.settings_notes_subtitle),
-            icon = { Icon(Icons.Default.EditNote, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.EditNote, contentDescription = null) },
             checked = panels.notes,
             onCheckedChange = onEnableNotesChange
         )
@@ -1414,7 +1431,7 @@ private fun FeaturesSection(
         rows += {
             SettingChoiceItem(
                 title = stringResource(R.string.settings_notes_title_alignment),
-                icon = { Icon(Icons.AutoMirrored.Filled.FormatAlignLeft, contentDescription = null) },
+                icon = { Icon(Icons.AutoMirrored.Outlined.FormatAlignLeft, contentDescription = null) },
                 selected = notesTitleAlignment,
                 options = horizontalOptions(),
                 onSelected = onNotesTitleAlignmentChange
@@ -1434,6 +1451,7 @@ private fun PermissionsSection() {
             title = stringResource(titleRes),
             subtitle = stringResource(bodyRes),
             icon = { Icon(icon, contentDescription = null) },
+            external = true,
             onClick = { context.startSafely(intent(), fallback) }
         )
     }
@@ -1441,25 +1459,25 @@ private fun PermissionsSection() {
         title = null,
         description = stringResource(R.string.permissions_intro),
         items = listOf(
-            action(R.string.settings_app_info, R.string.settings_app_info_subtitle, Icons.Default.Settings, { Intent(appDetails) }),
-            action(R.string.perm_notification_listener, R.string.perm_notification_listener_body, Icons.Default.Notifications, {
+            action(R.string.settings_app_info, R.string.settings_app_info_subtitle, Icons.Outlined.AppSettingsAlt, { Intent(appDetails) }),
+            action(R.string.perm_notification_listener, R.string.perm_notification_listener_body, Icons.Outlined.Notifications, {
                 Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
             }),
-            action(R.string.perm_usage_access, R.string.perm_usage_access_body, Icons.Default.QueryStats, {
+            action(R.string.perm_usage_access, R.string.perm_usage_access_body, Icons.Outlined.QueryStats, {
                 Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
             }),
-            action(R.string.perm_accessibility, R.string.perm_accessibility_body, Icons.Default.Lock, {
+            action(R.string.perm_accessibility, R.string.perm_accessibility_body, Icons.Outlined.Accessibility, {
                 Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
             }),
-            action(R.string.perm_default_home, R.string.perm_default_home_body, Icons.Default.Home, {
+            action(R.string.perm_default_home, R.string.perm_default_home_body, Icons.Outlined.Home, {
                 Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
             }),
-            action(R.string.perm_query_apps, R.string.perm_query_apps_body, Icons.Default.Apps, { Intent(appDetails) }),
-            action(R.string.perm_widgets, R.string.perm_widgets_body, Icons.Default.Widgets, { Intent(appDetails) }),
+            action(R.string.perm_query_apps, R.string.perm_query_apps_body, Icons.Outlined.Apps, { Intent(appDetails) }),
+            action(R.string.perm_widgets, R.string.perm_widgets_body, Icons.Outlined.Widgets, { Intent(appDetails) }),
             action(
                 R.string.perm_private_space,
                 R.string.perm_private_space_body,
-                Icons.Default.Security,
+                Icons.Outlined.Security,
                 { Intent("android.settings.PRIVATE_SPACE_SETTINGS") },
                 fallback = Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)
             )

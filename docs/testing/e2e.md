@@ -43,6 +43,15 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest \
   --tests "*NotificationCardsInstrumentedTest"
 ```
 
+## Settings rows (emulator only)
+
+`SettingsRowsInstrumentedTest` measures where the icons of Settings rows sit with the Compose test rule: a text row (action, toggle) keeps its leading icon and trailing control centered whatever the subtitle length (a three-line subtitle used to move them to the title line), and a slider or choice row keeps its icon on the title line. Its three tests also run and pass on the JVM under Robolectric with native graphics, and the alignment tests fail when the alignment rule is removed (checked by hand; Robolectric is not a project dependency). It has not been run on an emulator yet: run it before relying on it.
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest \
+  --tests "*SettingsRowsInstrumentedTest"
+```
+
 ## Home swipes (emulator only)
 
 `HomeSwipeInstrumentedTest` drives the pointer loop of `Modifier.homeSwipe` with the Compose test rule: each direction opens the target of its edge, a quick flick commits, Home is off its place by the rubber band while the finger is down and is back at rest after a short swipe, a reversal under the distance, a commit, a commit whose action cannot run and a swipe that is switched off in the middle; a direction without a target, a swipe that does not commit and a disabled swipe move nothing and are not a click on the clickable child under the finger (a plain tap still is). On Android 12 and later (the tests skip on 11 and earlier) an app commit leaves Home 30% of the width off its place in the swipe direction, dimmed and departed until it is reset, a swipe while it is departed is swallowed, and an app that cannot be launched springs Home back. It starts no activity, so it does not exercise the system edge gestures, the exclusion strips or the app launch animation; those are checks in `manual-checklist.md`. It compiles with the build but has not been run yet: run it on an emulator before relying on it.
