@@ -1,7 +1,7 @@
 [versions]
 agp = "9.4.1"
 coreKtx = "1.19.1"
-kotlinStdlib = "2.4.10"
+kotlinStdlib = "2.4.21"
 lifecycleViewmodelKtx = "2.9.0"
 material = "1.12.0"
 workRuntimeKtx = "2.10.1"
