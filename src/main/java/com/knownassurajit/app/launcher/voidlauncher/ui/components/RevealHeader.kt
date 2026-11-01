@@ -4,12 +4,14 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.DraggableState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -117,14 +119,13 @@ class RevealHeaderState {
 }
 
 /**
- * Pulls [state]'s header in as the finger moves down and pushes it away as the finger moves up, the
- * way a Material "enter always" app bar does, but without taking any scroll from the content: the
- * header floats over it, so the list answers the finger at once. Releasing springs the header to
- * open or closed ([HeaderRevealMath.settleTarget]).
- *
- * While the header is still coming out, a pull the list could not use is taken here, so the list
- * does not stretch as well; once the header is fully out the rest of the pull stretches the list.
- * [isEnabled] is read on every event, so the header can be switched off (editing, picker open).
+ * Puts [state]'s header away while the content under it scrolls: once the user is scrolling the
+ * widgets, the header has done its job. It follows the finger up and springs shut (or back open) on
+ * release ([HeaderRevealMath.settleTarget]). It never brings the header **in**: the content is made of
+ * widgets, and a widget that handles its own touches (a button, a list) keeps a drag from ever
+ * reaching the scroll container, so a pull on the content would open the header only sometimes.
+ * The header opens from a dedicated strip instead ([RevealPullZone]). It takes no scroll from the
+ * content. [isEnabled] is read on every event.
  */
 class RevealHeaderConnection(
     private val state: RevealHeaderState,
@@ -133,18 +134,15 @@ class RevealHeaderConnection(
     private val isEnabled: () -> Boolean
 ) : NestedScrollConnection {
     private var releaseVelocity = 0f
+    private var moved = false
 
     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-        if (isEnabled() && available.y != 0f) state.dragBy(available.y)
+        if (isEnabled() && available.y < 0f && !state.isHidden) {
+            state.dragBy(available.y)
+            moved = true
+        }
         return Offset.Zero
     }
-
-    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
-        if (isEnabled() && source == NestedScrollSource.UserInput && available.y > 0f && !state.isFullyShown) {
-            Offset(0f, available.y)
-        } else {
-            Offset.Zero
-        }
 
     override suspend fun onPreFling(available: Velocity): Velocity {
         releaseVelocity = available.y
@@ -154,7 +152,9 @@ class RevealHeaderConnection(
     override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
         val velocity = releaseVelocity
         releaseVelocity = 0f
-        if (isEnabled()) state.settle(velocity, flingVelocityPx, settleSpec())
+        val settle = moved
+        moved = false
+        if (settle && isEnabled()) state.settle(velocity, flingVelocityPx, settleSpec())
         return Velocity.Zero
     }
 }
@@ -173,12 +173,30 @@ fun Modifier.revealHeader(state: RevealHeaderState): Modifier = this
     }
 
 /**
- * The small bar that says a header is waiting above: it fades out as the header comes in, a tap
- * toggles the header ([onToggle]) and a drag pulls it. The target is wider than the bar so that a
- * thumb finds it; [description] is what a screen reader says.
+ * Lets the user push an open header back up by dragging it, like a sheet; it springs to open or shut
+ * on release. Buttons inside it keep their taps (a drag only starts past the touch slop).
+ * [dragState] moves [state]: `rememberDraggableState { state.dragBy(it) }`.
+ */
+fun Modifier.revealHeaderDrag(
+    state: RevealHeaderState,
+    dragState: DraggableState,
+    flingVelocityPx: Float,
+    settleSpec: AnimationSpec<Float>
+): Modifier = draggable(
+    state = dragState,
+    orientation = Orientation.Vertical,
+    onDragStopped = { velocity -> state.settle(velocity, flingVelocityPx, settleSpec) }
+)
+
+/**
+ * The strip along the top of the screen that opens the header: drag down on it and the header
+ * follows the finger, tap it and the header springs open. It is the full width of the screen and
+ * sits above the content (the content starts below it), so it never competes with a widget for a
+ * touch and works the same every time. A short bar in its middle says what it is for; it fades as
+ * the header comes in. [description] is what a screen reader says.
  */
 @Composable
-fun RevealHandle(
+fun RevealPullZone(
     state: RevealHeaderState,
     description: String,
     flingVelocityPx: Float,
@@ -189,14 +207,14 @@ fun RevealHandle(
     val dragState = rememberDraggableState { delta -> state.dragBy(delta) }
     Box(
         modifier = modifier
-            .size(width = HANDLE_TARGET_WIDTH, height = HANDLE_TARGET_HEIGHT)
-            .graphicsLayer { alpha = 1f - state.fraction }
+            .fillMaxWidth()
+            .height(PULL_ZONE_HEIGHT)
             .draggable(
                 state = dragState,
                 orientation = Orientation.Vertical,
                 onDragStopped = { velocity -> state.settle(velocity, flingVelocityPx, settleSpec) }
             )
-            // No ripple: the bar is a hint, and the header moving is the feedback.
+            // No ripple across the whole strip: the header moving is the feedback.
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -205,20 +223,19 @@ fun RevealHandle(
                 onClick = onToggle
             )
             .semantics { contentDescription = description },
-        contentAlignment = Alignment.BottomCenter
+        contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .padding(bottom = HANDLE_BOTTOM_GAP)
+                .graphicsLayer { alpha = 1f - state.fraction }
                 .size(width = HANDLE_BAR_WIDTH, height = HANDLE_BAR_HEIGHT)
                 .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = HANDLE_ALPHA), CircleShape)
         )
     }
 }
 
-private val HANDLE_TARGET_WIDTH = 96.dp
-private val HANDLE_TARGET_HEIGHT = 44.dp
-private val HANDLE_BAR_WIDTH = 36.dp
+/** Height of [RevealPullZone]: a comfortable target (Material's 48 dp minus the status bar's own margin). */
+val PULL_ZONE_HEIGHT = 40.dp
+private val HANDLE_BAR_WIDTH = 40.dp
 private val HANDLE_BAR_HEIGHT = 4.dp
-private val HANDLE_BOTTOM_GAP = 6.dp
-private const val HANDLE_ALPHA = 0.5f
+private const val HANDLE_ALPHA = 0.6f

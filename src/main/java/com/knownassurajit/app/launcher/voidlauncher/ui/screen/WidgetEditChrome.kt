@@ -1,203 +1,66 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.screen
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.R
+import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetGrid
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetLayoutHelper
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
-import kotlin.math.abs
-
-// ── Resize handles ──
-
-/** What a resize handle changes: the width, the height, or both (the corner). */
-internal enum class ResizeAxis { Width, Height, Both }
-
-/** Which resize handles a selected widget shows; see [resizeHandlesFor]. */
-internal data class ResizeHandles(val corner: Boolean, val rightEdge: Boolean, val bottomEdge: Boolean) {
-    val any: Boolean get() = corner || rightEdge || bottomEdge
-}
-
-/**
- * The handles a widget gets from the directions its provider can be resized in. A widget that grows
- * both ways has the corner and, once it is big enough to take them without crowding the corner, a
- * handle in the middle of its right and bottom edges; a widget that grows one way has just the
- * handle on that edge. Handles are on the right and bottom edge only because a widget keeps its
- * top-left cell when it is resized.
- */
-internal fun resizeHandlesFor(
-    resizesHorizontally: Boolean,
-    resizesVertically: Boolean,
-    span: WidgetLayoutHelper.WidgetSpan
-): ResizeHandles = when {
-    resizesHorizontally && resizesVertically -> ResizeHandles(
-        corner = true,
-        rightEdge = span.rows >= MIN_CELLS_FOR_EDGE_HANDLE,
-        bottomEdge = span.columns >= MIN_CELLS_FOR_EDGE_HANDLE
-    )
-    resizesHorizontally -> ResizeHandles(corner = false, rightEdge = true, bottomEdge = false)
-    resizesVertically -> ResizeHandles(corner = false, rightEdge = false, bottomEdge = true)
-    else -> ResizeHandles(corner = false, rightEdge = false, bottomEdge = false)
-}
-
-private const val MIN_CELLS_FOR_EDGE_HANDLE = 2
-
-/**
- * Whether a touch at [position] on a widget of [width] x [height] px lands on one of its resize
- * [handles]. The widget's own long-press and drag must leave such a touch alone, so it reads the
- * same geometry as the handles: each is a square of [target] px against the right or bottom edge,
- * and the edge handles are [edgeLength] px long, centred on their edge.
- */
-internal fun isOnResizeHandle(
-    position: Offset,
-    width: Float,
-    height: Float,
-    handles: ResizeHandles,
-    target: Float,
-    edgeLength: Float
-): Boolean {
-    val nearRight = position.x >= width - target
-    val nearBottom = position.y >= height - target
-    val onCorner = handles.corner && nearRight && nearBottom
-    val onRight = handles.rightEdge && nearRight && abs(position.y - height / 2f) <= edgeLength / 2f
-    val onBottom = handles.bottomEdge && nearBottom && abs(position.x - width / 2f) <= edgeLength / 2f
-    return onCorner || onRight || onBottom
-}
-
-internal val RESIZE_HANDLE_TARGET = 48.dp
-internal val RESIZE_HANDLE_EDGE_LENGTH = 64.dp
-
-private val HANDLE_INSET = 6.dp
-private val HANDLE_BORDER = 2.dp
-private val CORNER_DOT = 22.dp
-private val EDGE_PILL_LONG = 40.dp
-private val EDGE_PILL_SHORT = 10.dp
-
-/**
- * One resize handle of a selected widget. Dragging it changes the widget's span in whole cells
- * along [axis] ([WidgetLayoutHelper.snapSpan]); [onResize] says what the drag asks for and the
- * caller fits it around the other widgets. The handle is a primary-colored pill with a surface
- * outline, so it shows on any widget.
- */
-@Composable
-internal fun BoxScope.WidgetResizeHandle(
-    axis: ResizeAxis,
-    handle: HandleSide,
-    description: String,
-    span: () -> WidgetLayoutHelper.WidgetSpan,
-    metrics: GridMetrics,
-    onResize: (WidgetLayoutHelper.WidgetSpan) -> Unit
-) {
-    val density = LocalDensity.current
-    val spanLatest = rememberUpdatedState(span)
-    val onResizeLatest = rememberUpdatedState(onResize)
-    val (zone, pill) = when (handle) {
-        HandleSide.Corner -> Alignment.BottomEnd to CORNER_DOT.let { it to it }
-        HandleSide.Right -> Alignment.CenterEnd to (EDGE_PILL_SHORT to EDGE_PILL_LONG)
-        HandleSide.Bottom -> Alignment.BottomCenter to (EDGE_PILL_LONG to EDGE_PILL_SHORT)
-    }
-    val zoneModifier = when (handle) {
-        HandleSide.Corner -> Modifier.size(RESIZE_HANDLE_TARGET)
-        HandleSide.Right -> Modifier.size(RESIZE_HANDLE_TARGET, RESIZE_HANDLE_EDGE_LENGTH)
-        HandleSide.Bottom -> Modifier.size(RESIZE_HANDLE_EDGE_LENGTH, RESIZE_HANDLE_TARGET)
-    }
-    Box(
-        modifier = Modifier
-            .align(zone)
-            .then(zoneModifier)
-            .zIndex(1f)
-            .semantics { contentDescription = description }
-            .pointerInput(axis, metrics) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    down.consume()
-                    val origin = spanLatest.value()
-                    var dragX = 0f
-                    var dragY = 0f
-                    drag(down.id) { change ->
-                        val delta = change.positionChange()
-                        change.consume()
-                        dragX += delta.x
-                        dragY += delta.y
-                        val snapped = WidgetLayoutHelper.snapSpan(
-                            start = origin,
-                            deltaXDp = if (axis == ResizeAxis.Height) 0f else with(density) { dragX.toDp().value },
-                            deltaYDp = if (axis == ResizeAxis.Width) 0f else with(density) { dragY.toDp().value },
-                            cellDp = metrics.cellDp,
-                            spacingDp = metrics.spacingDp
-                        )
-                        if (snapped != spanLatest.value()) onResizeLatest.value(snapped)
-                    }
-                }
-            },
-        contentAlignment = zone
-    ) {
-        Box(
-            modifier = Modifier
-                .padding(HANDLE_INSET)
-                .size(pill.first, pill.second)
-                .background(MaterialTheme.colorScheme.primary, CircleShape)
-                .border(HANDLE_BORDER, MaterialTheme.colorScheme.surface, CircleShape)
-        )
-    }
-}
-
-/** The edge of a widget a handle sits on. */
-internal enum class HandleSide { Corner, Right, Bottom }
 
 // ── Edit bar ──
 
 /**
- * The bar that appears while a widget is selected for customizing. It names the widget, says in one
- * line how to move and resize it, and puts the actions that used to be tiny corner icons on the
- * widget (settings, remove) and the way out (Done) in plain, labelled buttons. It floats over the
- * grid, so showing it never moves a widget under the finger.
+ * The bar that appears while a widget is picked for customizing. It names the widget and says in one
+ * line how to move it; its size is changed with plain Width and Height buttons, one cell at a time,
+ * only the ways the widget's app allows and never over another widget ([steps], from
+ * `WidgetGrid.resizeSteps`); Settings, Remove and Done are labelled buttons. Nothing is drawn on the
+ * widget itself: a handle there competes with the widget's own content for the finger. The bar
+ * floats over the grid, so showing it never moves a widget.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun WidgetEditBar(
     title: String,
+    span: WidgetLayoutHelper.WidgetSpan,
+    resizesHorizontally: Boolean,
+    resizesVertically: Boolean,
+    steps: WidgetGrid.ResizeSteps,
     hasSettings: Boolean,
+    onResize: (WidgetLayoutHelper.WidgetSpan) -> Unit,
     onSettings: () -> Unit,
     onRemove: () -> Unit,
     onDone: () -> Unit,
@@ -206,8 +69,8 @@ internal fun WidgetEditBar(
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        shadowElevation = 8.dp,
+        tonalElevation = VoidDimens.floatingBarTonalElevation,
+        shadowElevation = VoidDimens.floatingBarElevation,
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = VoidDimens.sectionSpacing)
@@ -220,7 +83,9 @@ internal fun WidgetEditBar(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { heading() }
                 )
                 Button(onClick = onDone) { Text(stringResource(R.string.done)) }
             }
@@ -230,6 +95,42 @@ internal fun WidgetEditBar(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = VoidDimens.compactSpacing)
             )
+            if (resizesHorizontally || resizesVertically) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = VoidDimens.rowSpacing),
+                    horizontalArrangement = Arrangement.spacedBy(VoidDimens.sectionSpacing)
+                ) {
+                    if (resizesHorizontally) {
+                        SizeStepper(
+                            label = stringResource(R.string.widget_width),
+                            value = span.columns,
+                            decreaseLabel = stringResource(R.string.widget_action_narrower),
+                            increaseLabel = stringResource(R.string.widget_action_wider),
+                            onDecrease = steps.narrower?.let { { onResize(it) } },
+                            onIncrease = steps.wider?.let { { onResize(it) } }
+                        )
+                    }
+                    if (resizesVertically) {
+                        SizeStepper(
+                            label = stringResource(R.string.widget_height),
+                            value = span.rows,
+                            decreaseLabel = stringResource(R.string.widget_action_shorter),
+                            increaseLabel = stringResource(R.string.widget_action_taller),
+                            onDecrease = steps.shorter?.let { { onResize(it) } },
+                            onIncrease = steps.taller?.let { { onResize(it) } }
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = stringResource(R.string.widget_fixed_size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = VoidDimens.rowSpacing)
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -268,6 +169,48 @@ internal fun WidgetEditBar(
     }
 }
 
+/**
+ * One size of the widget: its name, a minus button, the number of cells and a plus button. A button
+ * whose step is not possible ([onDecrease] or [onIncrease] `null`) is disabled. A screen reader
+ * hears the name with the number ("Width, 2 cells") and the buttons by what they do.
+ */
+@Composable
+private fun RowScope.SizeStepper(
+    label: String,
+    value: Int,
+    decreaseLabel: String,
+    increaseLabel: String,
+    onDecrease: (() -> Unit)?,
+    onIncrease: (() -> Unit)?
+) {
+    val spoken = pluralStringResource(R.plurals.widget_size_cells, value, label, value)
+    Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.clearAndSetSemantics {}
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FilledTonalIconButton(onClick = { onDecrease?.invoke() }, enabled = onDecrease != null) {
+                Icon(Icons.Outlined.Remove, contentDescription = decreaseLabel)
+            }
+            Text(
+                text = "$value",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = spoken }
+            )
+            FilledTonalIconButton(onClick = { onIncrease?.invoke() }, enabled = onIncrease != null) {
+                Icon(Icons.Outlined.Add, contentDescription = increaseLabel)
+            }
+        }
+    }
+}
+
 // ── Header ──
 
 /**
@@ -282,7 +225,7 @@ internal fun WidgetsHeader(onAddWidget: () -> Unit, modifier: Modifier = Modifie
     Surface(
         shape = MaterialTheme.shapes.extraLargeIncreased.copy(topStart = CornerSize(0.dp), topEnd = CornerSize(0.dp)),
         color = MaterialTheme.colorScheme.surfaceContainer,
-        shadowElevation = 6.dp,
+        shadowElevation = VoidDimens.overlayHeaderElevation,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(

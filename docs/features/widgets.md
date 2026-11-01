@@ -6,25 +6,27 @@ Widgets are hosted on a **dedicated Widgets screen** using native `AppWidgetHost
 
 This is live system widget rendering — not a decorative overlay.
 
-Android keeps a single listener registration per `AppWidgetHost` id (`1024`), while each Widgets screen builds its own host and the closing screen stays composed until its exit animation ends. Listening is therefore reference counted (`ListeningLease`): every Widgets screen starts it, and only the last one to leave stops it, so reopening Widgets while it is still closing never silences the new screen. See `docs/architecture/motion.md`.
+The launcher has one host (`WidgetHostHolder`, id `1024`) that lives as long as the activity and keeps the views it built, the way a home screen keeps its widgets. It listens for updates while the launcher is visible and widgets are pinned, so the kept views stay current. See [Speed](#speed).
 
-## The header is hidden until you pull
+## The header is hidden until you open it
 
-The Widgets screen opens as a plain, full-screen grid: there is no top bar. The title, the **Add widget** button and a one-line reminder of how to customize a widget sit in a header that floats over the grid and stays out of sight until it is asked for:
+The Widgets screen opens as a plain, full-screen grid: there is no top bar. The title, the **Add widget** button and a one-line reminder of how to customize a widget sit in a header that floats over the grid:
 
-- **Pull down** anywhere on the grid (the finger moving down) and the header follows the finger; **tap or drag the short bar** under the status bar and it opens as well. Moving the finger up pushes it away again, the way a Material "enter always" app bar behaves, but it never takes scroll from the list: it floats over it, so the grid answers the finger at once and no widget moves when the header appears.
-- Releasing settles it on a spring: open when at least half of it is out, closed otherwise, and a fling of 400 dp/s or more decides on its own. The spring is `MaterialTheme.motionScheme.defaultSpatialSpec()` (Material 3 Expressive) and follows the animation-speed setting. While the header is still coming out, the part of a pull the list could not use is taken by the header, so the list does not stretch as well; once it is fully out the rest of the pull stretches the list as usual.
-- A tap beside the widgets, customizing a widget and opening the picker put the header away. With **no widgets** it stays out (there is nothing to give the room to, and Add widget has to be reachable) and it comes back when the picker is closed without adding anything.
-- For TalkBack the bar is a button, "Show widget options"; the hidden header is not focusable. The pure rules (clamp, fraction, settle target) are `HeaderRevealMath`; `RevealHeaderState`, `RevealHeaderConnection` and `RevealHandle` are in `ui/components/RevealHeader.kt`.
+- **Open it from the strip at the top**: drag down on the strip under the status bar (a short bar marks it) and the header follows the finger, or tap the strip and it springs open. The strip is the full width of the screen and the grid starts below it, so it never shares a touch with a widget and works the same way every time.
+- **A pull on the widgets does not open it.** That was the first design, and on a device it was inconsistent: a widget that handles its own touches (a button, a list, a search bar) keeps the drag from ever reaching the grid, so the header came only when the pull started on an empty spot.
+- Releasing settles it on the Material 3 Expressive spatial spring (`MaterialTheme.motionScheme`, which follows the animation-speed setting): open when at least half of it is out, shut otherwise; a fling of 400 dp/s or more decides on its own.
+- **Closing**: drag the header up like a sheet, scroll the widgets (the header follows the finger away), tap beside the widgets, or press Back. Customizing a widget and opening the picker put it away too.
+- With **no widgets** it stays out (Add widget must be reachable) and comes back when the picker is closed without adding anything.
+- For TalkBack the strip is a button, "Show widget options"; the hidden header is not focusable. `HeaderRevealMath`, `RevealHeaderState`, `RevealHeaderConnection` (scroll only hides), `revealHeaderDrag` and `RevealPullZone` are in `ui/components/RevealHeader.kt`.
 
 ## Customizing a widget: tap and hold
 
-1. **Tap and hold** a widget (a still finger for the long-press time). It gives a haptic tick and the screen goes into customize mode: the widget rises a little and gets a primary outline, the other widgets dim, the grid cells are outlined, and the **edit bar** slides up from the bottom edge. The bar names the widget ("Customize Weather"), says in one line what to do ("Drag the widget to move it · drag a handle to resize") and has plain, labelled buttons: **Settings** (only when the provider has a configure activity; persisted only after it succeeds), **Remove** (asks to confirm) and **Done**. A widget under the bar is scrolled clear of it.
+1. **Tap and hold** a widget (a still finger for the long-press time). It gives a haptic tick and the screen goes into customize mode: the widget rises a little and gets a primary outline, the other widgets dim, the grid cells are outlined, and the **edit bar** slides up from the bottom edge. Nothing is drawn on the widget itself. The bar names the widget ("Customize Weather") and holds every action as a labelled control. A widget under the bar is scrolled clear of it.
 2. **Move**: drag the widget, in the same touch as the long press or in a new one. A snapshot of the real widget follows the finger, the cell it will land on (the free one nearest to it) is highlighted, the grid scrolls when the finger is near its top or bottom edge, and the edit bar steps aside while the widget is held.
-3. **Resize**: drag a handle. A widget that can grow both ways has a handle on its bottom-right corner and, once it is at least two cells tall or wide, one in the middle of its right and of its bottom edge; a widget that grows one way has the handle on that edge only (`AppWidgetProviderInfo.resizeMode`). The span snaps to whole cells and shrinks to the largest size that does not cover another widget.
-4. **Done**, a tap beside the widgets, or Back leaves customize mode (Back no longer leaves the screen while a widget is picked).
+3. **Resize**: the bar's **Width** and **Height** rows show the size in cells with a − and a + button. A step is one cell; a button is disabled when the widget's app does not allow that direction (`AppWidgetProviderInfo.resizeMode`), at one cell, at the edge of the grid, or when the cells it would take hold another widget (`WidgetGrid.resizeSteps`). A widget that cannot be resized says so instead. The first design used handles on the widget's edges and a dot in its corner; on a device the dot was not understood as a handle, and a handle on the widget competes with the widget's own content for the finger.
+4. **Settings** (only when the widget has a configure screen; kept only after it succeeds), **Remove** (asks to confirm) and **Done** are buttons in the bar. Done, a tap beside the widgets, or Back leaves customize mode (Back does not leave the screen while a widget is picked). While a widget is picked, a tap on another one picks that one instead of opening its app.
 
-TalkBack and switch users get the same without gestures: each widget has a **Customize** action; a picked widget adds **Make wider / narrower / taller / shorter** (only the directions the provider allows) and **Move left / right / up / down** (one cell, never onto another widget: `WidgetGrid.moved`), and the edit bar's buttons are ordinary buttons. The handle geometry is `resizeHandlesFor` and `isOnResizeHandle` (`WidgetEditChrome.kt`, unit tested), shared by the handles and by the widget's own long-press, which leaves a touch that starts on a handle alone.
+TalkBack and switch users get the same without gestures: each widget has a **Customize** action; a picked widget adds **Make wider / narrower / taller / shorter** (the same steps as the bar's buttons) and **Move left / right / up / down** (one cell, never onto another widget: `WidgetGrid.moved`); the bar reads each size as "Width, 2 cells".
 
 Other rules:
 
@@ -44,17 +46,19 @@ Home-screen grid widget placement is intentionally not part of this epic.
 - Add: tap a widget in the picker (first free cell) or hold it and drag it onto the grid. While held, the picker hides, the cells are outlined and the landing cell (the free one nearest the finger) is highlighted.
 - Layout rules live in `helper/WidgetGrid.kt` (pure, unit tested). Layouts saved before cells existed are placed in their saved order.
 
-## Performance and interaction
+## Speed
 
-Opening Widgets used to stall the slide-in, because three things landed on the main thread while the panel moved. They are now kept out of it:
+Widgets show on the first frame of the screen, already drawn:
 
-- **Provider list**: the pinned widgets are read by widget id (`AppWidgetManager.getAppWidgetInfo`, a few milliseconds), so the first widget no longer waits for every provider on the device and its label to load. That heavy list (`WidgetsViewModel.loadProviders`) loads in the background once the panel has arrived, or when the picker opens, and only once.
-- **Widget views**: `VoidAppWidgetHost` makes the host views apply the provider's `RemoteViews` on a background executor on Android 12 and later (`AppWidgetHostView.setExecutor`, as the platform launcher does), instead of inflating them on the main thread; Android 11 and earlier still inflate on the main thread. The views are also only created after the slide-in has ended (`LocalPanelSettled`), one per frame (`rememberStagedKeys`), with a tile of the widget's size in its place until the provider has drawn.
-- **Header**: composed after the panel has arrived (nobody pulls it during the slide-in).
+- **Kept views**: a widget view is built once and kept while the launcher's activity lives (`WidgetHostHolder`). Each later visit puts the same view back (`obtainView`) instead of asking every provider for its content again, and its size options are sent only when the size changed (`applySize`). The host listens while the launcher is visible, so kept views stay current.
+- **Built ahead of time**: 1.5 s after the launcher starts, the pinned widgets' views are built while the main thread is idle, one per idle moment, at the size the grid gives them (`WidgetHostHolder.prewarm`), so even the first visit has nothing to build.
+- **Known layout**: the pinned widgets as last read are kept too, so the screen lays the grid out on its first frame and checks with the system in the background (by widget id, `PinnedWidgetQuery`). The all-provider list for the picker loads in the background after the slide-in or when the picker opens, once.
+- **A view that has to be built** (a widget just pinned): on Android 12 and later `VoidAppWidgetHost` inflates its `RemoteViews` on a background executor, and it is built at once, one per frame, fading in over a tile of its size. Android 11 and earlier inflate on the main thread, so those wait for the slide-in.
+- The kept views are let go when the activity is destroyed, because they hold it.
+- Compose's `AndroidView` leaves a released view inside its old holder, so the widget item takes it out in `onRelease`; a kept view is only reused when it has no parent (a Widgets screen that is still closing keeps its own, and the new screen builds a fresh one).
 
 Also:
 
-- A widget's size options are sent to its provider only when its size changes (an `AppWidgetHostView` re-renders on every options update and drops touches meanwhile).
 - Screen positions used while dragging are plain fields, not Compose state, so scrolling and dragging never recompose the widget host views.
 - A long press lifts a widget only if the finger stays within the touch slop; a moving finger scrolls the grid or the widget.
 - Provider previews are decoded on demand per picker card and cached (`WidgetsViewModel.previewFor`).

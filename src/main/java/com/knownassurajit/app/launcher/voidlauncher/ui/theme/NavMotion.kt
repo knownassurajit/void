@@ -63,39 +63,39 @@ object NavMotion {
     /** The panel opens: it slides in from its edge, or (no edge) scales up and fades in. */
     fun enter(edge: PanelEdge, motion: VoidMotionScheme): EnterTransition =
         if (edge == PanelEdge.None) {
-            scaleIn(motion.slowScaleSpec(), NavTravel.sharedAxisPanelScale) +
+            scaleIn(motion.panelScaleSpec(), NavTravel.sharedAxisPanelScale) +
                 fadeIn(motion.defaultEffectsSpec())
         } else {
-            slideIn(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.enterStart(edge, it) }
+            slideIn(motion.panelSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.enterStart(edge, it) }
         }
 
     /** The screen under an opening panel moves the way the panel moves and dims (no edge: it scales up and fades out). */
     fun exit(edge: PanelEdge, motion: VoidMotionScheme): ExitTransition =
         if (edge == PanelEdge.None) {
-            scaleOut(motion.slowScaleSpec(), NavTravel.sharedAxisCoveredScale) +
+            scaleOut(motion.panelScaleSpec(), NavTravel.sharedAxisCoveredScale) +
                 fadeOut(motion.fastEffectsSpec())
         } else {
-            slideOut(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.exitEnd(edge, it) } +
+            slideOut(motion.panelSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.exitEnd(edge, it) } +
                 fadeOut(motion.slowEffectsSpec(), VoidAlpha.coveredByPanel)
         }
 
     /** The screen under a closing panel returns: [exit] played backwards. */
     fun popEnter(edge: PanelEdge, motion: VoidMotionScheme): EnterTransition =
         if (edge == PanelEdge.None) {
-            scaleIn(motion.slowScaleSpec(), NavTravel.sharedAxisCoveredScale) +
+            scaleIn(motion.panelScaleSpec(), NavTravel.sharedAxisCoveredScale) +
                 fadeIn(motion.fastEffectsSpec())
         } else {
-            slideIn(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popEnterStart(edge, it) } +
+            slideIn(motion.panelSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popEnterStart(edge, it) } +
                 fadeIn(motion.slowEffectsSpec(), VoidAlpha.coveredByPanel)
         }
 
     /** The panel closes: [enter] played backwards. */
     fun popExit(edge: PanelEdge, motion: VoidMotionScheme): ExitTransition =
         if (edge == PanelEdge.None) {
-            scaleOut(motion.slowScaleSpec(), NavTravel.sharedAxisPanelScale) +
+            scaleOut(motion.panelScaleSpec(), NavTravel.sharedAxisPanelScale) +
                 fadeOut(motion.defaultEffectsSpec())
         } else {
-            slideOut(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popExitEnd(edge, it) }
+            slideOut(motion.panelSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popExitEnd(edge, it) }
         }
 
     /**

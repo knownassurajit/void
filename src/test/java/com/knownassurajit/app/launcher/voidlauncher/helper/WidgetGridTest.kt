@@ -120,4 +120,47 @@ class WidgetGridTest {
         val mover = place("a", 0, 5, 4, 2)
         assertEquals(Cell(0, 6), WidgetGrid.moved(emptyList(), mover, columns = 0, rows = 1))
     }
+
+    @Test
+    fun resizeSteps_offerOneCellEachWayThatFits() {
+        val widget = place("a", 0, 0, 2, 2)
+        val steps = WidgetGrid.resizeSteps(emptyList(), widget, resizesHorizontally = true, resizesVertically = true)
+        assertEquals(WidgetSpan(3, 2), steps.wider)
+        assertEquals(WidgetSpan(1, 2), steps.narrower)
+        assertEquals(WidgetSpan(2, 3), steps.taller)
+        assertEquals(WidgetSpan(2, 1), steps.shorter)
+    }
+
+    @Test
+    fun resizeSteps_neverCoverANeighbourLeaveTheGridOrGoUnderOneCell() {
+        val widget = place("a", 2, 0, 1, 1)
+        // A neighbour to the right, nothing below.
+        val others = listOf(place("b", 3, 0, 1, 1))
+        val steps = WidgetGrid.resizeSteps(others, widget, resizesHorizontally = true, resizesVertically = true)
+        assertNull(steps.wider)
+        assertNull(steps.narrower)
+        assertNull(steps.shorter)
+        assertEquals(WidgetSpan(1, 2), steps.taller)
+        // Already as wide as the grid allows from column 0.
+        val full = WidgetGrid.resizeSteps(emptyList(), place("c", 0, 0, 4, 1), true, true)
+        assertNull(full.wider)
+        assertEquals(WidgetSpan(3, 1), full.narrower)
+    }
+
+    @Test
+    fun resizeSteps_followTheDirectionsTheProviderAllows() {
+        val widget = place("a", 0, 0, 2, 2)
+        val horizontal = WidgetGrid.resizeSteps(emptyList(), widget, resizesHorizontally = true, resizesVertically = false)
+        assertEquals(WidgetSpan(3, 2), horizontal.wider)
+        assertNull(horizontal.taller)
+        assertNull(horizontal.shorter)
+        val none = WidgetGrid.resizeSteps(emptyList(), widget, resizesHorizontally = false, resizesVertically = false)
+        assertEquals(WidgetGrid.ResizeSteps(null, null, null, null), none)
+    }
+
+    @Test
+    fun resizeSteps_stopAtTheTallestSpan() {
+        val tall = place("a", 0, 0, 1, WidgetLayoutHelper.MAX_ROWS)
+        assertNull(WidgetGrid.resizeSteps(emptyList(), tall, true, true).taller)
+    }
 }

@@ -37,6 +37,15 @@ object VoidMotion {
     const val effectsSlowStiffness = 800f
 
     /**
+     * The spring a full-screen panel moves on (slide, shared-axis scale), and Home with it: the
+     * spatial default token. It settles a 1080 px slide in about 0.3 s at standard speed. It was
+     * spatial slow (0.5 s), which read as sluggish for a launcher whose screens open many times a
+     * minute; damping 0.9 keeps the overshoot under 2 px, so the window edge never shows.
+     */
+    const val panelDamping = spatialDefaultDamping
+    const val panelStiffness = spatialDefaultStiffness
+
+    /**
      * Where a spring on a scale (a `Float` between 0.8 and 1.1) stops. Compose's default of 0.01
      * ends the spring with up to 1% of scale left, which snaps the screen by about 5 px at each
      * edge of a 1080 px display.
@@ -98,8 +107,15 @@ class VoidMotionScheme(private val speedKey: String) {
         visibilityThreshold
     )
 
-    /** [slowSpatialSpec] for a scale: it stops at [VoidMotion.scaleVisibilityThreshold] instead of Compose's 0.01. */
-    fun slowScaleSpec(): SpringSpec<Float> = slowSpatialSpec(VoidMotion.scaleVisibilityThreshold)
+    /** The spring of a full-screen panel and of Home moving with it ([VoidMotion.panelStiffness]). */
+    fun <T> panelSpatialSpec(visibilityThreshold: T? = null): SpringSpec<T> = scaled(
+        VoidMotion.panelDamping,
+        VoidMotion.panelStiffness,
+        visibilityThreshold
+    )
+
+    /** [panelSpatialSpec] for a scale: it stops at [VoidMotion.scaleVisibilityThreshold] instead of Compose's 0.01. */
+    fun panelScaleSpec(): SpringSpec<Float> = panelSpatialSpec(VoidMotion.scaleVisibilityThreshold)
 
     fun <T> fastEffectsSpec(visibilityThreshold: T? = null): SpringSpec<T> = scaled(
         VoidMotion.effectsFastDamping,

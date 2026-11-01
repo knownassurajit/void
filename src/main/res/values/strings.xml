@@ -194,7 +194,6 @@
     <string name="widget_remove_message">Remove \"%1$s\" from your widgets?</string>
     <string name="widget_bind_denied">Allow VOID to create widgets, then try again.</string>
     <string name="widget_unavailable_body">Widgets are unavailable on this device.</string>
-    <string name="widget_resize_handle">Resize widget</string>
     <string name="unlock_private_space">Unlock Private Space</string>
     <string name="lock_private_space">Lock Private Space</string>
     <string name="private_space_settings">Private Space settings</string>
@@ -413,13 +412,18 @@
     <string name="color_presets">Presets</string>
     <string name="color_saturation_value">Saturation and brightness</string>
     <string name="color_hue">Hue</string>
-    <string name="widget_edit_hint">Drag the widget to move it · drag a handle to resize</string>
+    <string name="widget_edit_hint">Drag the widget to move it</string>
+    <string name="widget_width">Width</string>
+    <string name="widget_height">Height</string>
+    <string name="widget_fixed_size">This widget keeps the size its app gives it</string>
+    <plurals name="widget_size_cells">
+        <item quantity="one">%1$s, %2$d cell</item>
+        <item quantity="other">%1$s, %2$d cells</item>
+    </plurals>
     <string name="widget_edit_title">Customize %1$s</string>
     <string name="widget_edit_settings">Settings</string>
     <string name="widget_header_hint">Tap and hold a widget to move, resize or remove it</string>
     <string name="widget_header_show">Show widget options</string>
-    <string name="widget_resize_width">Resize width</string>
-    <string name="widget_resize_height">Resize height</string>
     <string name="widget_action_customize">Customize</string>
     <string name="widget_action_wider">Make wider</string>
     <string name="widget_action_narrower">Make narrower</string>

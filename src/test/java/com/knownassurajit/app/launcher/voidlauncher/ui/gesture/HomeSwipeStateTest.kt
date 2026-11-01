@@ -330,8 +330,8 @@ class HomeSwipeStateTest {
     @Test
     fun aPanelOrTheNotificationList_handsOverOnTheSpringTheNavHostMovesHomeOn() {
         val handOff = afterCommitSpec(HomeAfterCommit.HandOff, standard)
-        assertEquals(VoidMotion.spatialSlowStiffness, handOff.stiffness, 0f)
-        assertEquals(VoidMotion.spatialSlowDamping, handOff.dampingRatio, 0f)
+        assertEquals(VoidMotion.panelStiffness, handOff.stiffness, 0f)
+        assertEquals(VoidMotion.panelDamping, handOff.dampingRatio, 0f)
     }
 
     @Test
@@ -354,7 +354,7 @@ class HomeSwipeStateTest {
     fun theCommitSpring_followsTheAnimationSpeedSetting() {
         val slow = VoidMotionScheme(Prefs.AnimationSpeed.SLOW)
         val handOff = afterCommitSpec(HomeAfterCommit.HandOff, slow)
-        assertEquals(VoidMotion.stiffnessFor(Prefs.AnimationSpeed.SLOW, VoidMotion.spatialSlowStiffness), handOff.stiffness, 0.001f)
+        assertEquals(VoidMotion.stiffnessFor(Prefs.AnimationSpeed.SLOW, VoidMotion.panelStiffness), handOff.stiffness, 0.001f)
         val depart = afterCommitSpec(HomeAfterCommit.Depart(PanelEdge.Right), slow)
         assertEquals(VoidMotion.stiffnessFor(Prefs.AnimationSpeed.SLOW, VoidMotion.spatialDefaultStiffness), depart.stiffness, 0.001f)
     }

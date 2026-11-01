@@ -12,6 +12,13 @@ object VoidDimens {
     val fontStateIconSize = 24.dp
     val fontProgressStrokeWidth = 2.dp
 
+    /** Elevation of a bar that floats over content (the widget edit bar), and its tonal lift. */
+    val floatingBarElevation = 8.dp
+    val floatingBarTonalElevation = 3.dp
+
+    /** Elevation of a header that slides in over content (the Widgets header). */
+    val overlayHeaderElevation = 6.dp
+
     /**
      * Drag distance along the dismiss direction that commits a swipe on release: the Material 3
      * `SwipeToDismissBox` positional threshold (`SwipeToDismissBoxDefaults.positionalThreshold`).

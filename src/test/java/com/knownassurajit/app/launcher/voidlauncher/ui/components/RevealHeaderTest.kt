@@ -125,50 +125,44 @@ class RevealHeaderConnectionTest {
     private fun post(unusedDy: Float) = connection.onPostScroll(Offset.Zero, Offset(0f, unusedDy), NestedScrollSource.UserInput)
 
     @Test
-    fun theFingerMovingDownPullsTheHeaderInAndTheFingerMovingUpPushesItOut() {
-        pre(80f)
-        assertEquals(80f, state.offsetPx, 0f)
-        pre(-30f)
-        assertEquals(50f, state.offsetPx, 0f)
+    fun scrollingTheContentNeverBringsTheHeaderIn() {
+        // A pull on the widgets reaches the scroll container only sometimes (a widget can keep it), so it
+        // must not open the header at all: the strip at the top does that.
+        pre(120f)
+        assertTrue(state.isHidden)
+        assertEquals(Offset.Zero, post(120f))
+        assertTrue(state.isHidden)
     }
 
     @Test
-    fun theListKeepsEveryPixelOfTheScroll() {
-        // The header floats over the list: it never takes scroll away from it.
-        assertEquals(Offset.Zero, pre(80f))
+    fun scrollingTheContentUpPushesAnOpenHeaderAway() {
+        state.dragBy(200f)
+        pre(-80f)
+        assertEquals(120f, state.offsetPx, 0f)
+        pre(-500f)
+        assertTrue(state.isHidden)
+    }
+
+    @Test
+    fun scrollingDownLeavesAnOpenHeaderWhereItIs() {
+        state.dragBy(150f)
+        pre(60f)
+        assertEquals(150f, state.offsetPx, 0f)
+    }
+
+    @Test
+    fun theContentKeepsEveryPixelOfTheScroll() {
+        state.dragBy(200f)
         assertEquals(Offset.Zero, pre(-80f))
-    }
-
-    @Test
-    fun aPullTheListCouldNotUseIsTakenWhileTheHeaderIsStillComingOut() {
-        pre(60f)
-        // The list is at its top and could not move: the 60 px are left over and go to the header's pull, not to a stretch.
-        assertEquals(Offset(0f, 60f), post(60f))
-    }
-
-    @Test
-    fun onceTheHeaderIsFullyOutTheRestOfThePullStretchesTheList() {
-        pre(250f)
-        assertTrue(state.isFullyShown)
-        assertEquals(Offset.Zero, post(50f))
-    }
-
-    @Test
-    fun aPullWithoutAFingerIsLeftAlone() {
-        pre(60f)
-        assertEquals(Offset.Zero, connection.onPostScroll(Offset.Zero, Offset(0f, 60f), NestedScrollSource.SideEffect))
-    }
-
-    @Test
-    fun leftoverUpwardScrollIsNeverTaken() {
-        assertEquals(Offset.Zero, post(-40f))
+        assertEquals(Offset.Zero, pre(80f))
+        assertEquals(Offset.Zero, post(40f))
     }
 
     @Test
     fun aDisabledConnectionDoesNothing() {
+        state.dragBy(200f)
         enabled = false
-        assertEquals(Offset.Zero, pre(80f))
-        assertTrue(state.isHidden)
-        assertEquals(Offset.Zero, post(80f))
+        assertEquals(Offset.Zero, pre(-80f))
+        assertTrue(state.isFullyShown)
     }
 }

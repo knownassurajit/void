@@ -29,13 +29,13 @@ class MotionDurationTest {
     }
 
     private fun panelSeconds(speed: String): Float =
-        settleSeconds(VoidMotionScheme(speed).slowSpatialSpec(ONE_PIXEL), PANEL_WIDTH_PX)
+        settleSeconds(VoidMotionScheme(speed).panelSpatialSpec(ONE_PIXEL), PANEL_WIDTH_PX)
 
     @Test
-    fun aPanelSettlesInAboutHalfASecondAtStandardSpeed() {
-        // docs/architecture/motion.md: "At standard speed a panel settles to one pixel in about 0.45 s".
+    fun aPanelSettlesInAboutAThirdOfASecondAtStandardSpeed() {
+        // docs/architecture/motion.md: a panel settles to one pixel in about 0.3 s at standard speed.
         val standard = panelSeconds(Prefs.AnimationSpeed.STANDARD)
-        assertTrue("a panel took $standard s at standard speed", standard in 0.35f..0.6f)
+        assertTrue("a panel took $standard s at standard speed", standard in 0.25f..0.4f)
     }
 
     @Test

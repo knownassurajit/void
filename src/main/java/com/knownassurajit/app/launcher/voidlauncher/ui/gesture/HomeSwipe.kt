@@ -167,7 +167,7 @@ internal fun Modifier.homeSwipeOffset(state: HomeSwipeState): Modifier = graphic
 
 /**
  * The spring Home moves on after a committed swipe ([exit], see [homeAfterCommit]). A panel or the
- * notification list is brought in by the `NavHost` transition, which moves Home on spatial slow in
+ * notification list is brought in by the `NavHost` transition, which moves Home on the panel spring in
  * the same direction: the peek decays on that spring too, so the two add up to one smooth movement
  * (on a faster spring the peek would pull Home back against the finger for a moment). An app on an
  * Android version whose own window animation moves Home has no Compose transition, so Home just
@@ -175,7 +175,7 @@ internal fun Modifier.homeSwipeOffset(state: HomeSwipeState): Modifier = graphic
  * whose action could not run springs back, both on spatial default.
  */
 internal fun afterCommitSpec(exit: HomeAfterCommit, motion: VoidMotionScheme): SpringSpec<Float> = when (exit) {
-    HomeAfterCommit.HandOff -> motion.slowSpatialSpec(SETTLE_VISIBILITY_PX)
+    HomeAfterCommit.HandOff -> motion.panelSpatialSpec(SETTLE_VISIBILITY_PX)
     HomeAfterCommit.SettleQuickly -> motion.fastSpatialSpec(SETTLE_VISIBILITY_PX)
     is HomeAfterCommit.Depart, HomeAfterCommit.SpringBack -> motion.defaultSpatialSpec(SETTLE_VISIBILITY_PX)
 }
