@@ -77,6 +77,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -881,7 +882,7 @@ fun WidgetsScreen(
                                     appWidgetHost = viewModel.appWidgetHost,
                                     placement = placement,
                                     metrics = metrics,
-                                    viewBuilt = placement.key in builtKeys,
+                                    viewBuilt = placement.key in builtKeys.value,
                                     selected = selectedWidgetKey == widget.key,
                                     dimmed = selectedWidgetKey != null && selectedWidgetKey != widget.key,
                                     lifted = drag?.widget?.key == widget.key,
@@ -1391,16 +1392,17 @@ private fun LiveWidgetItem(
 /**
  * The keys of [keys] that may build their widget view yet. Nothing before [enabled] (the screen has
  * not arrived), then one more per frame, in order: a view is built on the main thread and asks the
- * provider for its content, so building them all in one frame would stall it by the sum.
+ * provider for its content, so building them all in one frame would stall it by the sum. It is state
+ * so that only the items read it: each release recomposes the grid, not the whole screen.
  */
 @Composable
-private fun rememberStagedKeys(keys: List<String>, enabled: Boolean): Set<String> {
-    var released by remember { mutableStateOf<Set<String>>(emptySet()) }
+private fun rememberStagedKeys(keys: List<String>, enabled: Boolean): State<Set<String>> {
+    val released = remember { mutableStateOf<Set<String>>(emptySet()) }
     LaunchedEffect(enabled, keys) {
         if (!enabled) return@LaunchedEffect
         for (key in keys) {
-            if (key in released) continue
-            released = released + key
+            if (key in released.value) continue
+            released.value = released.value + key
             withFrameNanos { }
         }
     }

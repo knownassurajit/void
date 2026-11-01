@@ -9,7 +9,7 @@
 1. Launch home
 2. Swipe up → app drawer (no crash; keyboard on/off); a swipe follows the finger with Home before the panel opens
 3. Long-press drag home apps 5→2 cascade
-4. Open Widgets: picker shows previews; first pin may show a system “create widgets” prompt; widget appears after allow; pinned widgets show a check; long-press selects without opening the app; drag snaps to the grid
+4. Open Widgets: the grid has no top bar and a pull down brings in the header (title, Add widget); picker shows previews; first pin may show a system “create widgets” prompt; widget appears after allow; pinned widgets show a check; tap and hold customizes a widget (edit bar, handles) without opening the app; drag snaps to the grid
 5. Open Notes: swipe a note row to delete it (red arrow; the delete swipe is the opposite of the one that closes Notes, so it goes right when Notes is on the left swipe)
 6. Toggle homescreen components and verify reflow
 7. Long-press empty home space → picker; remove via chip X
@@ -23,6 +23,15 @@
 ```bash
 ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest \
   --tests "*ScreenBackSwipeInstrumentedTest"
+```
+
+## Widgets header (emulator only)
+
+`RevealHeaderInstrumentedTest` drives `RevealHeaderConnection` through a real `verticalScroll` with the Compose test rule, the way Widgets uses it: a list with nothing to scroll (a few widgets) still hands a downward pull to the header through nested scroll, a slow pull past half opens it, a short slow pull leaves it shut, a quick flick opens it whatever the distance, and a switched-off header ignores the pull. It compiles with the build but has not been run yet: run it on an emulator before relying on it.
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest \
+  --tests "*RevealHeaderInstrumentedTest"
 ```
 
 ## Home swipes (emulator only)
