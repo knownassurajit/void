@@ -1,5 +1,6 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
+import android.util.Log
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
@@ -28,6 +29,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The edge the panel being composed entered from. Provided per destination by [NavPanel]. */
 val LocalPanelEdge = compositionLocalOf { PanelEdge.None }
@@ -158,11 +160,21 @@ fun AnimatedContentScope.NavPanel(edge: PanelEdge, content: @Composable () -> Un
     }
 }
 
+/**
+ * The longest a panel is waited for. The slide-in takes 0.8 s at the slowest speed, so this is far
+ * past any real transition; it only guarantees that what waits for [LocalPanelSettled] (widget
+ * views, the keyboard) is never held back for good by a transition that did not report its end.
+ */
+private const val PANEL_SETTLE_TIMEOUT_MS = 2_000L
+
 @Composable
 private fun rememberPanelSettled(transition: Transition<EnterExitState>): State<Boolean> {
     val settled = remember { mutableStateOf(false) }
     LaunchedEffect(transition) {
-        snapshotFlow { transition.currentState == EnterExitState.Visible }.first { it }
+        val arrived = withTimeoutOrNull(PANEL_SETTLE_TIMEOUT_MS) {
+            snapshotFlow { transition.currentState == EnterExitState.Visible }.first { it }
+        }
+        if (arrived == null) Log.w("NavPanel", "panel_settle_timeout ms=$PANEL_SETTLE_TIMEOUT_MS")
         settled.value = true
     }
     return settled

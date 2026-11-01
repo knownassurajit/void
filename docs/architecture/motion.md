@@ -224,7 +224,7 @@ A transition is smooth only while every frame is cheap, and a few things cost te
 - The app drawer opens the keyboard when the panel has settled. It used to wait a fixed 320 ms, which is in the middle of the slide at the standard speed and long before the end of it at the slow one.
 - Widgets builds its widget views after the slide-in, one per frame, composes its header then, and loads the picker's provider list in the background (see `docs/features/widgets.md`).
 
-A fixed delay is the wrong tool for this: it is right at one animation speed only. A new screen with heavy first-frame work should read `LocalPanelSettled` the same way.
+If a transition never reports its end, `LocalPanelSettled` turns true after 2 s anyway (and logs `panel_settle_timeout`), so nothing that waits for it can be held back for good. A fixed delay is the wrong tool for this: it is right at one animation speed only. A new screen with heavy first-frame work should read `LocalPanelSettled` the same way.
 
 ## Limits
 
