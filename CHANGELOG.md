@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- Screen time in the app library: with Screen time on and usage access allowed, each app shows today's usage right after its name (`1h 5m`, `12m`, `<1m`; nothing for an app not used today), read once off the main thread when the drawer opens and again on resume (`AppDrawerViewModel`, `ScreenTimeSource`). Pinned shortcuts and apps of another profile show nothing, and TalkBack reads "12m today"
+- Settings → Home screen → **Screen time** section: show on Home, **show in app library** (`SHOW_APP_SCREEN_TIME`, default on, disabled while the Home switch is off), a usage-access row that says whether access is granted and opens the system screen (re-read on resume), and the size of the Home line
 - Material 3 Expressive throughout: `MaterialExpressiveTheme` with the expressive motion scheme for components, the full shape scale (adds 20/32/48 dp corners) and emphasized type roles in the launcher's own font; Settings and Notes use segmented list items, choices use connected toggle-button groups, switches show a check thumb, loading uses the Expressive loading indicator (material3 1.5.0-beta01 on Compose BOM 2026.09.00)
 - Color picker for Home and icon colors: saturation/brightness panel, hue bar, hex input (3, 6 or 8 digits, paste-friendly) with validation, theme-color swatches that follow dynamic color, and a preset palette; colors are stored as a theme role or `#RRGGBB` (`HomeColor`)
 - Private Space icon color (lock, settings, shield and private-app icons and the control pill)
@@ -24,6 +26,7 @@
 - Swipes that start at a screen edge: while Home is the screen on top, two full-height strips along the left and right edges (only for an edge that has an action) ask the system to leave them to the app (`systemGestureExclusion`, width `max(system gesture inset, 30 dp) + 8 dp`), so the edge swipe is an ordinary swipe; the system Back gesture is untouched on every other screen
 
 ### Changed
+- Screen time on Home and the per-app figures come from one reader (`ScreenTimeSource`, `ScreenTimeMath`), so the apps add up to the total; nothing is queried while Screen time is off (it used to query every minute regardless), and switching it on reads at once instead of at the next minute. The Screen time switch and size slider moved from Home layout and Clock into the new section; the search index follows
 - Settings regrouped and rebuilt as Expressive segmented sections: Appearance (font & style, system bars, motion), Home screen (live preview, layout, clock & date, home apps), App drawer (app list, Private Space), Gestures (swipes, navigation), Features (panels), Permissions; each Home text block has its own weight, color and opacity rows with explicit labels
 - Swipe settings are named after the finger ("Swipe left" moves the finger left and opens content from the right edge); stored settings are migrated once so every gesture keeps its action; the non-functional "Accessibility action" is no longer offered
 - Notes are Expressive segmented cards (same family as Settings), split into active and completed groups

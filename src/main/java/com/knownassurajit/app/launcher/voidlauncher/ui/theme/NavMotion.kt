@@ -1,8 +1,11 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -16,9 +19,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.flow.first
 
 /** The edge the panel being composed entered from. Provided per destination by [NavPanel]. */
 val LocalPanelEdge = compositionLocalOf { PanelEdge.None }
@@ -117,15 +126,44 @@ object NavMotion {
 }
 
 /**
+ * Whether the panel being composed has finished entering, as state so that only what reads it
+ * recomposes. It starts `false` and turns `true` once, when the slide-in ends, and stays `true`
+ * (an exit animation does not take it back, so nothing a screen built after it is torn down while the
+ * panel leaves). Outside a [NavPanel] it is always `true`.
+ *
+ * A screen uses it to keep work that blocks the main thread out of the transition: the slide is
+ * smooth only while every frame is cheap, and creating a hosted widget view or showing the keyboard
+ * costs tens of milliseconds, so such work waits for this flag instead of a fixed delay (a delay is
+ * wrong at the slow animation speed).
+ */
+val LocalPanelSettled = compositionLocalOf<State<Boolean>> { AlwaysSettled }
+
+private val AlwaysSettled: State<Boolean> = object : State<Boolean> {
+    override val value: Boolean = true
+}
+
+/**
  * Wraps the content of every destination except Home in an opaque black surface and tells it which
- * [edge] it entered from. No screen paints a background of its own, so without this surface the
- * screen under a sliding panel would show through it. Home stays transparent over the black window.
+ * [edge] it entered from and, through [LocalPanelSettled], when it has arrived. No screen paints a
+ * background of its own, so without this surface the screen under a sliding panel would show
+ * through it. Home stays transparent over the black window.
  */
 @Composable
-fun NavPanel(edge: PanelEdge, content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalPanelEdge provides edge) {
+fun AnimatedContentScope.NavPanel(edge: PanelEdge, content: @Composable () -> Unit) {
+    val settled = rememberPanelSettled(transition)
+    CompositionLocalProvider(LocalPanelEdge provides edge, LocalPanelSettled provides settled) {
         Box(modifier = Modifier.fillMaxSize().background(VoidBlack)) {
             content()
         }
     }
+}
+
+@Composable
+private fun rememberPanelSettled(transition: Transition<EnterExitState>): State<Boolean> {
+    val settled = remember { mutableStateOf(false) }
+    LaunchedEffect(transition) {
+        snapshotFlow { transition.currentState == EnterExitState.Visible }.first { it }
+        settled.value = true
+    }
+    return settled
 }

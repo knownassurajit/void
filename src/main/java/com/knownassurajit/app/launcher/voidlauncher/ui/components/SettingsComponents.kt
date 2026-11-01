@@ -165,7 +165,10 @@ fun SettingActionItem(
     ) { Text(title) }
 }
 
-/** A switch row: the whole row toggles; the thumb shows a check while on. */
+/**
+ * A switch row: the whole row toggles; the thumb shows a check while on. A row that is not
+ * [enabled] is dimmed and ignores touches (a setting that depends on another one that is off).
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingToggleItem(
@@ -173,18 +176,21 @@ fun SettingToggleItem(
     subtitle: String,
     icon: @Composable () -> Unit,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
 ) {
     SegmentedListItem(
         checked = checked,
         onCheckedChange = onCheckedChange,
         shapes = segmentShapes(),
+        enabled = enabled,
         leadingContent = icon,
         supportingContent = if (subtitle.isEmpty()) null else { { Subtitle(subtitle) } },
         trailingContent = {
             Switch(
                 checked = checked,
                 onCheckedChange = null,
+                enabled = enabled,
                 thumbContent = if (checked) {
                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
                 } else {

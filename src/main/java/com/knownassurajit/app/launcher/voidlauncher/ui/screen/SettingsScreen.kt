@@ -102,6 +102,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.MainUiState
 import com.knownassurajit.app.launcher.voidlauncher.R
@@ -167,6 +169,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var appHorizontalAlignment by remember { mutableIntStateOf(prefs.homeAlignment) }
     var appVerticalAlignment by remember { mutableIntStateOf(prefs.homeVerticalAlignment) }
     var showScreenTime by remember { mutableStateOf(prefs.showScreenTimeWidget) }
+    var showAppScreenTime by remember { mutableStateOf(prefs.showAppScreenTime) }
     var autoShowKeyboard by remember { mutableStateOf(prefs.autoShowKeyboard) }
     var showAlphabetCategories by remember { mutableStateOf(prefs.showAlphabetCategories) }
     var showStatusBar by remember { mutableStateOf(prefs.showStatusBar) }
@@ -358,8 +361,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                             onShowClockChange = { showClock = it; prefs.showClockWidget = it },
                             showDate = showDate,
                             onShowDateChange = { showDate = it; prefs.showDateWidget = it },
-                            showScreenTime = showScreenTime,
-                            onShowScreenTimeChange = { showScreenTime = it; prefs.showScreenTimeWidget = it },
                             showHomeApps = showHomeApps,
                             onShowHomeAppsChange = { showHomeApps = it; prefs.showHomeApps = it },
                             homeSectionOrder = homeSectionOrder,
@@ -368,6 +369,17 @@ fun SettingsScreen(onBack: () -> Unit) {
                             onClockSectionWeightChange = { clockSectionWeight = it; prefs.clockSectionWeight = it },
                             homeSidePadding = homeSidePadding,
                             onHomeSidePaddingChange = { homeSidePadding = it; prefs.homeSidePaddingDp = it },
+                            holdHome = holdHome
+                        )
+                    }
+                    if (search.screenTime) {
+                        ScreenTimeSection(
+                            showScreenTime = showScreenTime,
+                            onShowScreenTimeChange = { showScreenTime = it; prefs.showScreenTimeWidget = it },
+                            showAppScreenTime = showAppScreenTime,
+                            onShowAppScreenTimeChange = { showAppScreenTime = it; prefs.showAppScreenTime = it },
+                            screenTimeSizeScale = screenTimeSizeScale,
+                            onScreenTimeSizeScaleChange = { screenTimeSizeScale = it; prefs.screenTimeSizeScale = it },
                             snackbarHostState = snackbarHostState,
                             holdHome = holdHome
                         )
@@ -432,18 +444,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 valueText = ::scaleText,
                                 onHoldingChanged = holdHome,
                                 onChanged = { dateSizeScale = it; prefs.dateSizeScale = it }
-                            )
-                        }
-                        rows += {
-                            SettingSliderItem(
-                                title = stringResource(R.string.screen_time_size),
-                                subtitle = stringResource(R.string.settings_screen_time_size_subtitle),
-                                icon = { Icon(Icons.Default.QueryStats, contentDescription = null) },
-                                value = screenTimeSizeScale,
-                                range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
-                                valueText = ::scaleText,
-                                onHoldingChanged = holdHome,
-                                onChanged = { screenTimeSizeScale = it; prefs.screenTimeSizeScale = it }
                             )
                         }
                         addTextStyleRows(
@@ -705,6 +705,7 @@ private data class SettingsSearchFlags(
     val defaultLauncher: Boolean,
     val appearance: Boolean,
     val homeLayout: Boolean,
+    val screenTime: Boolean,
     val clock: Boolean,
     val homeApps: Boolean,
     val appDrawer: Boolean,
@@ -712,7 +713,7 @@ private data class SettingsSearchFlags(
     val features: Boolean,
     val permissions: Boolean
 ) {
-    val homeHeader: Boolean get() = homeLayout || clock || homeApps
+    val homeHeader: Boolean get() = homeLayout || screenTime || clock || homeApps
     val anyVisible: Boolean
         get() = defaultLauncher || appearance || homeHeader || appDrawer || gestures || features || permissions
 }
@@ -736,13 +737,20 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
         stringResource(R.string.settings_section_home_layout),
         stringResource(R.string.settings_show_clock),
         stringResource(R.string.show_date_time),
-        stringResource(R.string.screen_time),
         stringResource(R.string.settings_show_home_apps),
         stringResource(R.string.settings_section_order),
         stringResource(R.string.clock_first),
         stringResource(R.string.apps_first),
         stringResource(R.string.clock_section_weight),
         stringResource(R.string.settings_side_padding)
+    )
+    val screenTimeTerms = listOf(
+        stringResource(R.string.screen_time),
+        stringResource(R.string.settings_screen_time_home),
+        stringResource(R.string.settings_screen_time_apps),
+        stringResource(R.string.settings_screen_time_apps_subtitle),
+        stringResource(R.string.perm_usage_access),
+        stringResource(R.string.screen_time_size)
     )
     val clockTerms = listOf(
         stringResource(R.string.settings_section_clock),
@@ -752,7 +760,6 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
         stringResource(R.string.settings_clock_vertical),
         stringResource(R.string.clock_size),
         stringResource(R.string.date_size),
-        stringResource(R.string.screen_time_size),
         stringResource(R.string.settings_clock_weight),
         stringResource(R.string.settings_clock_color),
         stringResource(R.string.settings_clock_opacity)
@@ -818,6 +825,7 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
         ),
         appearance = group(stringResource(R.string.settings_group_appearance), appearanceTerms),
         homeLayout = group(homeTitle, homeLayoutTerms),
+        screenTime = group(homeTitle, screenTimeTerms),
         clock = group(homeTitle, clockTerms),
         homeApps = group(homeTitle, homeAppsTerms),
         appDrawer = group(stringResource(R.string.settings_group_app_drawer), appDrawerTerms),
@@ -980,8 +988,6 @@ private fun HomeLayoutSection(
     onShowClockChange: (Boolean) -> Unit,
     showDate: Boolean,
     onShowDateChange: (Boolean) -> Unit,
-    showScreenTime: Boolean,
-    onShowScreenTimeChange: (Boolean) -> Unit,
     showHomeApps: Boolean,
     onShowHomeAppsChange: (Boolean) -> Unit,
     homeSectionOrder: String,
@@ -990,13 +996,8 @@ private fun HomeLayoutSection(
     onClockSectionWeightChange: (Float) -> Unit,
     homeSidePadding: Float,
     onHomeSidePaddingChange: (Float) -> Unit,
-    snackbarHostState: SnackbarHostState,
     holdHome: (Boolean) -> Unit
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val usageRedirected = stringResource(R.string.settings_usage_access_redirected)
-    val screenTimeEnabled = stringResource(R.string.settings_screen_time_enabled)
     SettingsSection(
         title = stringResource(R.string.settings_section_home_layout),
         items = listOf(
@@ -1016,24 +1017,6 @@ private fun HomeLayoutSection(
                     icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
                     checked = showDate,
                     onCheckedChange = onShowDateChange
-                )
-            },
-            {
-                SettingToggleItem(
-                    title = stringResource(R.string.screen_time),
-                    subtitle = stringResource(R.string.settings_screen_time_subtitle),
-                    icon = { Icon(Icons.Default.QueryStats, contentDescription = null) },
-                    checked = showScreenTime,
-                    onCheckedChange = { enabled ->
-                        onShowScreenTimeChange(enabled)
-                        if (!enabled) return@SettingToggleItem
-                        if (FeatureAvailability.isUsageAccessGranted(context)) {
-                            scope.launch { snackbarHostState.showSnackbar(screenTimeEnabled) }
-                        } else {
-                            context.startSafely(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                            scope.launch { snackbarHostState.showSnackbar(usageRedirected) }
-                        }
-                    }
                 )
             },
             {
@@ -1080,6 +1063,90 @@ private fun HomeLayoutSection(
                     valueText = { "${it.roundToInt()} dp" },
                     onHoldingChanged = holdHome,
                     onChanged = onHomeSidePaddingChange
+                )
+            }
+        )
+    )
+}
+
+/**
+ * Everything about screen time in one place: the total under the clock, the per-app figures in the
+ * app library, the usage access they depend on, and the size of the Home line. The library switch is
+ * off-limits while screen time itself is off, because the library shows nothing then.
+ */
+@Composable
+private fun ScreenTimeSection(
+    showScreenTime: Boolean,
+    onShowScreenTimeChange: (Boolean) -> Unit,
+    showAppScreenTime: Boolean,
+    onShowAppScreenTimeChange: (Boolean) -> Unit,
+    screenTimeSizeScale: Float,
+    onScreenTimeSizeScaleChange: (Float) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    holdHome: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val usageRedirected = stringResource(R.string.settings_usage_access_redirected)
+    val screenTimeEnabled = stringResource(R.string.settings_screen_time_enabled)
+    // The system screen the user comes back from changes this, so it is read again on every resume.
+    var usageAccessGranted by remember { mutableStateOf(FeatureAvailability.isUsageAccessGranted(context)) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        usageAccessGranted = FeatureAvailability.isUsageAccessGranted(context)
+    }
+    SettingsSection(
+        title = stringResource(R.string.screen_time),
+        description = stringResource(R.string.settings_screen_time_description),
+        items = listOf(
+            {
+                SettingToggleItem(
+                    title = stringResource(R.string.settings_screen_time_home),
+                    subtitle = stringResource(R.string.settings_screen_time_subtitle),
+                    icon = { Icon(Icons.Default.QueryStats, contentDescription = null) },
+                    checked = showScreenTime,
+                    onCheckedChange = { enabled ->
+                        onShowScreenTimeChange(enabled)
+                        if (!enabled) return@SettingToggleItem
+                        if (usageAccessGranted) {
+                            scope.launch { snackbarHostState.showSnackbar(screenTimeEnabled) }
+                        } else {
+                            Log.i(TAG, "screen_time_usage_access_requested")
+                            context.startSafely(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                            scope.launch { snackbarHostState.showSnackbar(usageRedirected) }
+                        }
+                    }
+                )
+            },
+            {
+                SettingToggleItem(
+                    title = stringResource(R.string.settings_screen_time_apps),
+                    subtitle = stringResource(R.string.settings_screen_time_apps_subtitle),
+                    icon = { Icon(Icons.Default.Apps, contentDescription = null) },
+                    checked = showAppScreenTime,
+                    enabled = showScreenTime,
+                    onCheckedChange = onShowAppScreenTimeChange
+                )
+            },
+            {
+                SettingActionItem(
+                    title = stringResource(R.string.perm_usage_access),
+                    subtitle = stringResource(
+                        if (usageAccessGranted) R.string.settings_screen_time_access_granted else R.string.settings_screen_time_access_needed
+                    ),
+                    icon = { Icon(Icons.Default.Security, contentDescription = null) },
+                    onClick = { context.startSafely(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+                )
+            },
+            {
+                SettingSliderItem(
+                    title = stringResource(R.string.screen_time_size),
+                    subtitle = stringResource(R.string.settings_screen_time_size_subtitle),
+                    icon = { Icon(Icons.Default.QueryStats, contentDescription = null) },
+                    value = screenTimeSizeScale,
+                    range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
+                    valueText = ::scaleText,
+                    onHoldingChanged = holdHome,
+                    onChanged = onScreenTimeSizeScaleChange
                 )
             }
         )

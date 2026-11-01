@@ -278,7 +278,9 @@ class MainActivity : ComponentActivity() {
                                     mainViewModel.selectedApp(app, com.knownassurajit.app.launcher.voidlauncher.data.Constants.FLAG_LAUNCH_APP)
                                 },
                                 onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
-                                privateSpacePlacement = uiState.privateSpacePlacement
+                                privateSpacePlacement = uiState.privateSpacePlacement,
+                                // Per-app usage is part of screen time: it follows the Home switch as well as its own.
+                                showAppScreenTime = uiState.showScreenTime && uiState.showAppScreenTime
                             )
                         }
                     }
