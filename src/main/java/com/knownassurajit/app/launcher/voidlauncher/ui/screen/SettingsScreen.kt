@@ -5,9 +5,14 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import android.view.Gravity
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +48,7 @@ import androidx.compose.material.icons.outlined.FormatLineSpacing
 import androidx.compose.material.icons.outlined.FormatListNumbered
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.HorizontalSplit
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
@@ -51,6 +57,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SignalCellularAlt
 import androidx.compose.material.icons.outlined.SortByAlpha
 import androidx.compose.material.icons.outlined.Summarize
@@ -63,12 +70,10 @@ import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.Timelapse
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.VerticalAlignCenter
-import androidx.compose.material.icons.outlined.ViewList
+import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.outlined.WidthNormal
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -94,6 +99,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -112,6 +118,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.MainUiState
 import com.knownassurajit.app.launcher.voidlauncher.R
@@ -163,7 +170,18 @@ val LocalSettingsPrefs = staticCompositionLocalOf<Prefs> { error("LocalSettingsP
 /** A section's rows; each becomes one segment of its [SettingsSection]. */
 private typealias SettingRows = MutableList<@Composable () -> Unit>
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Top-level functional categories for settings navigation. */
+enum class SettingsCategory {
+    APPEARANCE,
+    HOME_SCREEN,
+    APP_DRAWER,
+    GESTURES,
+    PANELS,
+    PERMISSIONS,
+    ABOUT
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -222,6 +240,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var contentSwipeToBack by remember { mutableStateOf(prefs.contentSwipeToBack) }
     var privateSpacePlacement by remember { mutableStateOf(prefs.privateSpacePlacement) }
     var searchQuery by remember { mutableStateOf("") }
+    var currentCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
 
     val isPrivateSpaceConfigured = remember { PrivateSpaceHelper.getPrivateSpaceProfile(context) != null }
     val privateSpaceAvailable = FeatureAvailability.isPrivateSpaceAvailable(context)
@@ -258,10 +277,17 @@ fun SettingsScreen(onBack: () -> Unit) {
         homeAppsColor = homeAppsColor,
         clockFontWeight = clockFontWeight,
         homeAppsFontWeight = homeAppsFontWeight,
-        homeSidePaddingDp = homeSidePadding
+        homeSidePaddingDp = homeSidePadding,
     )
     val holdHome: (Boolean) -> Unit = { holding -> activePreviewTarget = if (holding) SettingsPreviewTarget.HOME else null }
     val holdDrawer: (Boolean) -> Unit = { holding -> activePreviewTarget = if (holding) SettingsPreviewTarget.DRAWER else null }
+
+    BackHandler(enabled = searchQuery.isNotBlank()) {
+        searchQuery = ""
+    }
+    BackHandler(enabled = (searchQuery.isBlank() && currentCategory != null)) {
+        currentCategory = null
+    }
 
     CompositionLocalProvider(LocalSettingsPrefs provides prefs) {
         Box(
@@ -271,8 +297,14 @@ fun SettingsScreen(onBack: () -> Unit) {
                 // While the search field has the keyboard up, every result can still be scrolled above it.
                 .imePadding()
                 .screenBackSwipe(
-                    // With the picker open, Dismiss (TalkBack) closes the picker, not Settings.
-                    onBack = { if (showFontPicker) showFontPicker = false else onBack() },
+                    onBack = {
+                        when {
+                            showFontPicker -> showFontPicker = false
+                            searchQuery.isNotBlank() -> searchQuery = ""
+                            currentCategory != null -> currentCategory = null
+                            else -> onBack()
+                        }
+                    },
                     enabled = LocalContentSwipeToBack.current && !showFontPicker
                 )
         ) {
@@ -288,367 +320,659 @@ fun SettingsScreen(onBack: () -> Unit) {
                 snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
             ) { paddingValues ->
                 val search = evaluateSettingsSearch(searchQuery, privateSpaceAvailable)
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
-                ) {
-                    SettingsHeader(
-                        onShowCredits = { showDeveloperInfo = true },
-                        onOpenSystemSettings = { context.startSafely(Intent(android.provider.Settings.ACTION_SETTINGS)) }
-                    )
-                    VoidSearchField(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        hint = stringResource(R.string.settings_search_hint),
-                        leadingIconDescription = stringResource(R.string.search)
-                    )
+                val isSearching = searchQuery.isNotBlank()
 
-                    if (search.defaultLauncher) {
-                        SettingsSection(
-                            title = null,
-                            items = listOf {
-                                SettingActionItem(
-                                    title = stringResource(R.string.change_default_launcher),
-                                    subtitle = stringResource(R.string.manage_default_home_settings),
-                                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
-                                    external = true,
-                                    onClick = {
-                                        context.startSafely(
-                                            Intent(android.provider.Settings.ACTION_HOME_SETTINGS),
-                                            fallback = Intent(android.provider.Settings.ACTION_SETTINGS)
-                                        )
-                                    }
-                                )
-                            }
+                if (isSearching) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                    ) {
+                        SettingsHeader(
+                            onShowCredits = { showDeveloperInfo = true },
+                            onOpenSystemSettings = { context.startSafely(Intent(android.provider.Settings.ACTION_SETTINGS)) }
                         )
-                    }
+                        VoidSearchField(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            hint = stringResource(R.string.settings_search_hint),
+                            leadingIconDescription = stringResource(R.string.search)
+                        )
 
-                    // ── Appearance ──
-                    if (search.appearance) {
-                        SettingsGroupHeader(stringResource(R.string.settings_group_appearance))
-                        FontStyleSection(appFont = appFont, onOpenFontPicker = { showFontPicker = true })
-                        SettingsSection(
-                            title = stringResource(R.string.settings_section_system_bars),
-                            items = listOf {
-                                SettingToggleItem(
-                                    title = stringResource(R.string.notification_bar),
-                                    subtitle = stringResource(R.string.settings_status_bar_subtitle),
-                                    icon = { Icon(Icons.Outlined.SignalCellularAlt, contentDescription = null) },
-                                    checked = showStatusBar,
-                                    onCheckedChange = { showStatusBar = it; prefs.showStatusBar = it }
-                                )
-                            }
-                        )
-                        SettingsSection(
-                            title = stringResource(R.string.settings_section_motion),
-                            items = listOf {
-                                SettingChoiceItem(
-                                    title = stringResource(R.string.animation_speed),
-                                    subtitle = stringResource(R.string.animation_speed_subtitle),
-                                    icon = { Icon(Icons.Outlined.Animation, contentDescription = null) },
-                                    selected = animationSpeed,
-                                    options = listOf(
-                                        Prefs.AnimationSpeed.FAST to stringResource(R.string.animation_speed_fast),
-                                        Prefs.AnimationSpeed.STANDARD to stringResource(R.string.animation_speed_standard),
-                                        Prefs.AnimationSpeed.SLOW to stringResource(R.string.animation_speed_slow)
-                                    ),
-                                    onSelected = { animationSpeed = it; prefs.animationSpeed = it }
-                                )
-                            }
-                        )
-                    }
-
-                    // ── Home screen ──
-                    if (search.homeHeader) {
-                        SettingsGroupHeader(stringResource(R.string.settings_group_home))
-                        HomePreviewCard(state = previewState)
-                    }
-                    if (search.homeLayout) {
-                        HomeLayoutSection(
-                            showClock = showClock,
-                            onShowClockChange = { showClock = it; prefs.showClockWidget = it },
-                            showDate = showDate,
-                            onShowDateChange = { showDate = it; prefs.showDateWidget = it },
-                            showHomeApps = showHomeApps,
-                            onShowHomeAppsChange = { showHomeApps = it; prefs.showHomeApps = it },
-                            homeSectionOrder = homeSectionOrder,
-                            onHomeSectionOrderChange = { homeSectionOrder = it; prefs.homeSectionOrder = it },
-                            clockSectionWeight = clockSectionWeight,
-                            onClockSectionWeightChange = { clockSectionWeight = it; prefs.clockSectionWeight = it },
-                            homeSidePadding = homeSidePadding,
-                            onHomeSidePaddingChange = { homeSidePadding = it; prefs.homeSidePaddingDp = it },
-                            holdHome = holdHome
-                        )
-                    }
-                    if (search.screenTime) {
-                        ScreenTimeSection(
-                            showScreenTime = showScreenTime,
-                            onShowScreenTimeChange = { showScreenTime = it; prefs.showScreenTimeWidget = it },
-                            showAppScreenTime = showAppScreenTime,
-                            onShowAppScreenTimeChange = { showAppScreenTime = it; prefs.showAppScreenTime = it },
-                            screenTimeSizeScale = screenTimeSizeScale,
-                            onScreenTimeSizeScaleChange = { screenTimeSizeScale = it; prefs.screenTimeSizeScale = it },
-                            snackbarHostState = snackbarHostState,
-                            holdHome = holdHome
-                        )
-                    }
-                    if (search.clock) {
-                        val rows: SettingRows = mutableListOf()
-                        rows += {
-                            SettingToggleItem(
-                                title = stringResource(R.string.settings_24_hour),
-                                subtitle = stringResource(R.string.settings_24_hour_subtitle),
-                                icon = { Icon(Icons.Outlined.AccessTime, contentDescription = null) },
-                                checked = use24HourClock,
-                                onCheckedChange = { use24HourClock = it; prefs.use24HourClock = it }
-                            )
-                        }
-                        rows += {
-                            SettingToggleItem(
-                                title = stringResource(R.string.settings_show_seconds),
-                                subtitle = stringResource(R.string.settings_show_seconds_subtitle),
-                                icon = { Icon(Icons.Outlined.Timer, contentDescription = null) },
-                                checked = showSeconds,
-                                onCheckedChange = { showSeconds = it; prefs.showClockSeconds = it }
-                            )
-                        }
-                        rows += {
-                            SettingChoiceItem(
-                                title = stringResource(R.string.settings_clock_horizontal),
-                                icon = { Icon(Icons.AutoMirrored.Outlined.FormatAlignLeft, contentDescription = null) },
-                                selected = clockHorizontalAlignment,
-                                options = horizontalOptions(),
-                                onSelected = { clockHorizontalAlignment = it; prefs.clockAlignment = it }
-                            )
-                        }
-                        rows += {
-                            SettingChoiceItem(
-                                title = stringResource(R.string.settings_clock_vertical),
-                                icon = { Icon(Icons.Outlined.VerticalAlignCenter, contentDescription = null) },
-                                selected = clockVerticalAlignment,
-                                options = verticalOptions(),
-                                onSelected = { clockVerticalAlignment = it; prefs.clockVerticalAlignment = it }
-                            )
-                        }
-                        rows += {
-                            SettingSliderItem(
-                                title = stringResource(R.string.clock_size),
-                                subtitle = stringResource(R.string.settings_clock_size_subtitle),
-                                icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
-                                value = clockSizeScale,
-                                range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
-                                valueText = ::scaleText,
-                                onHoldingChanged = holdHome,
-                                onChanged = { clockSizeScale = it; prefs.clockSizeScale = it }
-                            )
-                        }
-                        rows += {
-                            SettingSliderItem(
-                                title = stringResource(R.string.date_size),
-                                subtitle = stringResource(R.string.settings_date_size_subtitle),
-                                icon = { Icon(Icons.Outlined.DateRange, contentDescription = null) },
-                                value = dateSizeScale,
-                                range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
-                                valueText = ::scaleText,
-                                onHoldingChanged = holdHome,
-                                onChanged = { dateSizeScale = it; prefs.dateSizeScale = it }
-                            )
-                        }
-                        addTextStyleRows(
-                            rows = rows,
-                            style = TextStyleRows(R.string.settings_clock_weight, R.string.settings_clock_color, R.string.settings_clock_opacity),
-                            fontWeight = clockFontWeight,
-                            color = clockColor,
-                            opacity = clockOpacity,
-                            onFontWeightChange = { clockFontWeight = it; prefs.clockFontWeight = it },
-                            onColorChange = { clockColor = it; prefs.clockColor = it },
-                            onOpacityChange = { clockOpacity = it; prefs.clockOpacity = it },
-                            holdHome = holdHome
-                        )
-                        SettingsSection(stringResource(R.string.settings_section_clock), rows)
-                    }
-                    if (search.homeApps) {
-                        val rows: SettingRows = mutableListOf()
-                        rows += {
-                            SettingCounterItem(
-                                title = stringResource(R.string.settings_max_home_apps),
-                                subtitle = stringResource(R.string.settings_max_home_apps_subtitle),
-                                icon = { Icon(Icons.Outlined.FormatListNumbered, contentDescription = null) },
-                                value = maxHomeApps,
-                                range = 1..10,
-                                onChange = { maxHomeApps = it; prefs.maxHomeApps = it }
-                            )
-                        }
-                        rows += {
-                            SettingChoiceItem(
-                                title = stringResource(R.string.settings_apps_horizontal),
-                                icon = { Icon(Icons.AutoMirrored.Outlined.FormatAlignLeft, contentDescription = null) },
-                                selected = appHorizontalAlignment,
-                                options = horizontalOptions(),
-                                onSelected = { appHorizontalAlignment = it; prefs.homeAlignment = it }
-                            )
-                        }
-                        rows += {
-                            SettingChoiceItem(
-                                title = stringResource(R.string.settings_apps_vertical),
-                                icon = { Icon(Icons.Outlined.VerticalAlignCenter, contentDescription = null) },
-                                selected = appVerticalAlignment,
-                                options = verticalOptions(),
-                                onSelected = { appVerticalAlignment = it; prefs.homeVerticalAlignment = it }
-                            )
-                        }
-                        rows += {
-                            SettingSliderItem(
-                                title = stringResource(R.string.settings_app_spacing),
-                                subtitle = stringResource(R.string.settings_app_spacing_subtitle),
-                                icon = { Icon(Icons.Outlined.FormatLineSpacing, contentDescription = null) },
-                                value = appSpacing,
-                                range = 0f..HomeStyle.MAX_APP_SPACING,
-                                valueText = { "${it.roundToInt()}" },
-                                onHoldingChanged = holdHome,
-                                onChanged = { appSpacing = it; prefs.appSpacingDp = it }
-                            )
-                        }
-                        rows += {
-                            SettingSliderItem(
-                                title = stringResource(R.string.home_text_size),
-                                subtitle = stringResource(R.string.settings_home_text_size_subtitle),
-                                icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
-                                value = homeTextSize,
-                                range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_APP_SIZE_SCALE,
-                                valueText = ::scaleText,
-                                onHoldingChanged = holdHome,
-                                onChanged = { homeTextSize = it; prefs.homeTextSizeScale = it }
-                            )
-                        }
-                        addTextStyleRows(
-                            rows = rows,
-                            style = TextStyleRows(R.string.settings_apps_weight, R.string.settings_apps_color, R.string.settings_apps_opacity),
-                            fontWeight = homeAppsFontWeight,
-                            color = homeAppsColor,
-                            opacity = homeAppsOpacity,
-                            onFontWeightChange = { homeAppsFontWeight = it; prefs.homeAppsFontWeight = it },
-                            onColorChange = { homeAppsColor = it; prefs.homeAppsColor = it },
-                            onOpacityChange = { homeAppsOpacity = it; prefs.homeAppsOpacity = it },
-                            holdHome = holdHome
-                        )
-                        SettingsSection(stringResource(R.string.settings_section_home_apps), rows)
-                    }
-
-                    // ── App drawer ──
-                    if (search.appDrawer) {
-                        SettingsGroupHeader(stringResource(R.string.settings_group_app_drawer))
-                        SettingsSection(
-                            title = stringResource(R.string.settings_section_app_list),
-                            items = listOf(
-                                {
-                                    SettingToggleItem(
-                                        title = stringResource(R.string.settings_show_alphabet),
-                                        subtitle = stringResource(R.string.settings_show_alphabet_subtitle),
-                                        icon = { Icon(Icons.Outlined.SortByAlpha, contentDescription = null) },
-                                        checked = showAlphabetCategories,
-                                        onCheckedChange = { showAlphabetCategories = it; prefs.showAlphabetCategories = it }
-                                    )
-                                },
-                                {
-                                    SettingToggleItem(
-                                        title = stringResource(R.string.auto_show_keyboard),
-                                        subtitle = stringResource(R.string.settings_auto_keyboard_subtitle),
-                                        icon = { Icon(Icons.Outlined.Keyboard, contentDescription = null) },
-                                        checked = autoShowKeyboard,
-                                        onCheckedChange = { autoShowKeyboard = it; prefs.autoShowKeyboard = it }
-                                    )
-                                },
-                                {
-                                    SettingSliderItem(
-                                        title = stringResource(R.string.app_drawer_text_size),
-                                        subtitle = stringResource(R.string.settings_drawer_text_size_subtitle),
-                                        icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
-                                        value = drawerTextSize,
-                                        range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_APP_SIZE_SCALE,
-                                        valueText = ::scaleText,
-                                        onHoldingChanged = holdDrawer,
-                                        onChanged = { drawerTextSize = it; prefs.appDrawerTextSizeScale = it }
+                        if (search.defaultLauncher) {
+                            SettingsSection(
+                                title = null,
+                                items = listOf {
+                                    SettingActionItem(
+                                        title = stringResource(R.string.change_default_launcher),
+                                        subtitle = stringResource(R.string.manage_default_home_settings),
+                                        icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
+                                        external = true,
+                                        onClick = {
+                                            context.startSafely(
+                                                Intent(android.provider.Settings.ACTION_HOME_SETTINGS),
+                                                fallback = Intent(android.provider.Settings.ACTION_SETTINGS)
+                                            )
+                                        }
                                     )
                                 }
                             )
-                        )
-                        PrivateSpaceSection(
-                            privateSpaceEnabled = privateSpaceEnabled,
-                            onPrivateSpaceEnabledChange = { privateSpaceEnabled = it; prefs.privateSpaceEnabled = it },
-                            privateSpacePlacement = privateSpacePlacement,
-                            onPrivateSpacePlacementChange = { privateSpacePlacement = it; prefs.privateSpacePlacement = it },
-                            iconColor = privateSpaceIconColor,
-                            onIconColorChange = { privateSpaceIconColor = it; prefs.privateSpaceIconColor = it },
-                            isPrivateSpaceConfigured = isPrivateSpaceConfigured,
-                            privateSpaceAvailable = privateSpaceAvailable,
-                            snackbarHostState = snackbarHostState
-                        )
-                    }
+                        }
 
-                    // ── Gestures ──
-                    if (search.gestures) {
-                        SettingsGroupHeader(stringResource(R.string.gestures))
-                        GesturesSection(
-                            enableGestures = enableGestures,
-                            onEnableGesturesChange = { enableGestures = it; prefs.enableGestures = it },
-                            enableSwipeDownNotifications = enableSwipeDownNotifications,
-                            onEnableSwipeDownNotificationsChange = {
-                                enableSwipeDownNotifications = it
-                                prefs.enableSwipeDownNotifications = it
-                            },
-                            panels = EnabledPanels(enableSummary, enableWidgets, enableNotes),
-                            left = SwipeSide(leftSwipeAction, leftSwipeApp),
-                            onLeftSwipeActionChange = {
-                                leftSwipeAction = it
-                                prefs.leftSwipeAction = it
-                                if (it == SwipeAction.APP) showAppPicker = "left"
-                            },
-                            right = SwipeSide(rightSwipeAction, rightSwipeApp),
-                            onRightSwipeActionChange = {
-                                rightSwipeAction = it
-                                prefs.rightSwipeAction = it
-                                if (it == SwipeAction.APP) showAppPicker = "right"
-                            },
-                            contentSwipeToBack = contentSwipeToBack,
-                            onContentSwipeToBackChange = { contentSwipeToBack = it; prefs.contentSwipeToBack = it },
-                            snackbarHostState = snackbarHostState
-                        )
-                    }
+                        // ── Appearance ──
+                        if (search.appearance) {
+                            SettingsGroupHeader(stringResource(R.string.settings_group_appearance))
+                            FontStyleSection(appFont = appFont, onOpenFontPicker = { showFontPicker = true })
+                            SettingsSection(
+                                title = stringResource(R.string.settings_section_system_bars),
+                                items = listOf {
+                                    SettingToggleItem(
+                                        title = stringResource(R.string.notification_bar),
+                                        subtitle = stringResource(R.string.settings_status_bar_subtitle),
+                                        icon = { Icon(Icons.Outlined.SignalCellularAlt, contentDescription = null) },
+                                        checked = showStatusBar,
+                                        onCheckedChange = { showStatusBar = it; prefs.showStatusBar = it }
+                                    )
+                                }
+                            )
+                            SettingsSection(
+                                title = stringResource(R.string.settings_section_motion),
+                                items = listOf {
+                                    SettingChoiceItem(
+                                        title = stringResource(R.string.animation_speed),
+                                        subtitle = stringResource(R.string.animation_speed_subtitle),
+                                        icon = { Icon(Icons.Outlined.Animation, contentDescription = null) },
+                                        selected = animationSpeed,
+                                        options = listOf(
+                                            Prefs.AnimationSpeed.FAST to stringResource(R.string.animation_speed_fast),
+                                            Prefs.AnimationSpeed.STANDARD to stringResource(R.string.animation_speed_standard),
+                                            Prefs.AnimationSpeed.SLOW to stringResource(R.string.animation_speed_slow)
+                                        ),
+                                        onSelected = { animationSpeed = it; prefs.animationSpeed = it }
+                                    )
+                                }
+                            )
+                        }
 
-                    // ── Features ──
-                    if (search.features) {
-                        SettingsGroupHeader(stringResource(R.string.settings_group_features))
-                        FeaturesSection(
-                            panels = EnabledPanels(enableSummary, enableWidgets, enableNotes),
-                            onEnableSummaryChange = { enableSummary = it; prefs.enableNotificationSummary = it },
-                            onEnableWidgetsChange = { enableWidgets = it; prefs.enableWidgets = it },
-                            onEnableNotesChange = { enableNotes = it; prefs.enableNotes = it },
-                            notesTitleAlignment = notesTitleAlignment,
-                            onNotesTitleAlignmentChange = { notesTitleAlignment = it; prefs.notesTitleAlignment = it },
-                            snackbarHostState = snackbarHostState
-                        )
-                    }
+                        // ── Home screen ──
+                        if (search.homeHeader) {
+                            SettingsGroupHeader(stringResource(R.string.settings_group_home))
+                            HomePreviewCard(state = previewState)
+                        }
+                        if (search.homeLayout) {
+                            HomeLayoutSection(
+                                showClock = showClock,
+                                onShowClockChange = { showClock = it; prefs.showClockWidget = it },
+                                showDate = showDate,
+                                onShowDateChange = { showDate = it; prefs.showDateWidget = it },
+                                showHomeApps = showHomeApps,
+                                onShowHomeAppsChange = { showHomeApps = it; prefs.showHomeApps = it },
+                                homeSectionOrder = homeSectionOrder,
+                                onHomeSectionOrderChange = { homeSectionOrder = it; prefs.homeSectionOrder = it },
+                                clockSectionWeight = clockSectionWeight,
+                                onClockSectionWeightChange = { clockSectionWeight = it; prefs.clockSectionWeight = it },
+                                homeSidePadding = homeSidePadding,
+                                onHomeSidePaddingChange = { homeSidePadding = it; prefs.homeSidePaddingDp = it },
+                                holdHome = holdHome
+                            )
+                        }
+                        if (search.screenTime) {
+                            ScreenTimeSection(
+                                showScreenTime = showScreenTime,
+                                onShowScreenTimeChange = { showScreenTime = it; prefs.showScreenTimeWidget = it },
+                                showAppScreenTime = showAppScreenTime,
+                                onShowAppScreenTimeChange = { showAppScreenTime = it; prefs.showAppScreenTime = it },
+                                screenTimeSizeScale = screenTimeSizeScale,
+                                onScreenTimeSizeScaleChange = { screenTimeSizeScale = it; prefs.screenTimeSizeScale = it },
+                                snackbarHostState = snackbarHostState,
+                                holdHome = holdHome
+                            )
+                        }
+                        if (search.clock) {
+                            ClockFormatSection(
+                                use24HourClock = use24HourClock,
+                                onUse24HourClockChange = { use24HourClock = it; prefs.use24HourClock = it },
+                                showSeconds = showSeconds,
+                                onShowSecondsChange = { showSeconds = it; prefs.showClockSeconds = it },
+                                clockHorizontalAlignment = clockHorizontalAlignment,
+                                onClockHorizontalAlignmentChange = { clockHorizontalAlignment = it; prefs.clockAlignment = it },
+                                clockVerticalAlignment = clockVerticalAlignment,
+                                onClockVerticalAlignmentChange = { clockVerticalAlignment = it; prefs.clockVerticalAlignment = it },
+                                clockSizeScale = clockSizeScale,
+                                onClockSizeScaleChange = { clockSizeScale = it; prefs.clockSizeScale = it },
+                                dateSizeScale = dateSizeScale,
+                                onDateSizeScaleChange = { dateSizeScale = it; prefs.dateSizeScale = it },
+                                holdHome = holdHome
+                            )
+                            ClockStyleSection(
+                                clockFontWeight = clockFontWeight,
+                                onClockFontWeightChange = { clockFontWeight = it; prefs.clockFontWeight = it },
+                                clockColor = clockColor,
+                                onClockColorChange = { clockColor = it; prefs.clockColor = it },
+                                clockOpacity = clockOpacity,
+                                onClockOpacityChange = { clockOpacity = it; prefs.clockOpacity = it },
+                                holdHome = holdHome
+                            )
+                        }
+                        if (search.homeApps) {
+                            HomeAppsLayoutSection(
+                                maxHomeApps = maxHomeApps,
+                                onMaxHomeAppsChange = { maxHomeApps = it; prefs.maxHomeApps = it },
+                                appHorizontalAlignment = appHorizontalAlignment,
+                                onAppHorizontalAlignmentChange = { appHorizontalAlignment = it; prefs.homeAlignment = it },
+                                appVerticalAlignment = appVerticalAlignment,
+                                onAppVerticalAlignmentChange = { appVerticalAlignment = it; prefs.homeVerticalAlignment = it },
+                                appSpacing = appSpacing,
+                                onAppSpacingChange = { appSpacing = it; prefs.appSpacingDp = it },
+                                holdHome = holdHome
+                            )
+                            HomeAppsStyleSection(
+                                homeTextSize = homeTextSize,
+                                onHomeTextSizeChange = { homeTextSize = it; prefs.homeTextSizeScale = it },
+                                homeAppsFontWeight = homeAppsFontWeight,
+                                onHomeAppsFontWeightChange = { homeAppsFontWeight = it; prefs.homeAppsFontWeight = it },
+                                homeAppsColor = homeAppsColor,
+                                onHomeAppsColorChange = { homeAppsColor = it; prefs.homeAppsColor = it },
+                                homeAppsOpacity = homeAppsOpacity,
+                                onHomeAppsOpacityChange = { homeAppsOpacity = it; prefs.homeAppsOpacity = it },
+                                holdHome = holdHome
+                            )
+                        }
 
-                    // ── Permissions ──
-                    if (search.permissions) {
-                        SettingsGroupHeader(stringResource(R.string.permissions))
-                        PermissionsSection()
-                    }
+                        // ── App drawer ──
+                        if (search.appDrawer) {
+                            SettingsGroupHeader(stringResource(R.string.settings_group_app_drawer))
+                            AppDrawerListSection(
+                                showAlphabetCategories = showAlphabetCategories,
+                                onShowAlphabetCategoriesChange = { showAlphabetCategories = it; prefs.showAlphabetCategories = it },
+                                autoShowKeyboard = autoShowKeyboard,
+                                onAutoShowKeyboardChange = { autoShowKeyboard = it; prefs.autoShowKeyboard = it },
+                                drawerTextSize = drawerTextSize,
+                                onDrawerTextSizeChange = { drawerTextSize = it; prefs.appDrawerTextSizeScale = it },
+                                showAppScreenTime = showAppScreenTime,
+                                showScreenTime = showScreenTime,
+                                onShowAppScreenTimeChange = { showAppScreenTime = it; prefs.showAppScreenTime = it },
+                                holdDrawer = holdDrawer
+                            )
+                            PrivateSpaceSection(
+                                privateSpaceEnabled = privateSpaceEnabled,
+                                onPrivateSpaceEnabledChange = { privateSpaceEnabled = it; prefs.privateSpaceEnabled = it },
+                                privateSpacePlacement = privateSpacePlacement,
+                                onPrivateSpacePlacementChange = { privateSpacePlacement = it; prefs.privateSpacePlacement = it },
+                                iconColor = privateSpaceIconColor,
+                                onIconColorChange = { privateSpaceIconColor = it; prefs.privateSpaceIconColor = it },
+                                isPrivateSpaceConfigured = isPrivateSpaceConfigured,
+                                privateSpaceAvailable = privateSpaceAvailable,
+                                snackbarHostState = snackbarHostState
+                            )
+                        }
 
-                    if (!search.anyVisible) {
-                        Text(
-                            text = stringResource(R.string.settings_no_matches),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(VoidDimens.sectionSpacing)
-                        )
-                    }
+                        // ── Gestures ──
+                        if (search.gestures) {
+                            SettingsGroupHeader(stringResource(R.string.settings_group_gestures_navigation))
+                            GesturesSection(
+                                enableGestures = enableGestures,
+                                onEnableGesturesChange = { enableGestures = it; prefs.enableGestures = it },
+                                enableSwipeDownNotifications = enableSwipeDownNotifications,
+                                onEnableSwipeDownNotificationsChange = {
+                                    enableSwipeDownNotifications = it
+                                    prefs.enableSwipeDownNotifications = it
+                                },
+                                panels = EnabledPanels(enableSummary, enableWidgets, enableNotes),
+                                left = SwipeSide(leftSwipeAction, leftSwipeApp),
+                                onLeftSwipeActionChange = {
+                                    leftSwipeAction = it
+                                    prefs.leftSwipeAction = it
+                                    if (it == SwipeAction.APP) showAppPicker = "left"
+                                },
+                                right = SwipeSide(rightSwipeAction, rightSwipeApp),
+                                onRightSwipeActionChange = {
+                                    rightSwipeAction = it
+                                    prefs.rightSwipeAction = it
+                                    if (it == SwipeAction.APP) showAppPicker = "right"
+                                },
+                                contentSwipeToBack = contentSwipeToBack,
+                                onContentSwipeToBackChange = { contentSwipeToBack = it; prefs.contentSwipeToBack = it },
+                                snackbarHostState = snackbarHostState
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                        // ── Features ──
+                        if (search.features) {
+                            SettingsGroupHeader(stringResource(R.string.settings_group_panels))
+                            FeaturesSection(
+                                panels = EnabledPanels(enableSummary, enableWidgets, enableNotes),
+                                onEnableSummaryChange = { enableSummary = it; prefs.enableNotificationSummary = it },
+                                onEnableWidgetsChange = { enableWidgets = it; prefs.enableWidgets = it },
+                                onEnableNotesChange = { enableNotes = it; prefs.enableNotes = it },
+                                notesTitleAlignment = notesTitleAlignment,
+                                onNotesTitleAlignmentChange = { notesTitleAlignment = it; prefs.notesTitleAlignment = it },
+                                snackbarHostState = snackbarHostState
+                            )
+                        }
+
+                        // ── Permissions ──
+                        if (search.permissions) {
+                            SettingsGroupHeader(stringResource(R.string.permissions))
+                            PermissionsSection()
+                        }
+
+                        // ── About ──
+                        if (search.about) {
+                            SettingsGroupHeader(stringResource(R.string.settings_group_about))
+                            AboutSection(onShowCredits = { showDeveloperInfo = true })
+                        }
+
+                        if (!search.anyVisible) {
+                            Text(
+                                text = stringResource(R.string.settings_no_matches),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(VoidDimens.sectionSpacing)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                    }
+                } else {
+                    val motion = rememberVoidMotionScheme(animationSpeed)
+                    AnimatedContent(
+                        targetState = currentCategory,
+                        transitionSpec = {
+                            if (targetState != null && initialState == null) {
+                                (fadeIn(animationSpec = motion.defaultEffectsSpec()) +
+                                    slideInHorizontally(animationSpec = motion.defaultSpatialSpec()) { it / 4 })
+                                    .togetherWith(
+                                        fadeOut(animationSpec = motion.defaultEffectsSpec()) +
+                                            slideOutHorizontally(animationSpec = motion.defaultSpatialSpec()) { -it / 4 }
+                                    )
+                            } else if (targetState == null && initialState != null) {
+                                (fadeIn(animationSpec = motion.defaultEffectsSpec()) +
+                                    slideInHorizontally(animationSpec = motion.defaultSpatialSpec()) { -it / 4 })
+                                    .togetherWith(
+                                        fadeOut(animationSpec = motion.defaultEffectsSpec()) +
+                                            slideOutHorizontally(animationSpec = motion.defaultSpatialSpec()) { it / 4 }
+                                    )
+                            } else {
+                                fadeIn(animationSpec = motion.defaultEffectsSpec())
+                                    .togetherWith(fadeOut(animationSpec = motion.defaultEffectsSpec()))
+                            }
+                        },
+                        label = "SettingsCategoryContent"
+                    ) { category ->
+                        when (category) {
+                            null -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                                ) {
+                                    SettingsHeader(
+                                        onShowCredits = { showDeveloperInfo = true },
+                                        onOpenSystemSettings = { context.startSafely(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+                                    )
+                                    VoidSearchField(
+                                        query = searchQuery,
+                                        onQueryChange = { searchQuery = it },
+                                        hint = stringResource(R.string.settings_search_hint),
+                                        leadingIconDescription = stringResource(R.string.search)
+                                    )
+
+                                    SettingsSection(
+                                        title = null,
+                                        items = listOf {
+                                            SettingActionItem(
+                                                title = stringResource(R.string.change_default_launcher),
+                                                subtitle = stringResource(R.string.manage_default_home_settings),
+                                                icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
+                                                external = true,
+                                                onClick = {
+                                                    context.startSafely(
+                                                        Intent(android.provider.Settings.ACTION_HOME_SETTINGS),
+                                                        fallback = Intent(android.provider.Settings.ACTION_SETTINGS)
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    )
+
+                                    SettingsSection(
+                                        title = null,
+                                        items = listOf(
+                                            {
+                                                SettingActionItem(
+                                                    title = stringResource(R.string.settings_group_appearance),
+                                                    subtitle = stringResource(R.string.settings_category_appearance_subtitle),
+                                                    icon = { Icon(Icons.Outlined.Palette, contentDescription = null) },
+                                                    onClick = { currentCategory = SettingsCategory.APPEARANCE }
+                                                )
+                                            },
+                                            {
+                                                SettingActionItem(
+                                                    title = stringResource(R.string.settings_group_home),
+                                                    subtitle = stringResource(R.string.settings_category_home_subtitle),
+                                                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
+                                                    onClick = { currentCategory = SettingsCategory.HOME_SCREEN }
+                                                )
+                                            },
+                                            {
+                                                SettingActionItem(
+                                                    title = stringResource(R.string.settings_group_app_drawer),
+                                                    subtitle = stringResource(R.string.settings_category_app_drawer_subtitle),
+                                                    icon = { Icon(Icons.Outlined.Apps, contentDescription = null) },
+                                                    onClick = { currentCategory = SettingsCategory.APP_DRAWER }
+                                                )
+                                            },
+                                            {
+                                                SettingActionItem(
+                                                    title = stringResource(R.string.settings_group_gestures_navigation),
+                                                    subtitle = stringResource(R.string.settings_category_gestures_subtitle),
+                                                    icon = { Icon(Icons.Outlined.Swipe, contentDescription = null) },
+                                                    onClick = { currentCategory = SettingsCategory.GESTURES }
+                                                )
+                                            },
+                                            {
+                                                SettingActionItem(
+                                                    title = stringResource(R.string.settings_group_panels),
+                                                    subtitle = stringResource(R.string.settings_category_panels_subtitle),
+                                                    icon = { Icon(Icons.Outlined.Widgets, contentDescription = null) },
+                                                    onClick = { currentCategory = SettingsCategory.PANELS }
+                                                )
+                                            },
+                                            {
+                                                SettingActionItem(
+                                                    title = stringResource(R.string.permissions),
+                                                    subtitle = stringResource(R.string.settings_category_permissions_subtitle),
+                                                    icon = { Icon(Icons.Outlined.Security, contentDescription = null) },
+                                                    onClick = { currentCategory = SettingsCategory.PERMISSIONS }
+                                                )
+                                            },
+                                            {
+                                                SettingActionItem(
+                                                    title = stringResource(R.string.settings_group_about),
+                                                    subtitle = stringResource(R.string.settings_category_about_subtitle),
+                                                    icon = { Icon(Icons.Outlined.Info, contentDescription = null) },
+                                                    onClick = { currentCategory = SettingsCategory.ABOUT }
+                                                )
+                                            }
+                                        )
+                                    )
+
+                                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                                }
+                            }
+                            SettingsCategory.APPEARANCE -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                                ) {
+                                    CategoryDetailHeader(
+                                        title = stringResource(R.string.settings_group_appearance),
+                                        onBack = { currentCategory = null }
+                                    )
+                                    FontStyleSection(appFont = appFont, onOpenFontPicker = { showFontPicker = true })
+                                    SettingsSection(
+                                        title = stringResource(R.string.settings_section_system_bars),
+                                        items = listOf {
+                                            SettingToggleItem(
+                                                title = stringResource(R.string.notification_bar),
+                                                subtitle = stringResource(R.string.settings_status_bar_subtitle),
+                                                icon = { Icon(Icons.Outlined.SignalCellularAlt, contentDescription = null) },
+                                                checked = showStatusBar,
+                                                onCheckedChange = { showStatusBar = it; prefs.showStatusBar = it }
+                                            )
+                                        }
+                                    )
+                                    SettingsSection(
+                                        title = stringResource(R.string.settings_section_motion),
+                                        items = listOf {
+                                            SettingChoiceItem(
+                                                title = stringResource(R.string.animation_speed),
+                                                subtitle = stringResource(R.string.animation_speed_subtitle),
+                                                icon = { Icon(Icons.Outlined.Animation, contentDescription = null) },
+                                                selected = animationSpeed,
+                                                options = listOf(
+                                                    Prefs.AnimationSpeed.FAST to stringResource(R.string.animation_speed_fast),
+                                                    Prefs.AnimationSpeed.STANDARD to stringResource(R.string.animation_speed_standard),
+                                                    Prefs.AnimationSpeed.SLOW to stringResource(R.string.animation_speed_slow)
+                                                ),
+                                                onSelected = { animationSpeed = it; prefs.animationSpeed = it }
+                                            )
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                                }
+                            }
+                            SettingsCategory.HOME_SCREEN -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                                ) {
+                                    CategoryDetailHeader(
+                                        title = stringResource(R.string.settings_group_home),
+                                        onBack = { currentCategory = null }
+                                    )
+                                    HomePreviewCard(state = previewState)
+                                    HomeLayoutSection(
+                                        showClock = showClock,
+                                        onShowClockChange = { showClock = it; prefs.showClockWidget = it },
+                                        showDate = showDate,
+                                        onShowDateChange = { showDate = it; prefs.showDateWidget = it },
+                                        showHomeApps = showHomeApps,
+                                        onShowHomeAppsChange = { showHomeApps = it; prefs.showHomeApps = it },
+                                        homeSectionOrder = homeSectionOrder,
+                                        onHomeSectionOrderChange = { homeSectionOrder = it; prefs.homeSectionOrder = it },
+                                        clockSectionWeight = clockSectionWeight,
+                                        onClockSectionWeightChange = { clockSectionWeight = it; prefs.clockSectionWeight = it },
+                                        homeSidePadding = homeSidePadding,
+                                        onHomeSidePaddingChange = { homeSidePadding = it; prefs.homeSidePaddingDp = it },
+                                        holdHome = holdHome
+                                    )
+                                    ClockFormatSection(
+                                        use24HourClock = use24HourClock,
+                                        onUse24HourClockChange = { use24HourClock = it; prefs.use24HourClock = it },
+                                        showSeconds = showSeconds,
+                                        onShowSecondsChange = { showSeconds = it; prefs.showClockSeconds = it },
+                                        clockHorizontalAlignment = clockHorizontalAlignment,
+                                        onClockHorizontalAlignmentChange = { clockHorizontalAlignment = it; prefs.clockAlignment = it },
+                                        clockVerticalAlignment = clockVerticalAlignment,
+                                        onClockVerticalAlignmentChange = { clockVerticalAlignment = it; prefs.clockVerticalAlignment = it },
+                                        clockSizeScale = clockSizeScale,
+                                        onClockSizeScaleChange = { clockSizeScale = it; prefs.clockSizeScale = it },
+                                        dateSizeScale = dateSizeScale,
+                                        onDateSizeScaleChange = { dateSizeScale = it; prefs.dateSizeScale = it },
+                                        holdHome = holdHome
+                                    )
+                                    ClockStyleSection(
+                                        clockFontWeight = clockFontWeight,
+                                        onClockFontWeightChange = { clockFontWeight = it; prefs.clockFontWeight = it },
+                                        clockColor = clockColor,
+                                        onClockColorChange = { clockColor = it; prefs.clockColor = it },
+                                        clockOpacity = clockOpacity,
+                                        onClockOpacityChange = { clockOpacity = it; prefs.clockOpacity = it },
+                                        holdHome = holdHome
+                                    )
+                                    HomeAppsLayoutSection(
+                                        maxHomeApps = maxHomeApps,
+                                        onMaxHomeAppsChange = { maxHomeApps = it; prefs.maxHomeApps = it },
+                                        appHorizontalAlignment = appHorizontalAlignment,
+                                        onAppHorizontalAlignmentChange = { appHorizontalAlignment = it; prefs.homeAlignment = it },
+                                        appVerticalAlignment = appVerticalAlignment,
+                                        onAppVerticalAlignmentChange = { appVerticalAlignment = it; prefs.homeVerticalAlignment = it },
+                                        appSpacing = appSpacing,
+                                        onAppSpacingChange = { appSpacing = it; prefs.appSpacingDp = it },
+                                        holdHome = holdHome
+                                    )
+                                    HomeAppsStyleSection(
+                                        homeTextSize = homeTextSize,
+                                        onHomeTextSizeChange = { homeTextSize = it; prefs.homeTextSizeScale = it },
+                                        homeAppsFontWeight = homeAppsFontWeight,
+                                        onHomeAppsFontWeightChange = { homeAppsFontWeight = it; prefs.homeAppsFontWeight = it },
+                                        homeAppsColor = homeAppsColor,
+                                        onHomeAppsColorChange = { homeAppsColor = it; prefs.homeAppsColor = it },
+                                        homeAppsOpacity = homeAppsOpacity,
+                                        onHomeAppsOpacityChange = { homeAppsOpacity = it; prefs.homeAppsOpacity = it },
+                                        holdHome = holdHome
+                                    )
+                                    ScreenTimeSection(
+                                        showScreenTime = showScreenTime,
+                                        onShowScreenTimeChange = { showScreenTime = it; prefs.showScreenTimeWidget = it },
+                                        showAppScreenTime = showAppScreenTime,
+                                        onShowAppScreenTimeChange = { showAppScreenTime = it; prefs.showAppScreenTime = it },
+                                        screenTimeSizeScale = screenTimeSizeScale,
+                                        onScreenTimeSizeScaleChange = { screenTimeSizeScale = it; prefs.screenTimeSizeScale = it },
+                                        snackbarHostState = snackbarHostState,
+                                        holdHome = holdHome
+                                    )
+                                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                                }
+                            }
+                            SettingsCategory.APP_DRAWER -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                                ) {
+                                    CategoryDetailHeader(
+                                        title = stringResource(R.string.settings_group_app_drawer),
+                                        onBack = { currentCategory = null }
+                                    )
+                                    AppDrawerListSection(
+                                        showAlphabetCategories = showAlphabetCategories,
+                                        onShowAlphabetCategoriesChange = { showAlphabetCategories = it; prefs.showAlphabetCategories = it },
+                                        autoShowKeyboard = autoShowKeyboard,
+                                        onAutoShowKeyboardChange = { autoShowKeyboard = it; prefs.autoShowKeyboard = it },
+                                        drawerTextSize = drawerTextSize,
+                                        onDrawerTextSizeChange = { drawerTextSize = it; prefs.appDrawerTextSizeScale = it },
+                                        showAppScreenTime = showAppScreenTime,
+                                        showScreenTime = showScreenTime,
+                                        onShowAppScreenTimeChange = { showAppScreenTime = it; prefs.showAppScreenTime = it },
+                                        holdDrawer = holdDrawer
+                                    )
+                                    PrivateSpaceSection(
+                                        privateSpaceEnabled = privateSpaceEnabled,
+                                        onPrivateSpaceEnabledChange = { privateSpaceEnabled = it; prefs.privateSpaceEnabled = it },
+                                        privateSpacePlacement = privateSpacePlacement,
+                                        onPrivateSpacePlacementChange = { privateSpacePlacement = it; prefs.privateSpacePlacement = it },
+                                        iconColor = privateSpaceIconColor,
+                                        onIconColorChange = { privateSpaceIconColor = it; prefs.privateSpaceIconColor = it },
+                                        isPrivateSpaceConfigured = isPrivateSpaceConfigured,
+                                        privateSpaceAvailable = privateSpaceAvailable,
+                                        snackbarHostState = snackbarHostState
+                                    )
+                                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                                }
+                            }
+                            SettingsCategory.GESTURES -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                                ) {
+                                    CategoryDetailHeader(
+                                        title = stringResource(R.string.settings_group_gestures_navigation),
+                                        onBack = { currentCategory = null }
+                                    )
+                                    GesturesSection(
+                                        enableGestures = enableGestures,
+                                        onEnableGesturesChange = { enableGestures = it; prefs.enableGestures = it },
+                                        enableSwipeDownNotifications = enableSwipeDownNotifications,
+                                        onEnableSwipeDownNotificationsChange = {
+                                            enableSwipeDownNotifications = it
+                                            prefs.enableSwipeDownNotifications = it
+                                        },
+                                        panels = EnabledPanels(enableSummary, enableWidgets, enableNotes),
+                                        left = SwipeSide(leftSwipeAction, leftSwipeApp),
+                                        onLeftSwipeActionChange = {
+                                            leftSwipeAction = it
+                                            prefs.leftSwipeAction = it
+                                            if (it == SwipeAction.APP) showAppPicker = "left"
+                                        },
+                                        right = SwipeSide(rightSwipeAction, rightSwipeApp),
+                                        onRightSwipeActionChange = {
+                                            rightSwipeAction = it
+                                            prefs.rightSwipeAction = it
+                                            if (it == SwipeAction.APP) showAppPicker = "right"
+                                        },
+                                        contentSwipeToBack = contentSwipeToBack,
+                                        onContentSwipeToBackChange = { contentSwipeToBack = it; prefs.contentSwipeToBack = it },
+                                        snackbarHostState = snackbarHostState
+                                    )
+                                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                                }
+                            }
+                            SettingsCategory.PANELS -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                                ) {
+                                    CategoryDetailHeader(
+                                        title = stringResource(R.string.settings_group_panels),
+                                        onBack = { currentCategory = null }
+                                    )
+                                    FeaturesSection(
+                                        panels = EnabledPanels(enableSummary, enableWidgets, enableNotes),
+                                        onEnableSummaryChange = { enableSummary = it; prefs.enableNotificationSummary = it },
+                                        onEnableWidgetsChange = { enableWidgets = it; prefs.enableWidgets = it },
+                                        onEnableNotesChange = { enableNotes = it; prefs.enableNotes = it },
+                                        notesTitleAlignment = notesTitleAlignment,
+                                        onNotesTitleAlignmentChange = { notesTitleAlignment = it; prefs.notesTitleAlignment = it },
+                                        snackbarHostState = snackbarHostState
+                                    )
+                                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                                }
+                            }
+                            SettingsCategory.PERMISSIONS -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                                ) {
+                                    CategoryDetailHeader(
+                                        title = stringResource(R.string.permissions),
+                                        onBack = { currentCategory = null }
+                                    )
+                                    PermissionsSection()
+                                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                                }
+                            }
+                            SettingsCategory.ABOUT -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = VoidDimens.sectionSpacing, vertical = VoidDimens.sectionSpacing)
+                                ) {
+                                    CategoryDetailHeader(
+                                        title = stringResource(R.string.settings_group_about),
+                                        onBack = { currentCategory = null }
+                                    )
+                                    AboutSection(onShowCredits = { showDeveloperInfo = true })
+                                    Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing * 2))
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -700,15 +1024,53 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 }
 
+/** Header shown at the top of an individual settings category sub-screen. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CategoryDetailHeader(
+    title: String,
+    onBack: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = 0.dp,
+                end = VoidDimens.sectionSpacing - VoidDimens.iconButtonGlyphInset,
+                bottom = VoidDimens.sectionSpacing
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = stringResource(R.string.navigate_back)
+            )
+        }
+        Spacer(modifier = Modifier.width(VoidDimens.compactSpacing))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.semantics { heading() }
+        )
+    }
+}
+
 /** Starts [intent], or [fallback] when nothing handles it; a missing activity is never a crash. */
 private fun Context.startSafely(intent: Intent, fallback: Intent? = null) {
     try {
-        startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    } catch (e: android.content.ActivityNotFoundException) {
-        Log.w(TAG, "settings_intent_unavailable action=${intent.action}")
-        fallback?.let { runCatching { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
-    } catch (e: SecurityException) {
-        Log.w(TAG, "settings_intent_denied action=${intent.action}")
+        startActivity(intent)
+    } catch (_: Exception) {
+        if (fallback != null) {
+            try {
+                startActivity(fallback)
+            } catch (_: Exception) {
+                Log.w(TAG, "failed to start fallback activity")
+            }
+        } else {
+            Log.w(TAG, "failed to start activity")
+        }
     }
 }
 
@@ -722,11 +1084,12 @@ private data class SettingsSearchFlags(
     val appDrawer: Boolean,
     val gestures: Boolean,
     val features: Boolean,
-    val permissions: Boolean
+    val permissions: Boolean,
+    val about: Boolean
 ) {
     val homeHeader: Boolean get() = homeLayout || screenTime || clock || homeApps
     val anyVisible: Boolean
-        get() = defaultLauncher || appearance || homeHeader || appDrawer || gestures || features || permissions
+        get() = defaultLauncher || appearance || homeHeader || appDrawer || gestures || features || permissions || about
 }
 
 @Composable
@@ -765,6 +1128,7 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
     )
     val clockTerms = listOf(
         stringResource(R.string.settings_section_clock),
+        stringResource(R.string.settings_section_clock_style),
         stringResource(R.string.settings_24_hour),
         stringResource(R.string.settings_show_seconds),
         stringResource(R.string.settings_clock_horizontal),
@@ -777,6 +1141,8 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
     )
     val homeAppsTerms = listOf(
         stringResource(R.string.settings_section_home_apps),
+        stringResource(R.string.settings_section_apps_layout),
+        stringResource(R.string.settings_section_apps_style),
         stringResource(R.string.settings_max_home_apps),
         stringResource(R.string.settings_apps_horizontal),
         stringResource(R.string.settings_apps_vertical),
@@ -791,6 +1157,7 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
         add(stringResource(R.string.settings_show_alphabet))
         add(stringResource(R.string.auto_show_keyboard))
         add(stringResource(R.string.app_drawer_text_size))
+        add(stringResource(R.string.settings_screen_time_apps))
         add(stringResource(R.string.private_space))
         add(stringResource(R.string.settings_enable_private_space))
         add(stringResource(R.string.settings_private_space_icon_color))
@@ -813,6 +1180,7 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
         stringResource(R.string.swipe_action_open_app)
     )
     val featuresTerms = listOf(
+        stringResource(R.string.settings_group_panels),
         stringResource(R.string.swipe_action_notification_summary),
         stringResource(R.string.swipe_action_widgets),
         stringResource(R.string.swipe_action_notes),
@@ -820,6 +1188,8 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
     )
     val permissionsTerms = listOf(
         stringResource(R.string.permissions_intro),
+        stringResource(R.string.settings_section_core_permissions),
+        stringResource(R.string.settings_section_feature_permissions),
         stringResource(R.string.perm_notification_listener),
         stringResource(R.string.perm_usage_access),
         stringResource(R.string.perm_accessibility),
@@ -827,6 +1197,16 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
         stringResource(R.string.perm_query_apps),
         stringResource(R.string.perm_widgets),
         stringResource(R.string.perm_private_space)
+    )
+    val aboutTerms = listOf(
+        stringResource(R.string.about),
+        stringResource(R.string.settings_group_about),
+        stringResource(R.string.developer_credits),
+        stringResource(R.string.credits_author),
+        stringResource(R.string.credits_repository),
+        stringResource(R.string.settings_source_code),
+        stringResource(R.string.settings_version),
+        stringResource(R.string.settings_system_settings)
     )
     val homeTitle = stringResource(R.string.settings_group_home)
     return SettingsSearchFlags(
@@ -840,9 +1220,10 @@ private fun evaluateSettingsSearch(query: String, privateSpaceAvailable: Boolean
         clock = group(homeTitle, clockTerms),
         homeApps = group(homeTitle, homeAppsTerms),
         appDrawer = group(stringResource(R.string.settings_group_app_drawer), appDrawerTerms),
-        gestures = group(stringResource(R.string.gestures), gesturesTerms),
-        features = group(stringResource(R.string.settings_group_features), featuresTerms),
-        permissions = group(stringResource(R.string.permissions), permissionsTerms)
+        gestures = group(stringResource(R.string.settings_group_gestures_navigation), gesturesTerms),
+        features = group(stringResource(R.string.settings_group_panels), featuresTerms),
+        permissions = group(stringResource(R.string.permissions), permissionsTerms),
+        about = group(stringResource(R.string.settings_group_about), aboutTerms)
     )
 }
 
@@ -1047,7 +1428,7 @@ private fun HomeLayoutSection(
                 SettingToggleItem(
                     title = stringResource(R.string.settings_show_home_apps),
                     subtitle = stringResource(R.string.settings_show_home_apps_subtitle),
-                    icon = { Icon(Icons.Outlined.ViewList, contentDescription = null) },
+                    icon = { Icon(Icons.AutoMirrored.Outlined.ViewList, contentDescription = null) },
                     checked = showHomeApps,
                     onCheckedChange = onShowHomeAppsChange
                 )
@@ -1087,6 +1468,266 @@ private fun HomeLayoutSection(
                     valueText = { "${it.roundToInt()} dp" },
                     onHoldingChanged = holdHome,
                     onChanged = onHomeSidePaddingChange
+                )
+            }
+        )
+    )
+}
+
+@Composable
+private fun ClockFormatSection(
+    use24HourClock: Boolean,
+    onUse24HourClockChange: (Boolean) -> Unit,
+    showSeconds: Boolean,
+    onShowSecondsChange: (Boolean) -> Unit,
+    clockHorizontalAlignment: Int,
+    onClockHorizontalAlignmentChange: (Int) -> Unit,
+    clockVerticalAlignment: Int,
+    onClockVerticalAlignmentChange: (Int) -> Unit,
+    clockSizeScale: Float,
+    onClockSizeScaleChange: (Float) -> Unit,
+    dateSizeScale: Float,
+    onDateSizeScaleChange: (Float) -> Unit,
+    holdHome: (Boolean) -> Unit
+) {
+    val rows: SettingRows = mutableListOf()
+    rows += {
+        SettingToggleItem(
+            title = stringResource(R.string.settings_24_hour),
+            subtitle = stringResource(R.string.settings_24_hour_subtitle),
+            icon = { Icon(Icons.Outlined.AccessTime, contentDescription = null) },
+            checked = use24HourClock,
+            onCheckedChange = onUse24HourClockChange
+        )
+    }
+    rows += {
+        SettingToggleItem(
+            title = stringResource(R.string.settings_show_seconds),
+            subtitle = stringResource(R.string.settings_show_seconds_subtitle),
+            icon = { Icon(Icons.Outlined.Timer, contentDescription = null) },
+            checked = showSeconds,
+            onCheckedChange = onShowSecondsChange
+        )
+    }
+    rows += {
+        SettingChoiceItem(
+            title = stringResource(R.string.settings_clock_horizontal),
+            icon = { Icon(Icons.AutoMirrored.Outlined.FormatAlignLeft, contentDescription = null) },
+            selected = clockHorizontalAlignment,
+            options = horizontalOptions(),
+            onSelected = onClockHorizontalAlignmentChange
+        )
+    }
+    rows += {
+        SettingChoiceItem(
+            title = stringResource(R.string.settings_clock_vertical),
+            icon = { Icon(Icons.Outlined.VerticalAlignCenter, contentDescription = null) },
+            selected = clockVerticalAlignment,
+            options = verticalOptions(),
+            onSelected = onClockVerticalAlignmentChange
+        )
+    }
+    rows += {
+        SettingSliderItem(
+            title = stringResource(R.string.clock_size),
+            subtitle = stringResource(R.string.settings_clock_size_subtitle),
+            icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
+            value = clockSizeScale,
+            range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
+            valueText = ::scaleText,
+            onHoldingChanged = holdHome,
+            onChanged = onClockSizeScaleChange
+        )
+    }
+    rows += {
+        SettingSliderItem(
+            title = stringResource(R.string.date_size),
+            subtitle = stringResource(R.string.settings_date_size_subtitle),
+            icon = { Icon(Icons.Outlined.DateRange, contentDescription = null) },
+            value = dateSizeScale,
+            range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_CLOCK_SIZE_SCALE,
+            valueText = ::scaleText,
+            onHoldingChanged = holdHome,
+            onChanged = onDateSizeScaleChange
+        )
+    }
+    SettingsSection(stringResource(R.string.settings_section_clock), rows)
+}
+
+@Composable
+private fun ClockStyleSection(
+    clockFontWeight: Int,
+    onClockFontWeightChange: (Int) -> Unit,
+    clockColor: String,
+    onClockColorChange: (String) -> Unit,
+    clockOpacity: Float,
+    onClockOpacityChange: (Float) -> Unit,
+    holdHome: (Boolean) -> Unit
+) {
+    val rows: SettingRows = mutableListOf()
+    addTextStyleRows(
+        rows = rows,
+        style = TextStyleRows(R.string.settings_clock_weight, R.string.settings_clock_color, R.string.settings_clock_opacity),
+        fontWeight = clockFontWeight,
+        color = clockColor,
+        opacity = clockOpacity,
+        onFontWeightChange = onClockFontWeightChange,
+        onColorChange = onClockColorChange,
+        onOpacityChange = onClockOpacityChange,
+        holdHome = holdHome
+    )
+    SettingsSection(stringResource(R.string.settings_section_clock_style), rows)
+}
+
+@Composable
+private fun HomeAppsLayoutSection(
+    maxHomeApps: Int,
+    onMaxHomeAppsChange: (Int) -> Unit,
+    appHorizontalAlignment: Int,
+    onAppHorizontalAlignmentChange: (Int) -> Unit,
+    appVerticalAlignment: Int,
+    onAppVerticalAlignmentChange: (Int) -> Unit,
+    appSpacing: Float,
+    onAppSpacingChange: (Float) -> Unit,
+    holdHome: (Boolean) -> Unit
+) {
+    val rows: SettingRows = mutableListOf()
+    rows += {
+        SettingCounterItem(
+            title = stringResource(R.string.settings_max_home_apps),
+            subtitle = stringResource(R.string.settings_max_home_apps_subtitle),
+            icon = { Icon(Icons.Outlined.FormatListNumbered, contentDescription = null) },
+            value = maxHomeApps,
+            range = 1..10,
+            onChange = onMaxHomeAppsChange
+        )
+    }
+    rows += {
+        SettingChoiceItem(
+            title = stringResource(R.string.settings_apps_horizontal),
+            icon = { Icon(Icons.AutoMirrored.Outlined.FormatAlignLeft, contentDescription = null) },
+            selected = appHorizontalAlignment,
+            options = horizontalOptions(),
+            onSelected = onAppHorizontalAlignmentChange
+        )
+    }
+    rows += {
+        SettingChoiceItem(
+            title = stringResource(R.string.settings_apps_vertical),
+            icon = { Icon(Icons.Outlined.VerticalAlignCenter, contentDescription = null) },
+            selected = appVerticalAlignment,
+            options = verticalOptions(),
+            onSelected = onAppVerticalAlignmentChange
+        )
+    }
+    rows += {
+        SettingSliderItem(
+            title = stringResource(R.string.settings_app_spacing),
+            subtitle = stringResource(R.string.settings_app_spacing_subtitle),
+            icon = { Icon(Icons.Outlined.FormatLineSpacing, contentDescription = null) },
+            value = appSpacing,
+            range = 0f..HomeStyle.MAX_APP_SPACING,
+            valueText = { it.roundToInt().toString() },
+            onHoldingChanged = holdHome,
+            onChanged = onAppSpacingChange
+        )
+    }
+    SettingsSection(stringResource(R.string.settings_section_apps_layout), rows)
+}
+
+@Composable
+private fun HomeAppsStyleSection(
+    homeTextSize: Float,
+    onHomeTextSizeChange: (Float) -> Unit,
+    homeAppsFontWeight: Int,
+    onHomeAppsFontWeightChange: (Int) -> Unit,
+    homeAppsColor: String,
+    onHomeAppsColorChange: (String) -> Unit,
+    homeAppsOpacity: Float,
+    onHomeAppsOpacityChange: (Float) -> Unit,
+    holdHome: (Boolean) -> Unit
+) {
+    val rows: SettingRows = mutableListOf()
+    rows += {
+        SettingSliderItem(
+            title = stringResource(R.string.home_text_size),
+            subtitle = stringResource(R.string.settings_home_text_size_subtitle),
+            icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
+            value = homeTextSize,
+            range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_APP_SIZE_SCALE,
+            valueText = ::scaleText,
+            onHoldingChanged = holdHome,
+            onChanged = onHomeTextSizeChange
+        )
+    }
+    addTextStyleRows(
+        rows = rows,
+        style = TextStyleRows(R.string.settings_apps_weight, R.string.settings_apps_color, R.string.settings_apps_opacity),
+        fontWeight = homeAppsFontWeight,
+        color = homeAppsColor,
+        opacity = homeAppsOpacity,
+        onFontWeightChange = onHomeAppsFontWeightChange,
+        onColorChange = onHomeAppsColorChange,
+        onOpacityChange = onHomeAppsOpacityChange,
+        holdHome = holdHome
+    )
+    SettingsSection(stringResource(R.string.settings_section_apps_style), rows)
+}
+
+@Composable
+private fun AppDrawerListSection(
+    showAlphabetCategories: Boolean,
+    onShowAlphabetCategoriesChange: (Boolean) -> Unit,
+    autoShowKeyboard: Boolean,
+    onAutoShowKeyboardChange: (Boolean) -> Unit,
+    drawerTextSize: Float,
+    onDrawerTextSizeChange: (Float) -> Unit,
+    showAppScreenTime: Boolean,
+    showScreenTime: Boolean,
+    onShowAppScreenTimeChange: (Boolean) -> Unit,
+    holdDrawer: (Boolean) -> Unit
+) {
+    SettingsSection(
+        title = stringResource(R.string.settings_section_app_list),
+        items = listOf(
+            {
+                SettingToggleItem(
+                    title = stringResource(R.string.settings_show_alphabet),
+                    subtitle = stringResource(R.string.settings_show_alphabet_subtitle),
+                    icon = { Icon(Icons.Outlined.SortByAlpha, contentDescription = null) },
+                    checked = showAlphabetCategories,
+                    onCheckedChange = onShowAlphabetCategoriesChange
+                )
+            },
+            {
+                SettingToggleItem(
+                    title = stringResource(R.string.auto_show_keyboard),
+                    subtitle = stringResource(R.string.settings_auto_keyboard_subtitle),
+                    icon = { Icon(Icons.Outlined.Keyboard, contentDescription = null) },
+                    checked = autoShowKeyboard,
+                    onCheckedChange = onAutoShowKeyboardChange
+                )
+            },
+            {
+                SettingSliderItem(
+                    title = stringResource(R.string.app_drawer_text_size),
+                    subtitle = stringResource(R.string.settings_drawer_text_size_subtitle),
+                    icon = { Icon(Icons.Outlined.TextFields, contentDescription = null) },
+                    value = drawerTextSize,
+                    range = HomeStyle.MIN_SIZE_SCALE..HomeStyle.MAX_APP_SIZE_SCALE,
+                    valueText = ::scaleText,
+                    onHoldingChanged = holdDrawer,
+                    onChanged = onDrawerTextSizeChange
+                )
+            },
+            {
+                SettingToggleItem(
+                    title = stringResource(R.string.settings_screen_time_apps),
+                    subtitle = stringResource(R.string.settings_screen_time_apps_subtitle),
+                    icon = { Icon(Icons.Outlined.Apps, contentDescription = null) },
+                    checked = showAppScreenTime,
+                    enabled = showScreenTime,
+                    onCheckedChange = onShowAppScreenTimeChange
                 )
             }
         )
@@ -1456,10 +2097,19 @@ private fun PermissionsSection() {
         )
     }
     SettingsSection(
-        title = null,
+        title = stringResource(R.string.settings_section_core_permissions),
         description = stringResource(R.string.permissions_intro),
         items = listOf(
+            action(R.string.perm_default_home, R.string.perm_default_home_body, Icons.Outlined.Home, {
+                Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
+            }),
             action(R.string.settings_app_info, R.string.settings_app_info_subtitle, Icons.Outlined.AppSettingsAlt, { Intent(appDetails) }),
+            action(R.string.perm_query_apps, R.string.perm_query_apps_body, Icons.Outlined.Apps, { Intent(appDetails) })
+        )
+    )
+    SettingsSection(
+        title = stringResource(R.string.settings_section_feature_permissions),
+        items = listOf(
             action(R.string.perm_notification_listener, R.string.perm_notification_listener_body, Icons.Outlined.Notifications, {
                 Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
             }),
@@ -1469,10 +2119,6 @@ private fun PermissionsSection() {
             action(R.string.perm_accessibility, R.string.perm_accessibility_body, Icons.Outlined.Accessibility, {
                 Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
             }),
-            action(R.string.perm_default_home, R.string.perm_default_home_body, Icons.Outlined.Home, {
-                Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
-            }),
-            action(R.string.perm_query_apps, R.string.perm_query_apps_body, Icons.Outlined.Apps, { Intent(appDetails) }),
             action(R.string.perm_widgets, R.string.perm_widgets_body, Icons.Outlined.Widgets, { Intent(appDetails) }),
             action(
                 R.string.perm_private_space,
@@ -1481,6 +2127,72 @@ private fun PermissionsSection() {
                 { Intent("android.settings.PRIVATE_SPACE_SETTINGS") },
                 fallback = Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)
             )
+        )
+    )
+}
+
+@Composable
+private fun AboutSection(onShowCredits: () -> Unit) {
+    val context = LocalContext.current
+    SettingsSection(
+        title = stringResource(R.string.settings_system_settings),
+        items = listOf(
+            {
+                SettingActionItem(
+                    title = stringResource(R.string.change_default_launcher),
+                    subtitle = stringResource(R.string.manage_default_home_settings),
+                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
+                    external = true,
+                    onClick = {
+                        context.startSafely(
+                            Intent(android.provider.Settings.ACTION_HOME_SETTINGS),
+                            fallback = Intent(android.provider.Settings.ACTION_SETTINGS)
+                        )
+                    }
+                )
+            },
+            {
+                SettingActionItem(
+                    title = stringResource(R.string.settings_system_settings),
+                    subtitle = stringResource(R.string.settings_app_info_subtitle),
+                    icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                    external = true,
+                    onClick = { context.startSafely(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+                )
+            }
+        )
+    )
+    SettingsSection(
+        title = stringResource(R.string.about),
+        items = listOf(
+            {
+                SettingActionItem(
+                    title = stringResource(R.string.developer_credits),
+                    subtitle = stringResource(R.string.settings_credits_subtitle),
+                    icon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                    onClick = onShowCredits
+                )
+            },
+            {
+                SettingActionItem(
+                    title = stringResource(R.string.credits_repository),
+                    subtitle = stringResource(R.string.settings_source_code_subtitle),
+                    icon = { Icon(Icons.Outlined.Code, contentDescription = null) },
+                    external = true,
+                    onClick = {
+                        context.startSafely(Intent(Intent.ACTION_VIEW, "https://github.com/knownassurajit/void".toUri()))
+                    }
+                )
+            },
+            {
+                SettingActionItem(
+                    title = stringResource(R.string.settings_version),
+                    subtitle = BuildConfig.VERSION_NAME,
+                    icon = { Icon(Icons.Outlined.Info, contentDescription = null) },
+                    trailing = null,
+                    onClick = {}
+                )
+            }
         )
     )
 }

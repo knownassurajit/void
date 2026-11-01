@@ -317,6 +317,26 @@
     <!-- Settings groups and sections -->
     <string name="settings_group_appearance">Appearance</string>
     <string name="settings_group_app_drawer">App drawer</string>
+    <string name="settings_group_gestures_navigation">Gestures &amp; navigation</string>
+    <string name="settings_group_panels">Panels &amp; features</string>
+    <string name="settings_group_about">About &amp; system</string>
+    <string name="settings_category_appearance_subtitle">Font, system display, status bar, animations</string>
+    <string name="settings_category_home_subtitle">Layout, clock &amp; date, home apps, screen time</string>
+    <string name="settings_category_app_drawer_subtitle">App list, keyboard, private space</string>
+    <string name="settings_category_gestures_subtitle">Side swipes, swipe down, swipe to back</string>
+    <string name="settings_category_panels_subtitle">Notification summary, widgets, notes</string>
+    <string name="settings_category_permissions_subtitle">System permissions, notification access, usage stats</string>
+    <string name="settings_category_about_subtitle">Default launcher, system settings, credits, version</string>
+    <string name="settings_section_time_date">Time &amp; date</string>
+    <string name="settings_section_clock_style">Clock style</string>
+    <string name="settings_section_apps_layout">Apps layout</string>
+    <string name="settings_section_apps_style">App label style</string>
+    <string name="settings_section_core_permissions">Core launcher</string>
+    <string name="settings_section_feature_permissions">Feature access</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_source_code">Source code</string>
+    <string name="settings_source_code_subtitle">View project on GitHub</string>
+    <string name="settings_credits_subtitle">Creator and developer info</string>
     <string name="settings_section_font_style">Font &amp; style</string>
     <string name="settings_section_system_bars">System bars</string>
     <string name="settings_section_home_layout">Layout</string>
