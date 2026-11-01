@@ -67,7 +67,7 @@ jobs:
         run: ./gradlew lintDebug --no-daemon
 
       - name: Upload Test & Lint Reports
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: test-reports-${{ github.run_id }}
@@ -478,7 +478,7 @@ jobs:
           echo "aab=${NEW_AAB}" >> $GITHUB_OUTPUT
 
       - name: Upload Builds to Artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: success()
         with:
           name: void-release-builds-v${{ steps.version.outputs.app_version }}
