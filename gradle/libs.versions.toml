@@ -11,7 +11,7 @@ composeBom = "2026.09.00"
 # MaterialShapes, MaterialExpressiveTheme) ship in 1.5; the BOM still maps material3 to 1.4.0.
 material3 = "1.5.0-beta01"
 navigationCompose = "2.10.2"
-serializationJson = "1.9.0"
+serializationJson = "1.12.0"
 profileinstaller = "1.4.1"
 mlkitSummarization = "1.0.0-beta1"
 mlkitPrompt = "1.0.0-beta4"
