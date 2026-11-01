@@ -48,7 +48,8 @@ data class HomescreenPreferences(
     val homeAppsColor: String = HomeTextColor.Default.key,
     val clockFontWeight: Int = HomeStyle.DEFAULT_CLOCK_WEIGHT,
     val homeAppsFontWeight: Int = HomeStyle.DEFAULT_APP_WEIGHT,
-    val homeSidePaddingDp: Float = HomeStyle.DEFAULT_SIDE_PADDING_DP
+    val homeSidePaddingDp: Float = HomeStyle.DEFAULT_SIDE_PADDING_DP,
+    val showAppScreenTime: Boolean = true
 )
 
 data class HomeAppSlot(
@@ -116,6 +117,7 @@ class Prefs private constructor(context: Context) {
     private val SHOW_DATE_WIDGET = "SHOW_DATE_WIDGET"
     private val SHOW_CLOCK_SECONDS = "SHOW_CLOCK_SECONDS"
     private val SHOW_SCREEN_TIME_WIDGET = "SHOW_SCREEN_TIME_WIDGET"
+    private val SHOW_APP_SCREEN_TIME = "SHOW_APP_SCREEN_TIME"
     private val SHOW_HOME_APPS = "SHOW_HOME_APPS"
     private val CLOCK_ALIGNMENT = "CLOCK_ALIGNMENT"
     private val CLOCK_VERTICAL_ALIGNMENT = "CLOCK_VERTICAL_ALIGNMENT"
@@ -242,6 +244,7 @@ class Prefs private constructor(context: Context) {
         SHOW_CLOCK_WIDGET,
         SHOW_DATE_WIDGET,
         SHOW_SCREEN_TIME_WIDGET,
+        SHOW_APP_SCREEN_TIME,
         SHOW_HOME_APPS,
         CLOCK_ALIGNMENT,
         CLOCK_VERTICAL_ALIGNMENT,
@@ -378,7 +381,8 @@ class Prefs private constructor(context: Context) {
             homeAppsColor = homeAppsColor,
             clockFontWeight = clockFontWeight,
             homeAppsFontWeight = homeAppsFontWeight,
-            homeSidePaddingDp = homeSidePaddingDp
+            homeSidePaddingDp = homeSidePaddingDp,
+            showAppScreenTime = prefs.getBoolean(SHOW_APP_SCREEN_TIME, true)
         )
         return result
     }
@@ -457,6 +461,7 @@ class Prefs private constructor(context: Context) {
         showClockWidget = true
         showDateWidget = true
         showScreenTimeWidget = true
+        showAppScreenTime = true
         emitHomescreenPrefs()
     }
 
@@ -552,6 +557,14 @@ class Prefs private constructor(context: Context) {
         get() = prefs.getBoolean(SHOW_SCREEN_TIME_WIDGET, true)
         set(value) {
             prefs.edit { putBoolean(SHOW_SCREEN_TIME_WIDGET, value) }
+            emitHomescreenPrefs()
+        }
+
+    /** Today's usage next to each app in the app library; only shown while [showScreenTimeWidget] is on. */
+    var showAppScreenTime: Boolean
+        get() = prefs.getBoolean(SHOW_APP_SCREEN_TIME, true)
+        set(value) {
+            prefs.edit { putBoolean(SHOW_APP_SCREEN_TIME, value) }
             emitHomescreenPrefs()
         }
 

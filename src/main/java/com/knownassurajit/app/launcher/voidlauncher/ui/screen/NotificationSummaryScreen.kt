@@ -2,62 +2,53 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.screen
 
 import android.app.Application
 import android.app.Notification
-import androidx.core.app.NotificationCompat
-import android.text.format.DateUtils
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.core.app.NotificationCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
+import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppNotificationSummary
 import com.knownassurajit.app.launcher.voidlauncher.helper.AiSummarizer
+import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
 import com.knownassurajit.app.launcher.voidlauncher.helper.NotificationService
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.DismissibleCard
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.NotificationAccessPrompt
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.NotificationCard
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.PanelMessage
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidPanelTitle
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.panelTitlePadding
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.rememberNotificationAccess
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.navigationBarsPadding
-import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
-import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
-import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
-import kotlin.math.abs
 
 // ── ViewModel ──
 
@@ -194,6 +185,7 @@ class NotificationSummaryViewModel(application: Application) : AndroidViewModel(
     }
 }
 
+
 // ── Screen ──
 
 @Composable
@@ -201,244 +193,150 @@ fun NotificationSummaryScreen(
     viewModel: NotificationSummaryViewModel = viewModel(),
     onBack: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    if (!FeatureAvailability.isNotificationSummaryAvailable(context)) {
+    if (!FeatureAvailability.isNotificationSummaryAvailable(LocalContext.current)) {
         FeatureUnavailableScreen(
-            "Notification Summary",
-            "AI notification summary is unavailable on this device. Check notification listener access and on-device AI support.",
+            stringResource(R.string.notification_summary),
+            stringResource(R.string.summary_unavailable_body),
             onBack
         )
         return
     }
 
+    val hasAccess = rememberNotificationAccess()
     val summaries by viewModel.summaries.collectAsState()
     val aiAvailable by viewModel.isAiAvailable.collectAsState()
+    val totalCount = remember(summaries) { summaries.sumOf { it.notifications.size } }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
             .screenBackSwipe(onBack)
     ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        VoidPanelTitle(
+            text = stringResource(R.string.notification_summary),
+            modifier = Modifier.panelTitlePadding()
         ) {
-            Text(
-                text = "Notification Summary",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Medium
-            )
-            // Total notification count badge
-            val totalCount = summaries.sumOf { it.notifications.size }
-            if (totalCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "$totalCount",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
+            if (hasAccess && totalCount > 0) TotalCountPill(totalCount)
         }
-
-        if (aiAvailable == false) {
+        if (hasAccess && aiAvailable == false) {
             Text(
-                text = "On-device AI summary is not available on this device. Displaying raw notification content.",
+                text = stringResource(R.string.ai_summary_unavailable),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                modifier = Modifier.padding(
+                    start = VoidDimens.screenPadding,
+                    end = VoidDimens.screenPadding,
+                    bottom = VoidDimens.rowSpacing
+                )
             )
         }
+        VoidSectionDivider(modifier = Modifier.padding(horizontal = VoidDimens.screenPadding))
 
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 20.dp),
-            color = MaterialTheme.colorScheme.outlineVariant
+        val contentModifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+        when {
+            !hasAccess -> NotificationAccessPrompt(modifier = contentModifier)
+            summaries.isEmpty() -> PanelMessage(
+                title = stringResource(R.string.summary_all_clear),
+                body = stringResource(R.string.no_summary),
+                modifier = contentModifier
+            )
+            else -> SummaryList(summaries = summaries, onDismiss = viewModel::dismissApp, modifier = contentModifier)
+        }
+    }
+}
+
+/** How many notifications the summary covers, said in words to a screen reader. */
+@Composable
+private fun TotalCountPill(count: Int) {
+    val description = pluralStringResource(R.plurals.notification_count, count, count)
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = Modifier
+            .padding(start = VoidDimens.rowSpacing)
+            .clearAndSetSemantics { contentDescription = description }
+    ) {
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = VoidDimens.rowSpacing, vertical = VoidDimens.compactSpacing)
         )
+    }
+}
 
-        if (summaries.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
+@Composable
+private fun SummaryList(
+    summaries: List<AppNotificationSummary>,
+    onDismiss: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val dismissLabel = stringResource(R.string.dismiss)
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.rowSpacing),
+        verticalArrangement = Arrangement.spacedBy(VoidDimens.cardGap)
+    ) {
+        items(items = summaries, key = { it.packageName }) { summary ->
+            DismissibleCard(
+                dismissLabel = dismissLabel,
+                onDismiss = { onDismiss(summary.packageName) },
+                modifier = Modifier.animateItem()
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "All clear",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "No pending notifications to summarize",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = summaries,
-                    key = { it.packageName }
-                ) { summary ->
-                    val dismissState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = { value ->
-                            if (value != SwipeToDismissBoxValue.Settled) {
-                                viewModel.dismissApp(summary.packageName)
-                                true
-                            } else false
-                        }
-                    )
-
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        backgroundContent = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp),
-                                contentAlignment = Alignment.CenterEnd
-                            ) {
-                                Text(
-                                    text = "Dismiss",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    ) {
-                        SummaryCard(summary)
-                    }
-                }
+                SummaryCard(summary)
             }
         }
-    } // Column
-    } // Box
+    }
 }
 
 @Composable
 private fun SummaryCard(summary: AppNotificationSummary) {
-    val relativeTime = remember(summary.latestTimestamp) {
-        DateUtils.getRelativeTimeSpanString(
-            summary.latestTimestamp,
-            System.currentTimeMillis(),
-            DateUtils.MINUTE_IN_MILLIS,
-            DateUtils.FORMAT_ABBREV_RELATIVE
-        ).toString()
-    }
-
-    OutlinedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
+    val relativeTime = remember(summary.latestTimestamp) { relativeTimeOf(summary.latestTimestamp) }
+    NotificationCard(
+        appLabel = summary.appLabel,
+        count = summary.notifications.size,
+        time = relativeTime
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // App header with notification count badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = summary.appLabel,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    // Notification count badge
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "${summary.notifications.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-                Text(
-                    text = relativeTime,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // AI Summary or loading
-            if (summary.isLoading) {
-                Text(
-                    text = "Summarizing notifications...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-            } else {
-                val summaryText = summary.aiSummary ?: "No summary available"
-                // Parse bullets: split on "• " or "* " line markers
-                val bullets = summaryText
-                    .split("\n")
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-                    .map { line ->
-                        line.removePrefix("• ").removePrefix("* ").removePrefix("- ").trim()
-                    }
-                    .filter { it.isNotBlank() }
-
-                if (bullets.size > 1) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        bullets.forEach { bullet ->
-                            Text(
-                                text = "• $bullet",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                } else {
-                    Text(
-                        text = summaryText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+        if (summary.isLoading) {
+            Text(
+                text = stringResource(R.string.summarizing),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            val bullets = remember(summary.aiSummary) { SummaryBullets.parse(summary.aiSummary) }
+            when (bullets.size) {
+                0 -> SummaryText(stringResource(R.string.summary_empty), muted = true)
+                1 -> SummaryText(bullets.first())
+                else -> Column(verticalArrangement = Arrangement.spacedBy(VoidDimens.compactSpacing)) {
+                    bullets.forEach { bullet -> SummaryText(stringResource(R.string.summary_bullet, bullet)) }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SummaryText(text: String, muted: Boolean = false) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+    )
+}
+
+/** Splits a summary into its points: one per line, without the bullet a model or the fallback put in front. */
+internal object SummaryBullets {
+    /** A bullet, star or hyphen that starts a line and stands alone: followed by space or nothing ("Re-sent" keeps its hyphen). */
+    private val marker = Regex("""^[•*-](\s+|$)""")
+
+    fun parse(text: String?): List<String> =
+        text.orEmpty()
+            .lines()
+            .map { line -> line.trim().replaceFirst(marker, "").trim() }
+            .filter { it.isNotBlank() }
 }

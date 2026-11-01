@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.font.FontCatalog
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.font.rememberFontResolution
 
@@ -68,6 +69,7 @@ private val VoidExpressiveShapes = Shapes(
 @Composable
 fun VoidAppTheme(
     appFont: String = FontCatalog.DEFAULT_ID,
+    animationSpeed: String = Prefs.AnimationSpeed.STANDARD,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -81,11 +83,13 @@ fun VoidAppTheme(
     val font = rememberFontResolution(appFont).spec
     val typography = remember(font) { getTypography(font) }
 
-    // Expressive motion drives component springs (buttons, toggles, list items, indicators). Full-screen
-    // panel transitions keep the standard springs in VoidMotion: an overshoot there reveals the screen edge.
+    // Expressive motion drives component springs (buttons, toggles, list items, indicators), scaled by
+    // the animation-speed setting like the panels. Full-screen panel transitions keep the standard
+    // springs in VoidMotion: an overshoot there reveals the screen edge.
+    val motionScheme = remember(animationSpeed) { SpeedScaledMotionScheme(MotionScheme.expressive(), animationSpeed) }
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
-        motionScheme = MotionScheme.expressive(),
+        motionScheme = motionScheme,
         shapes = VoidExpressiveShapes,
         typography = typography,
         content = content

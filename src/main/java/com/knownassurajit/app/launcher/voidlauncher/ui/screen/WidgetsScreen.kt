@@ -9,16 +9,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Button
 import androidx.compose.foundation.Image
 import androidx.compose.animation.core.animateIntOffsetAsState
 import android.view.View
+import android.view.ViewGroup
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetHostView
 import android.appwidget.AppWidgetManager
@@ -45,15 +40,12 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,24 +62,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -109,10 +96,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -120,6 +107,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -134,12 +122,12 @@ import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.WidgetInfo
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
-import com.knownassurajit.app.launcher.voidlauncher.helper.ListenerCount
-import com.knownassurajit.app.launcher.voidlauncher.helper.ListeningLease
+import com.knownassurajit.app.launcher.voidlauncher.helper.PinnedWidgetQuery
+import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetHostHolder
+import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetIds
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetBindHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetGrid
 import com.knownassurajit.app.launcher.voidlauncher.helper.WidgetLayoutHelper
-import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalContentSwipeToBack
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAlpha
@@ -147,19 +135,41 @@ import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.customActions
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.PULL_ZONE_HEIGHT
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.RevealPullZone
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.revealHeaderDrag
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.RevealHeaderConnection
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.RevealHeaderState
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.revealHeader
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalPanelSettled
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.stoppingAtOnePixel
+import kotlinx.coroutines.flow.first
 
-private const val WIDGET_HOST_ID = 1024
 private const val PREVIEW_CACHE_SIZE = 64
 private const val TAG = "WidgetsViewModel"
 
-/** Shared by every [WidgetsViewModel]: the host id is registered once per process. */
-private val hostListeners = ListenerCount()
 
 data class PendingWidgetBinding(
     val widget: WidgetInfo,
@@ -185,22 +195,8 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
     private val ctx = application.applicationContext
     private val prefs = Prefs.get(ctx)
 
-    val appWidgetHost = AppWidgetHost(ctx, WIDGET_HOST_ID)
-
-    // Every Widgets screen builds its own host, but Android keeps one registration per host id.
-    // Screens overlap (the closing one stays until its exit animation ends), so a screen must not
-    // stop what a newer one started.
-    private val hostListening = ListeningLease(
-        count = hostListeners,
-        start = {
-            Log.d(TAG, "widget_host_listening state=start")
-            appWidgetHost.startListening()
-        },
-        stop = {
-            Log.d(TAG, "widget_host_listening state=stop")
-            appWidgetHost.stopListening()
-        }
-    )
+    /** The launcher's one widget host: it and the views it built outlive this screen ([WidgetHostHolder]). */
+    val appWidgetHost: AppWidgetHost = WidgetHostHolder.host(ctx)
 
     private val _allWidgets = MutableStateFlow<List<WidgetInfo>>(emptyList())
     val allWidgets: StateFlow<List<WidgetInfo>> = _allWidgets.asStateFlow()
@@ -220,27 +216,49 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
     // Where a widget dropped from the picker goes once the bind/configure round trip finishes.
     private val pendingCells = mutableMapOf<String, WidgetGrid.Cell>()
 
-    init { loadWidgets() }
+    // The provider of every pinned widget and, once the picker needs them, of every widget on the device.
+    private val known = LinkedHashMap<String, WidgetInfo>()
+    private var providersJob: Job? = null
 
-    fun startListening() = hostListening.acquire()
+    /** True until the pinned widgets are known; false at once when they were read before (this or an earlier screen, or the pre-build). */
+    private val _isLoading = MutableStateFlow(WidgetHostHolder.lastPinned == null)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    fun stopListening() = hostListening.release()
+    /** True while the provider list for the picker loads. */
+    private val _isLoadingProviders = MutableStateFlow(false)
+    val isLoadingProviders: StateFlow<Boolean> = _isLoadingProviders.asStateFlow()
 
-    override fun onCleared() {
-        super.onCleared()
-        hostListening.release()
+    init {
+        // The widgets read last time are laid out on the first frame (reading prefs is in memory), and
+        // the system is asked again in the background in case one went away.
+        WidgetHostHolder.lastPinned?.let { cached ->
+            cached.forEach { known[it.key] = it }
+            refreshPinnedAndIds()
+        }
+        loadPinnedWidgets()
     }
 
-    // Reading every provider and decoding its preview is heavy: keep it off the main thread.
-    private fun loadWidgets() = viewModelScope.launch {
-        val all = withContext(Dispatchers.IO) { queryWidgets() }
-        _allWidgets.value = all
-        refreshPinnedAndIds(all)
+    // Asking the system for the provider of each widget that is bound takes a few milliseconds; listing
+    // every provider on the device and loading its label is left to the picker.
+    private fun loadPinnedWidgets() = viewModelScope.launch {
+        val pinned = withContext(Dispatchers.IO) { PinnedWidgetQuery.query(ctx, prefs) }
+        pinned.forEach { known[it.widget.key] = it.widget }
+        refreshPinnedAndIds()
         _isLoading.value = false
     }
 
-    private val _isLoading = MutableStateFlow(true)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    /** Lists every provider for the picker. It is heavy (each label is loaded), so it runs once, off the main thread; later calls do nothing. */
+    fun loadProviders() {
+        if (providersJob != null) return
+        providersJob = viewModelScope.launch {
+            _isLoadingProviders.value = true
+            val all = withContext(Dispatchers.IO) { queryWidgets() }
+            // A pinned widget keeps the provider it was bound with.
+            all.forEach { known.putIfAbsent(it.key, it) }
+            _allWidgets.value = all
+            _isLoadingProviders.value = false
+        }
+    }
 
     private val previews = android.util.LruCache<String, Drawable>(PREVIEW_CACHE_SIZE)
 
@@ -257,6 +275,12 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
 
     fun cachedPreview(widget: WidgetInfo): Drawable? = previews.get(widget.key)
 
+    private fun appNameOf(packageName: String, appNames: MutableMap<String, String>): String =
+        appNames.getOrPut(packageName) {
+            val pm = ctx.packageManager
+            runCatching { pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString() }.getOrDefault(packageName)
+        }
+
     private fun queryWidgets(): List<WidgetInfo> {
         return try {
             val manager = AppWidgetManager.getInstance(ctx)
@@ -265,11 +289,7 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
             val started = android.os.SystemClock.elapsedRealtime()
             val all = manager.installedProviders.mapNotNull { info ->
                 try {
-                    val pkg = info.provider.packageName
-                    val appName = appNames.getOrPut(pkg) {
-                        runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
-                    }
-                    WidgetInfo(provider = info, label = info.loadLabel(pm), appName = appName)
+                    WidgetInfo(provider = info, label = info.loadLabel(pm), appName = appNameOf(info.provider.packageName, appNames))
                 } catch (_: Exception) { null }
             }.sortedBy { it.appName }
             Log.d(TAG, "widget_providers_loaded count=${all.size} ms=${android.os.SystemClock.elapsedRealtime() - started}")
@@ -280,9 +300,9 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun refreshPinnedAndIds(all: List<WidgetInfo> = _allWidgets.value) {
+    private fun refreshPinnedAndIds() {
         var pinned = prefs.pinnedWidgets
-        val idMap = buildWidgetIdMap()
+        val idMap = WidgetIds.parse(prefs.widgetAllocatedIds)
 
         // Drop pinned entries that have no allocated ID (e.g., migrating from old version)
         val orphans = pinned.filter { key -> !idMap.containsKey(key) }
@@ -292,14 +312,14 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         }
 
         val orderedKeys = prefs.widgetOrder
-        _pinnedWidgets.value = all.filter { widget ->
-            val key = widget.provider.provider.flattenToString()
-            idMap.containsKey(key) && pinned.contains(key)
+        _pinnedWidgets.value = known.values.filter { widget ->
+            idMap.containsKey(widget.key) && pinned.contains(widget.key)
         }.sortedBy { widget ->
             val index = orderedKeys.indexOf(widget.key)
             if (index < 0) Int.MAX_VALUE else index
         }
         _widgetIds.value = idMap
+        WidgetHostHolder.lastPinned = _pinnedWidgets.value
         refreshSpans()
     }
 
@@ -309,18 +329,6 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         _widgetSpans.value = stored.filterKeys { it in pinnedKeys }
         _widgetPositions.value = prefs.widgetPositions.mapNotNull(WidgetGrid::parseCell).toMap()
             .filterKeys { it in pinnedKeys }
-    }
-
-    private fun buildWidgetIdMap(): Map<String, Int> {
-        val map = mutableMapOf<String, Int>()
-        prefs.widgetAllocatedIds.forEach { entry ->
-            val idx = entry.lastIndexOf('|')
-            if (idx > 0) {
-                val id = entry.substring(idx + 1).toIntOrNull()
-                if (id != null) map[entry.substring(0, idx)] = id
-            }
-        }
-        return map
     }
 
     /** Starts adding [widget]; [cell] is where it was dropped on the grid, `null` for the first free cell. */
@@ -376,6 +384,7 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
 
     fun releaseAllocatedId(appWidgetId: Int, widget: WidgetInfo? = null) {
         widget?.let { pendingCells.remove(it.key) }
+        WidgetHostHolder.forget(appWidgetId)
         try { appWidgetHost.deleteAppWidgetId(appWidgetId) } catch (_: Exception) {}
     }
 
@@ -390,6 +399,7 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
 
     private fun commitPin(widget: WidgetInfo, appWidgetId: Int) {
         val key = widget.key
+        known[key] = widget
         val ids = prefs.widgetAllocatedIds.toMutableSet()
         ids.removeAll { it.startsWith("$key|") }
         ids.add("$key|$appWidgetId")
@@ -408,7 +418,10 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
         val key = widget.provider.provider.flattenToString()
         prefs.widgetAllocatedIds.find { it.startsWith("$key|") }
             ?.substringAfterLast('|')?.toIntOrNull()
-            ?.let { id -> try { appWidgetHost.deleteAppWidgetId(id) } catch (_: Exception) {} }
+            ?.let { id ->
+                WidgetHostHolder.forget(id)
+                try { appWidgetHost.deleteAppWidgetId(id) } catch (_: Exception) {}
+            }
 
         prefs.widgetAllocatedIds = prefs.widgetAllocatedIds.toMutableSet()
             .also { it.removeAll { e -> e.startsWith("$key|") } }
@@ -443,25 +456,7 @@ class WidgetsViewModel(application: Application) : AndroidViewModel(application)
     fun defaultSpan(
         widget: WidgetInfo,
         cellDp: Int = WidgetLayoutHelper.CELL_DP
-    ): WidgetLayoutHelper.WidgetSpan {
-        val targetWidth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            widget.provider.targetCellWidth
-        } else {
-            0
-        }
-        val targetHeight = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            widget.provider.targetCellHeight
-        } else {
-            0
-        }
-        return WidgetLayoutHelper.defaultSpan(
-            minWidthDp = widget.provider.minWidth,
-            minHeightDp = widget.provider.minHeight,
-            targetCellWidth = targetWidth,
-            targetCellHeight = targetHeight,
-            cellDp = cellDp
-        )
-    }
+    ): WidgetLayoutHelper.WidgetSpan = WidgetLayoutHelper.defaultSpanFor(widget.provider, cellDp)
 
     fun setWidgetSpan(widget: WidgetInfo, span: WidgetLayoutHelper.WidgetSpan) {
         val next = WidgetLayoutHelper.clampSpan(span)
@@ -497,7 +492,7 @@ private data class WidgetDrag(
 )
 
 /** Grid geometry for the current width: square cells of [cellDp] with [spacingDp] gaps. */
-private data class GridMetrics(val cellDp: Int, val spacingDp: Int) {
+internal data class GridMetrics(val cellDp: Int, val spacingDp: Int) {
     val stepDp: Float get() = (cellDp + spacingDp).toFloat()
 }
 
@@ -509,15 +504,32 @@ private class WidgetLayoutRefs {
     var screenOrigin: Offset = Offset.Zero
     var gridOrigin: Offset = Offset.Zero
     var viewport: Rect = Rect.Zero
+
+    /** Where each pinned widget is, by key; read only when a widget is picked, to scroll it clear of the edit bar. */
+    val coordinates: MutableMap<String, LayoutCoordinates> = HashMap()
 }
 
-private val GRID_CONTROL_SIZE = 48.dp
 private val AUTO_SCROLL_EDGE = 72.dp
 private const val AUTO_SCROLL_STEP_PX = 18f
 private const val AUTO_SCROLL_FRAME_MS = 16L
 private const val GHOST_ALPHA = 0.92f
 private const val LIFTED_ALPHA = 0.3f
 private const val GHOST_SCALE = 1.04f
+
+/** A picked widget rises a little; the others are dimmed. */
+private const val SELECTED_SCALE = 1.02f
+private const val DIMMED_ALPHA = 0.55f
+private val OUTLINE_WIDTH = 2.dp
+
+
+/** Release speed of a finger, per second, that opens or closes the header whatever distance it was pulled. */
+private val HEADER_FLING_VELOCITY = 400.dp
+
+/** Space kept under the grid for the edit bar until it has been measured. */
+private val EDIT_BAR_RESERVE = 240.dp
+
+/** How long to wait for the grid to grow under the edit bar before a picked widget is scrolled clear. */
+private const val EDIT_SCROLL_WAIT_MS = 400L
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -542,6 +554,7 @@ fun WidgetsScreen(
     val widgetSpans by viewModel.widgetSpans.collectAsState()
     val widgetPositions by viewModel.widgetPositions.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isLoadingProviders by viewModel.isLoadingProviders.collectAsState()
     var showPicker by remember { mutableStateOf(false) }
     var widgetToRemove by remember { mutableStateOf<WidgetInfo?>(null) }
     var selectedWidgetKey by remember { mutableStateOf<String?>(null) }
@@ -556,13 +569,9 @@ fun WidgetsScreen(
     val scrollState = rememberScrollState()
     // The grid spans the screen width minus its side padding: four square cells and three gaps.
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    // The same cell size the pre-built views were given (WidgetHostHolder.prewarm), so they need no new size.
     val metrics = remember(screenWidthDp) {
-        val spacing = WidgetLayoutHelper.GRID_SPACING_DP
-        val columns = WidgetLayoutHelper.GRID_COLUMNS
-        val cell = ((screenWidthDp - VoidDimens.screenPadding.value * 2 - spacing * (columns - 1)) / columns)
-            .toInt()
-            .coerceAtLeast(WidgetLayoutHelper.MIN_HEIGHT_DP)
-        GridMetrics(cell, spacing)
+        GridMetrics(WidgetLayoutHelper.cellDpFor(screenWidthDp, VoidDimens.screenPadding.value), WidgetLayoutHelper.GRID_SPACING_DP)
     }
 
     val activityLauncher = rememberLauncherForActivityResult(
@@ -602,9 +611,10 @@ fun WidgetsScreen(
         activityLauncher.launch(intent)
     }
 
+    // The host listens while widgets are pinned; an open screen also needs it for the first pin.
     DisposableEffect(Unit) {
-        viewModel.startListening()
-        onDispose { viewModel.stopListening() }
+        WidgetHostHolder.onScreenOpened(context)
+        onDispose { WidgetHostHolder.onScreenClosed(context) }
     }
 
     fun pin(widget: WidgetInfo, cell: WidgetGrid.Cell?) {
@@ -680,6 +690,89 @@ fun WidgetsScreen(
     }
 
     val editing = drag != null || selectedWidgetKey != null
+    val motion = MaterialTheme.motionScheme
+    val scope = rememberCoroutineScope()
+    val panelSettled by LocalPanelSettled.current
+    val selectedWidget = pinnedWidgets.firstOrNull { it.key == selectedWidgetKey }
+    // The edit bar slides out with the widget it showed, so it keeps that widget until it has left.
+    val barWidget = remember { arrayOfNulls<WidgetInfo>(1) }
+    if (selectedWidget != null) barWidget[0] = selectedWidget
+
+    // Nothing to hide a header from when there is no widget: the header stays out and offers Add widget.
+    val headerPinnedOpen = !isLoading && pinnedWidgets.isEmpty()
+    val headerState = remember { RevealHeaderState() }
+    val settleSpec = motion.defaultSpatialSpec<Float>()
+    val settleSpecLatest = rememberUpdatedState(settleSpec)
+    val headerEnabled by rememberUpdatedState(!editing && !showPicker && !headerPinnedOpen)
+    val flingVelocityPx = with(density) { HEADER_FLING_VELOCITY.toPx() }
+    val revealConnection = remember(headerState, flingVelocityPx) {
+        RevealHeaderConnection(
+            state = headerState,
+            flingVelocityPx = flingVelocityPx,
+            settleSpec = { settleSpecLatest.value },
+            isEnabled = { headerEnabled }
+        )
+    }
+    // It is out while the screen is empty and nothing else is going on, away while a widget is being
+    // customized or added, and otherwise (a screen with widgets) opened from the strip at the top.
+    val headerForcedOpen = headerPinnedOpen && !editing && !showPicker
+    LaunchedEffect(headerForcedOpen, editing, showPicker) {
+        if (headerForcedOpen) headerState.show(settleSpec) else headerState.hide(settleSpec)
+    }
+    // Leaving customize mode with the system Back puts the widget down instead of leaving the screen,
+    // and an open header closes first, the way a sheet does.
+    BackHandler(enabled = selectedWidgetKey != null && drag == null) { selectedWidgetKey = null }
+    val headerHidden by remember { derivedStateOf { headerState.isHidden } }
+    BackHandler(enabled = !headerHidden && headerEnabled) { scope.launch { headerState.hide(settleSpec) } }
+    // The picker's provider list is the heavy part of this screen. It loads in the background once the
+    // panel has arrived, so it is ready by the time Add widget is tapped.
+    LaunchedEffect(panelSettled, showPicker) {
+        if (panelSettled || showPicker) viewModel.loadProviders()
+    }
+    // Kept and pre-built views show on the first frame; the others are built one per frame. On Android
+    // 12 and later a view inflates off the main thread, so that starts at once; before it the inflation
+    // is on the main thread and waits for the slide-in (see [rememberStagedKeys]).
+    val builtKeys = rememberStagedKeys(
+        keys = placements.map { it.key },
+        enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || panelSettled,
+        isReady = { key -> widgetIds[key]?.let { WidgetHostHolder.isReady(it, context) } == true }
+    )
+    // The size buttons of the edit bar and the screen reader's resize actions offer the same steps.
+    val selectedPlacement = placements.firstOrNull { it.key == selectedWidgetKey }
+    val selectedSteps = selectedPlacement?.let { placement ->
+        val provider = selectedWidget?.provider
+        WidgetGrid.resizeSteps(
+            others = placements.filterNot { it.key == placement.key },
+            placement = placement,
+            resizesHorizontally = provider != null && provider.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0,
+            resizesVertically = provider != null && provider.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0
+        )
+    }
+    // The bar's measured height, so a picked widget can be scrolled clear of it.
+    var editBarHeightPx by remember { mutableIntStateOf(0) }
+    val editBarReservePx = if (editBarHeightPx > 0) editBarHeightPx.toFloat() else with(density) { EDIT_BAR_RESERVE.toPx() }
+    // A widget picked for customizing may sit under the bar: bring it into the clear part of the screen.
+    LaunchedEffect(selectedWidgetKey) {
+        val key = selectedWidgetKey ?: return@LaunchedEffect
+        val bounds = refs.coordinates[key]?.takeIf { it.isAttached }?.boundsInRoot() ?: return@LaunchedEffect
+        val margin = with(density) { VoidDimens.sectionSpacing.toPx() }
+        val clearTop = refs.viewport.top + margin
+        val clearBottom = refs.viewport.bottom - editBarReservePx - margin
+        val delta = when {
+            // Never past the widget's own top: one taller than the clear space stays where it is.
+            bounds.bottom > clearBottom -> minOf(bounds.bottom - clearBottom, bounds.top - clearTop).coerceAtLeast(0f)
+            bounds.top < clearTop -> bounds.top - clearTop
+            else -> 0f
+        }
+        // The room under the last widget appears with the next layout: scroll once the range has it.
+        if (delta > 0f) {
+            withTimeoutOrNull(EDIT_SCROLL_WAIT_MS) { snapshotFlow { scrollState.maxValue }.first { it >= scrollState.value + delta } }
+        }
+        if (delta != 0f) scrollState.animateScrollBy(delta, motion.defaultSpatialSpec())
+    }
+
+    val showOptionsLabel = stringResource(R.string.widget_header_show)
+    val statusBarHeight = LocalFixedStatusBarHeight.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -688,58 +781,16 @@ fun WidgetsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = LocalFixedStatusBarHeight.current)
+                .padding(top = statusBarHeight)
                 .navigationBarsPadding()
                 .screenBackSwipe(onBack, enabled = LocalContentSwipeToBack.current && !editing)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = VoidDimens.screenPadding,
-                        end = VoidDimens.sectionSpacing,
-                        top = VoidDimens.screenPadding,
-                        bottom = VoidDimens.rowSpacing
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = stringResource(R.string.widgets),
-                    style = MaterialTheme.typography.headlineSmallEmphasized,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                if (selectedWidgetKey != null) {
-                    Button(onClick = { selectedWidgetKey = null }) {
-                        Text(stringResource(R.string.done))
-                    }
-                } else {
-                    FilledTonalButton(onClick = { showPicker = true }) {
-                        Icon(
-                            Icons.Outlined.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(ButtonDefaults.IconSize)
-                        )
-                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                        Text(stringResource(R.string.add_widget))
-                    }
-                }
-            }
-            AnimatedVisibility(visible = editing) {
-                Text(
-                    text = stringResource(R.string.widget_edit_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.compactSpacing)
-                )
-            }
-            VoidSectionDivider()
-
             BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .onGloballyPositioned { refs.viewport = it.boundsInRoot() }
+                    .nestedScroll(revealConnection)
             ) {
                 val visibleRows = ((maxHeight - VoidDimens.sectionSpacing * 2).value / metrics.stepDp).toInt()
                 val rows = maxOf(
@@ -759,9 +810,19 @@ fun WidgetsScreen(
                         showCells = editing,
                         dropCell = dropCell,
                         dropSpan = drag?.span,
-                        onBackgroundTap = { selectedWidgetKey = null },
+                        onBackgroundTap = {
+                            selectedWidgetKey = null
+                            // A tap beside the widgets also puts a header that was pulled out away.
+                            if (headerEnabled) scope.launch { headerState.hide(settleSpec) }
+                        },
+                        // The grid starts below the strip that opens the header, so a widget never sits under it.
                         modifier = Modifier
-                            .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing)
+                            .padding(
+                                start = VoidDimens.screenPadding,
+                                end = VoidDimens.screenPadding,
+                                top = PULL_ZONE_HEIGHT,
+                                bottom = VoidDimens.sectionSpacing
+                            )
                             .onGloballyPositioned { refs.gridOrigin = it.positionInRoot() }
                     ) {
                         val byKey = pinnedWidgets.associateBy { it.key }
@@ -772,11 +833,14 @@ fun WidgetsScreen(
                                 LiveWidgetItem(
                                     widget = widget,
                                     widgetId = widgetId,
-                                    appWidgetHost = viewModel.appWidgetHost,
                                     placement = placement,
                                     metrics = metrics,
+                                    viewBuilt = placement.key in builtKeys.value,
+                                    resizeSteps = if (selectedWidgetKey == widget.key) selectedSteps else null,
                                     selected = selectedWidgetKey == widget.key,
+                                    dimmed = selectedWidgetKey != null && selectedWidgetKey != widget.key,
                                     lifted = drag?.widget?.key == widget.key,
+                                    onPositioned = { coordinates -> refs.coordinates[widget.key] = coordinates },
                                     onSelected = {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         selectedWidgetKey = widget.key
@@ -787,25 +851,19 @@ fun WidgetsScreen(
                                     },
                                     onMove = { pointer -> drag = drag?.copy(pointerInRoot = pointer) },
                                     onMoveEnd = { endDrag(commit = true) },
-                                    onRemoveClick = { widgetToRemove = widget },
-                                    onConfigureClick = {
-                                        widget.provider.configure?.let { configure ->
-                                            activityLauncher.launch(
-                                                Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
-                                                    .setComponent(configure)
-                                                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                                            )
+                                    onMoveBy = { columns, rowsDelta ->
+                                        val others = placements.filterNot { it.key == widget.key }
+                                        WidgetGrid.moved(others, placement, columns, rowsDelta)?.let { cell ->
+                                            viewModel.savePlacements(placements.map { if (it.key == widget.key) it.copy(cell = cell) else it })
                                         }
                                     },
-                                    onResize = { requested ->
-                                        val others = placements.filterNot { it.key == widget.key }
-                                        WidgetGrid.fitSpan(others, widget.key, placement.cell, requested)
-                                            ?.let { fitted -> viewModel.setWidgetSpan(widget, fitted) }
-                                    }
+                                    onResize = { span -> viewModel.setWidgetSpan(widget, span) }
                                 )
                             }
                         }
                     }
+                    // Room under the last widget for the edit bar, so any widget can be scrolled clear of it.
+                    if (selectedWidgetKey != null) Spacer(Modifier.height(with(density) { editBarReservePx.toDp() }))
                 }
 
                 when {
@@ -833,10 +891,88 @@ fun WidgetsScreen(
             }
         }
 
+        // The strip under the status bar that opens the header: drag down on it or tap it. The grid
+        // starts below it, so it never competes with a widget for a touch.
+        val stripActive by remember { derivedStateOf { !headerState.isFullyShown } }
+        if (!headerPinnedOpen && !editing && !showPicker && stripActive) {
+            RevealPullZone(
+                state = headerState,
+                description = showOptionsLabel,
+                flingVelocityPx = flingVelocityPx,
+                settleSpec = settleSpec,
+                onToggle = {
+                    scope.launch {
+                        if (headerState.isHidden) headerState.show(settleSpec) else headerState.hide(settleSpec)
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = statusBarHeight)
+            )
+        }
+        // The header floats over the grid so that showing it never moves a widget, and it is dragged up
+        // to close like a sheet. It is composed while it is hidden (it must be measured), so it is also
+        // kept from a screen reader and from keyboard focus then; nobody opens it during the slide-in,
+        // so it is composed once the panel has arrived.
+        val headerDrag = rememberDraggableState { delta -> headerState.dragBy(delta) }
+        if (panelSettled) {
+            WidgetsHeader(
+                onAddWidget = { showPicker = true },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .revealHeader(headerState)
+                    .revealHeaderDrag(headerState, headerDrag, flingVelocityPx, settleSpec)
+                    .then(
+                        if (headerHidden) Modifier.clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier
+                    )
+            )
+        }
+
+        AnimatedVisibility(
+            visible = selectedWidget != null && drag == null,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = VoidDimens.rowSpacing)
+                .onSizeChanged { editBarHeightPx = it.height },
+            enter = slideInVertically(motion.defaultSpatialSpec<IntOffset>().stoppingAtOnePixel()) { it } +
+                fadeIn(motion.defaultEffectsSpec()),
+            exit = slideOutVertically(motion.fastSpatialSpec<IntOffset>().stoppingAtOnePixel()) { it } +
+                fadeOut(motion.fastEffectsSpec())
+        ) {
+            val barTarget = barWidget[0]
+            if (barTarget != null) {
+                val widgetId = widgetIds[barTarget.key]
+                val barSpan = placements.firstOrNull { it.key == barTarget.key }?.span
+                    ?: WidgetLayoutHelper.WidgetSpan(1, 1)
+                WidgetEditBar(
+                    title = stringResource(R.string.widget_edit_title, barTarget.label),
+                    span = barSpan,
+                    resizesHorizontally = barTarget.provider.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0,
+                    resizesVertically = barTarget.provider.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0,
+                    steps = selectedSteps ?: WidgetGrid.ResizeSteps(null, null, null, null),
+                    hasSettings = barTarget.provider.configure != null && widgetId != null,
+                    onResize = { span -> viewModel.setWidgetSpan(barTarget, span) },
+                    onSettings = {
+                        val configure = barTarget.provider.configure
+                        if (configure != null && widgetId != null) {
+                            activityLauncher.launch(
+                                Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
+                                    .setComponent(configure)
+                                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                            )
+                        }
+                    },
+                    onRemove = { widgetToRemove = barTarget },
+                    onDone = { selectedWidgetKey = null }
+                )
+            }
+        }
+
         WidgetPickerPanel(
             visible = showPicker,
             dragging = drag?.isNew == true,
-            isLoading = isLoading,
+            isLoading = isLoadingProviders,
             allWidgets = allWidgets,
             pinnedKeys = pinnedWidgets.map { it.key }.toSet(),
             loadPreview = viewModel::previewFor,
@@ -972,42 +1108,42 @@ private fun WidgetGridCanvas(
 private fun LiveWidgetItem(
     widget: WidgetInfo,
     widgetId: Int,
-    appWidgetHost: AppWidgetHost,
     placement: WidgetGrid.Placement,
     metrics: GridMetrics,
+    viewBuilt: Boolean,
+    resizeSteps: WidgetGrid.ResizeSteps?,
     selected: Boolean,
+    dimmed: Boolean,
     lifted: Boolean,
+    onPositioned: (LayoutCoordinates) -> Unit,
     onSelected: () -> Unit,
     onDeselect: () -> Unit,
     onMoveStart: (grab: Offset, pointerInRoot: Offset, snapshot: ImageBitmap?) -> Unit,
     onMove: (pointerInRoot: Offset) -> Unit,
     onMoveEnd: () -> Unit,
-    onRemoveClick: () -> Unit,
-    onConfigureClick: () -> Unit,
+    onMoveBy: (columns: Int, rows: Int) -> Unit,
     onResize: (WidgetLayoutHelper.WidgetSpan) -> Unit
 ) {
     val span = placement.span
     val widthDp = WidgetGrid.extentDp(span.columns, metrics.cellDp, metrics.spacingDp)
     val heightDp = WidgetGrid.extentDp(span.rows, metrics.cellDp, metrics.spacingDp)
     val density = LocalDensity.current
+    val motion = MaterialTheme.motionScheme
     val shape = MaterialTheme.shapes.largeIncreased
+    val outlineColor = MaterialTheme.colorScheme.primary
     val spanLatest = rememberUpdatedState(span)
     val selectedLatest = rememberUpdatedState(selected)
+    val onPositionedLatest = rememberUpdatedState(onPositioned)
     val onSelectedLatest = rememberUpdatedState(onSelected)
     val onDeselectLatest = rememberUpdatedState(onDeselect)
     val onMoveStartLatest = rememberUpdatedState(onMoveStart)
     val onMoveLatest = rememberUpdatedState(onMove)
     val onMoveEndLatest = rememberUpdatedState(onMoveEnd)
+    val onMoveByLatest = rememberUpdatedState(onMoveBy)
     val onResizeLatest = rememberUpdatedState(onResize)
     // The item stays in place while held (a snapshot follows the finger), so its coordinates stay valid.
     val coordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val hostView = remember { arrayOfNulls<View>(1) }
-    // The size last sent to the provider: options go out only when it changes, never per recomposition.
-    val appliedSize = remember { intArrayOf(0, 0) }
-    val resizeMode = widget.provider.resizeMode
-    val resizesHorizontally = resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL != 0
-    val resizesVertically = resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL != 0
-    val hasConfigure = widget.provider.configure != null
     val target = with(density) {
         IntOffset(
             (placement.cell.column * metrics.stepDp).dp.roundToPx(),
@@ -1015,25 +1151,79 @@ private fun LiveWidgetItem(
         )
     }
     // A widget that changes cell glides there on the theme's spatial spring instead of jumping.
-    val offset by animateIntOffsetAsState(target, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "widget_cell")
+    val offset by animateIntOffsetAsState(
+        target,
+        motion.defaultSpatialSpec<IntOffset>().stoppingAtOnePixel(),
+        label = "widget_cell"
+    )
+    // Picking a widget lifts it a little and quiets the others, so the one being customized is obvious.
+    val lift by animateFloatAsState(if (selected) SELECTED_SCALE else 1f, motion.defaultSpatialSpec(), label = "widget_lift")
+    val quiet by animateFloatAsState(if (dimmed) DIMMED_ALPHA else 1f, motion.defaultEffectsSpec(), label = "widget_quiet")
+    val outline by animateFloatAsState(if (selected) 1f else 0f, motion.defaultEffectsSpec(), label = "widget_outline")
+    // A kept or pre-built view shows at once, fully drawn. A view built now fades in quickly over a tile
+    // of its size, so nothing jumps while the provider draws it.
+    val viewAlpha = remember { Animatable(if (viewBuilt) 1f else 0f) }
+    val viewFade = motion.fastEffectsSpec<Float>()
+    LaunchedEffect(viewBuilt) {
+        if (viewBuilt) viewAlpha.animateTo(1f, viewFade)
+    }
+
+    val customizeLabel = stringResource(R.string.widget_action_customize)
+    val widerLabel = stringResource(R.string.widget_action_wider)
+    val narrowerLabel = stringResource(R.string.widget_action_narrower)
+    val tallerLabel = stringResource(R.string.widget_action_taller)
+    val shorterLabel = stringResource(R.string.widget_action_shorter)
+    val leftLabel = stringResource(R.string.widget_action_move_left)
+    val rightLabel = stringResource(R.string.widget_action_move_right)
+    val upLabel = stringResource(R.string.widget_action_move_up)
+    val downLabel = stringResource(R.string.widget_action_move_down)
 
     Box(
         modifier = Modifier
             .offset { offset }
             .size(widthDp.dp, heightDp.dp)
             .zIndex(if (selected) 1f else 0f)
-            .graphicsLayer { alpha = if (lifted) LIFTED_ALPHA else 1f }
-            .onGloballyPositioned { coordinates[0] = it }
-            .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
+            .graphicsLayer {
+                alpha = (if (lifted) LIFTED_ALPHA else 1f) * quiet
+                scaleX = lift
+                scaleY = lift
+            }
+            .onGloballyPositioned {
+                coordinates[0] = it
+                onPositionedLatest.value(it)
+            }
+            .drawWithContent {
+                drawContent()
+                if (outline > 0f) {
+                    drawOutline(
+                        outline = shape.createOutline(size, layoutDirection, this),
+                        color = outlineColor.copy(alpha = outline),
+                        style = Stroke(width = OUTLINE_WIDTH.toPx())
+                    )
+                }
+            }
+            // A screen reader has no long press and no drag: the same customizing is offered as actions.
+            .semantics {
+                val actions = mutableListOf<CustomAccessibilityAction>()
+                if (!selected) {
+                    actions += CustomAccessibilityAction(customizeLabel) { onSelectedLatest.value(); true }
+                } else {
+                    // The same steps as the edit bar's buttons: only the sizes that fit.
+                    resizeSteps?.wider?.let { span -> actions += CustomAccessibilityAction(widerLabel) { onResizeLatest.value(span); true } }
+                    resizeSteps?.narrower?.let { span -> actions += CustomAccessibilityAction(narrowerLabel) { onResizeLatest.value(span); true } }
+                    resizeSteps?.taller?.let { span -> actions += CustomAccessibilityAction(tallerLabel) { onResizeLatest.value(span); true } }
+                    resizeSteps?.shorter?.let { span -> actions += CustomAccessibilityAction(shorterLabel) { onResizeLatest.value(span); true } }
+                    actions += CustomAccessibilityAction(leftLabel) { onMoveByLatest.value(-1, 0); true }
+                    actions += CustomAccessibilityAction(rightLabel) { onMoveByLatest.value(1, 0); true }
+                    actions += CustomAccessibilityAction(upLabel) { onMoveByLatest.value(0, -1); true }
+                    actions += CustomAccessibilityAction(downLabel) { onMoveByLatest.value(0, 1); true }
+                }
+                customActions = actions
+            }
             .pointerInput(widget.key) {
-                val control = GRID_CONTROL_SIZE.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
                     val wasSelected = selectedLatest.value
-                    // The remove, configure and resize controls of a selected widget handle their own touches.
-                    if (wasSelected && isInControlZone(down.position, size.width.toFloat(), size.height.toFloat(), control, hasConfigure)) {
-                        return@awaitEachGesture
-                    }
                     if (!wasSelected) {
                         // Only a still finger held for the long-press time lifts the widget: a tap belongs to the
                         // widget, and a finger that moves first is scrolling the grid or the widget itself.
@@ -1072,113 +1262,75 @@ private fun LiveWidgetItem(
                 }
             }
     ) {
-        AndroidView(
-            factory = { ctx ->
-                try {
-                    appWidgetHost.createView(ctx, widgetId, widget.provider).also { view ->
-                        WidgetLayoutHelper.applyHostSize(view, widgetId, widthDp, heightDp)
-                        appliedSize[0] = widthDp
-                        appliedSize[1] = heightDp
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "widget_view_failed reason=${e.javaClass.simpleName}")
-                    android.widget.FrameLayout(ctx)
-                }.also { hostView[0] = it }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(shape),
-            update = { view ->
-                val host = view as? AppWidgetHostView ?: return@AndroidView
-                if (appliedSize[0] != widthDp || appliedSize[1] != heightDp) {
-                    WidgetLayoutHelper.applyHostSize(host, widgetId, widthDp, heightDp)
-                    appliedSize[0] = widthDp
-                    appliedSize[1] = heightDp
-                }
-            }
-        )
-        if (selected) {
-            if (hasConfigure) {
-                FilledTonalIconButton(
-                    onClick = onConfigureClick,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .zIndex(1f)
-                        .padding(VoidDimens.compactSpacing)
-                ) {
-                    Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.widget_configure))
-                }
-            }
-            FilledIconButton(
-                onClick = onRemoveClick,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                ),
+        if (viewAlpha.value < 1f) {
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .zIndex(1f)
-                    .padding(VoidDimens.compactSpacing)
-            ) {
-                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.widget_remove))
-            }
-            if (resizesHorizontally || resizesVertically) {
-                val resizeLabel = stringResource(R.string.widget_resize_handle)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .zIndex(1f)
-                        .size(GRID_CONTROL_SIZE)
-                        .semantics { contentDescription = resizeLabel }
-                        .pointerInput(widget.key, metrics) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                down.consume()
-                                val origin = spanLatest.value
-                                var dragX = 0f
-                                var dragY = 0f
-                                drag(down.id) { change ->
-                                    val delta = change.positionChange()
-                                    change.consume()
-                                    dragX += delta.x
-                                    dragY += delta.y
-                                    val snapped = WidgetLayoutHelper.snapSpan(
-                                        start = origin,
-                                        deltaXDp = with(density) { dragX.toDp().value },
-                                        deltaYDp = with(density) { dragY.toDp().value },
-                                        cellDp = metrics.cellDp,
-                                        spacingDp = metrics.spacingDp
-                                    )
-                                    // Only the directions the provider allows (AppWidgetProviderInfo.resizeMode).
-                                    val allowed = WidgetLayoutHelper.WidgetSpan(
-                                        columns = if (resizesHorizontally) snapped.columns else origin.columns,
-                                        rows = if (resizesVertically) snapped.rows else origin.rows
-                                    )
-                                    if (allowed != spanLatest.value) onResizeLatest.value(allowed)
-                                }
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(FilterChipDefaults.IconSize + VoidDimens.compactSpacing)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape)
-                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
-                    )
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = 1f - viewAlpha.value }
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            )
+        }
+        if (viewBuilt) {
+            AndroidView(
+                factory = { ctx ->
+                    try {
+                        // The view kept from an earlier visit (or built ahead of time) comes back as it was.
+                        WidgetHostHolder.obtainView(ctx, widgetId, widget.provider).also { view ->
+                            WidgetHostHolder.applySize(view, widgetId, widthDp, heightDp)
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "widget_view_failed reason=${e.javaClass.simpleName}")
+                        android.widget.FrameLayout(ctx)
+                    }.also { hostView[0] = it }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = viewAlpha.value }
+                    .clip(shape),
+                // Compose leaves a released view inside its old holder; take it out so the next visit can
+                // put the kept view back (WidgetHostHolder only reuses a view without a parent).
+                onRelease = { view -> (view.parent as? ViewGroup)?.removeView(view) },
+                update = { view ->
+                    // Options go out only when the size changed (each one makes the provider render again).
+                    val host = view as? AppWidgetHostView ?: return@AndroidView
+                    WidgetHostHolder.applySize(host, widgetId, widthDp, heightDp)
                 }
-            }
+            )
+        }
+        if (dimmed) {
+            // While another widget is being customized a tap picks this one; it must not open the app behind it.
+            // Drags still pass through, so the grid scrolls over it.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(widget.key) { detectTapGestures { onSelectedLatest.value() } }
+            )
         }
     }
 }
 
-/** Whether [position] falls on one of a selected widget's corner controls. */
-private fun isInControlZone(position: Offset, width: Float, height: Float, control: Float, hasConfigure: Boolean): Boolean {
-    val top = position.y <= control
-    val bottom = position.y >= height - control
-    val start = position.x <= control
-    val end = position.x >= width - control
-    return (top && end) || (bottom && end) || (top && start && hasConfigure)
+/**
+ * The keys of [keys] whose widget view may be on screen. A view that is ready ([isReady]: kept from
+ * an earlier visit or built ahead of time) is there from the first frame. The others are built one
+ * per frame once [enabled], in order: building a view asks the provider for its content on the main
+ * thread, so building them all in one frame would stall it by the sum. It is state so that only the
+ * items read it: each release recomposes the grid, not the whole screen.
+ */
+@Composable
+private fun rememberStagedKeys(keys: List<String>, enabled: Boolean, isReady: (String) -> Boolean): State<Set<String>> {
+    val released = remember { mutableStateOf(keys.filter(isReady).toSet()) }
+    LaunchedEffect(enabled, keys) {
+        val ready = keys.filter { it !in released.value && isReady(it) }
+        if (ready.isNotEmpty()) released.value = released.value + ready
+        if (!enabled) return@LaunchedEffect
+        for (key in keys) {
+            if (key in released.value) continue
+            released.value = released.value + key
+            withFrameNanos { }
+        }
+    }
+    return released
 }
 
 /**
@@ -1264,7 +1416,11 @@ private fun WidgetPickerPanel(
             .toSortedMap(String.CASE_INSENSITIVE_ORDER)
     }
     Box(modifier = Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = visible && !dragging, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(
+            visible = visible && !dragging,
+            enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+            exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec())
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1275,8 +1431,10 @@ private fun WidgetPickerPanel(
         AnimatedVisibility(
             visible = visible,
             modifier = Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically(MaterialTheme.motionScheme.defaultSpatialSpec()) { it } + fadeIn(),
-            exit = slideOutVertically(MaterialTheme.motionScheme.fastSpatialSpec()) { it } + fadeOut()
+            enter = slideInVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>().stoppingAtOnePixel()) { it } +
+                fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+            exit = slideOutVertically(MaterialTheme.motionScheme.fastSpatialSpec<IntOffset>().stoppingAtOnePixel()) { it } +
+                fadeOut(MaterialTheme.motionScheme.fastEffectsSpec())
         ) {
             Surface(
                 shape = MaterialTheme.shapes.extraLargeIncreased.copy(bottomStart = CornerSize(0.dp), bottomEnd = CornerSize(0.dp)),
@@ -1298,7 +1456,9 @@ private fun WidgetPickerPanel(
                         stringResource(R.string.widget_picker_title),
                         style = MaterialTheme.typography.titleLargeEmphasized,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(start = VoidDimens.screenPadding, end = VoidDimens.screenPadding, top = VoidDimens.sectionSpacing)
+                        modifier = Modifier
+                            .padding(start = VoidDimens.screenPadding, end = VoidDimens.screenPadding, top = VoidDimens.sectionSpacing)
+                            .semantics { heading() }
                     )
                     Text(
                         stringResource(R.string.widget_picker_hint),
@@ -1329,7 +1489,9 @@ private fun WidgetPickerPanel(
                                             text = appName,
                                             style = MaterialTheme.typography.labelLarge,
                                             color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(start = VoidDimens.screenPadding, bottom = VoidDimens.rowSpacing)
+                                            modifier = Modifier
+                                                .padding(start = VoidDimens.screenPadding, bottom = VoidDimens.rowSpacing)
+                                                .semantics { heading() }
                                         )
                                         LazyRow(
                                             horizontalArrangement = Arrangement.spacedBy(VoidDimens.sectionSpacing - VoidDimens.compactSpacing),

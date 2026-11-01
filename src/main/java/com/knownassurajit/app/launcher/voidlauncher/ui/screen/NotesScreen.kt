@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -82,6 +83,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
@@ -94,13 +96,14 @@ import com.knownassurajit.app.launcher.voidlauncher.data.NoteItem
 import com.knownassurajit.app.launcher.voidlauncher.data.NoteRepository
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.helper.NoteReminderScheduler
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.PanelMessage
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidPanelTitle
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.dismissDirection
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.screenBackSwipe
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeAxis
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalPanelEdge
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAlpha
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import kotlinx.coroutines.launch
 
@@ -157,6 +160,7 @@ fun NotesScreen(onBack: () -> Unit) {
     var reminderFor by remember { mutableStateOf<NoteItem?>(null) }
     val deletedMessage = stringResource(R.string.note_deleted)
     val undoLabel = stringResource(R.string.undo)
+    val alignTitleLabel = stringResource(R.string.notes_title_align_action)
 
     fun refreshNotes() {
         notes.clear()
@@ -217,6 +221,8 @@ fun NotesScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .padding(top = LocalFixedStatusBarHeight.current)
             .navigationBarsPadding()
+            // The keyboard opens for the new-note field: the list and the snackbar stay above it.
+            .imePadding()
             .screenBackSwipe(onBack)
     ) {
         Column(
@@ -224,30 +230,24 @@ fun NotesScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.sectionSpacing)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = when (notesTitleAlignment) {
+            // A tap on the title moves it to the next alignment; a screen reader hears what the tap does.
+            VoidPanelTitle(
+                text = stringResource(R.string.notes_title),
+                arrangement = when (notesTitleAlignment) {
                     Gravity.CENTER_HORIZONTAL -> Arrangement.Center
                     Gravity.END -> Arrangement.End
                     else -> Arrangement.Start
-                }
-            ) {
-                Text(
-                    text = stringResource(R.string.notes_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.clickable {
-                        val next = when (notesTitleAlignment) {
-                            Gravity.START -> Gravity.CENTER_HORIZONTAL
-                            Gravity.CENTER_HORIZONTAL -> Gravity.END
-                            else -> Gravity.START
-                        }
-                        notesTitleAlignment = next
-                        prefs.notesTitleAlignment = next
+                },
+                titleModifier = Modifier.clickable(onClickLabel = alignTitleLabel) {
+                    val next = when (notesTitleAlignment) {
+                        Gravity.START -> Gravity.CENTER_HORIZONTAL
+                        Gravity.CENTER_HORIZONTAL -> Gravity.END
+                        else -> Gravity.START
                     }
-                )
-            }
+                    notesTitleAlignment = next
+                    prefs.notesTitleAlignment = next
+                }
+            )
             VoidSectionDivider(modifier = Modifier.padding(vertical = VoidDimens.rowSpacing))
             OutlinedTextField(
                 value = newNoteText,
@@ -264,15 +264,15 @@ fun NotesScreen(onBack: () -> Unit) {
                     Text(
                         stringResource(R.string.add_note_hint),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = VoidAlpha.muted)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = MaterialTheme.shapes.extraLarge,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                    focusedBorderColor = MaterialTheme.colorScheme.outline,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -286,18 +286,12 @@ fun NotesScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(VoidDimens.sectionSpacing))
 
             if (notes.isEmpty()) {
-                Box(
+                PanelMessage(
+                    body = stringResource(R.string.no_notes),
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        stringResource(R.string.no_notes),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = VoidAlpha.muted)
-                    )
-                }
+                        .fillMaxWidth()
+                )
             } else {
                 val active = notes.filterNot { it.isCompleted }
                 val completed = notes.filter { it.isCompleted }
@@ -326,6 +320,7 @@ fun NotesScreen(onBack: () -> Unit) {
                                         top = VoidDimens.sectionSpacing,
                                         bottom = VoidDimens.rowSpacing - NOTE_SEGMENT_GAP
                                     )
+                                    .semantics { heading() }
                             )
                         }
                         noteGroup(
@@ -503,11 +498,8 @@ private fun NoteCard(
         Text(
             text = note.text,
             style = MaterialTheme.typography.bodyLarge,
-            color = if (note.isCompleted) {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = VoidAlpha.muted)
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
+            // A done note is struck through and quieter, but stays readable: no transparency on body text.
+            color = if (note.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             textDecoration = if (note.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis

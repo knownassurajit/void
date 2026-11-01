@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.UserHandle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,8 +35,6 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -65,7 +65,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
@@ -75,15 +74,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.Collator
 import kotlin.math.abs
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.knownassurajit.app.launcher.voidlauncher.helper.AppCacheManager
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
+import com.knownassurajit.app.launcher.voidlauncher.helper.ScreenTimeMath
+import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalPanelSettled
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceControls
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceHeader
+import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSearchField
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidDimens
 import com.knownassurajit.app.launcher.voidlauncher.helper.ToggleOutcome
@@ -94,7 +99,9 @@ fun AppDrawerScreen(
     onBack: () -> Unit,
     onAppClick: (AppModel) -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    privateSpacePlacement: String = Prefs.PrivateSpacePlacement.BOTTOM
+    privateSpacePlacement: String = Prefs.PrivateSpacePlacement.BOTTOM,
+    showAppScreenTime: Boolean = false,
+    viewModel: AppDrawerViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val prefs = remember { Prefs.get(context) }
@@ -102,6 +109,10 @@ fun AppDrawerScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     val allApps by AppCacheManager.appCacheFlow.collectAsStateWithLifecycle(emptyList())
+    val usage by viewModel.usage.collectAsStateWithLifecycle()
+    // Only apps of this user have usage in our figures; a Private Space or work app of the same package has its own.
+    val ownUser = remember { android.os.Process.myUserHandle() }
+    val panelSettled by LocalPanelSettled.current
     val privateApps = remember { mutableStateListOf<AppModel>() }
     var isPrivateSpaceLocked by remember { mutableStateOf(true) }
     var hasPrivateSpace by remember { mutableStateOf(false) }
@@ -163,7 +174,13 @@ fun AppDrawerScreen(
     LaunchedEffect(Unit) { refreshPrivateSpace() }
 
     // Profile broadcasts are deferred while the process is cached, so also re-query on resume.
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refreshPrivateSpace() }
+    // The usage figures are read the same way: when the drawer opens (the guard in the view model
+    // drops the resume that follows it) and again after the user comes back from an app.
+    LaunchedEffect(showAppScreenTime) { viewModel.refreshUsage(showAppScreenTime) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        refreshPrivateSpace()
+        viewModel.refreshUsage(showAppScreenTime)
+    }
 
     DisposableEffect(privateSpaceActive) {
         // Nothing is registered below API 35 or when the feature is off, so there is nothing to
@@ -194,11 +211,12 @@ fun AppDrawerScreen(
     val privateInSearchBar = privateSpacePlacement == Prefs.PrivateSpacePlacement.SEARCH_BAR
     val filteredApps by remember {
         derivedStateOf {
-            val list = allApps.toList().filterNot { PrivateSpaceHelper.isAddEntry(it) }
-            val collator = Collator.getInstance()
-            val sorted = list.sortedWith(compareBy(collator) { it.appLabel })
-            if (searchQuery.isBlank()) sorted
-            else sorted.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
+            // The cache is already ordered by label (getAppsList sorts it before it is published and
+            // saved), so it is not sorted again here: that cost a collator and a pass over every app
+            // on the main thread, on every key typed in the search field.
+            val list = allApps.filterNot { PrivateSpaceHelper.isAddEntry(it) }
+            if (searchQuery.isBlank()) list
+            else list.filter { it.appLabel.contains(searchQuery, ignoreCase = true) }
         }
     }
     val filteredPrivateApps by remember {
@@ -270,11 +288,12 @@ fun AppDrawerScreen(
                 privateIconColor = privateIconColor
             )
 
-            LaunchedEffect(Unit) {
-                if (!prefs.autoShowKeyboard) return@LaunchedEffect
-                // Wait until the search field FocusRequester is attached to avoid
-                // IllegalStateException during the drawer enter transition.
-                kotlinx.coroutines.delay(320)
+            // The keyboard waits for the panel to arrive. It used to open after a fixed 320 ms, which is
+            // in the middle of the slide at the standard speed and long before the end of it at the slow
+            // one: the keyboard window and the layout change that follows it (the list shrinks by the
+            // keyboard's height) landed on the frames that were still animating.
+            LaunchedEffect(panelSettled) {
+                if (!panelSettled || !prefs.autoShowKeyboard) return@LaunchedEffect
                 try {
                     focusRequester.requestFocus()
                 } catch (_: IllegalStateException) {
@@ -296,6 +315,8 @@ fun AppDrawerScreen(
                 privateSpaceEnabled = prefs.privateSpaceEnabled,
                 appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
                 showBottomPrivateHeader = !privateInSearchBar,
+                usage = usage,
+                ownUser = ownUser,
                 onAppClick = onAppClick,
                 onTogglePrivateSpace = onTogglePrivateSpace,
                 onOpenPrivateSpaceSettings = onOpenPrivateSpaceSettings,
@@ -323,34 +344,26 @@ private fun AppDrawerSearchBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = VoidDimens.screenPadding, vertical = 12.dp),
+                // The Settings button draws its glyph inset in its target: less end padding puts the glyph
+                // on the same edge as the list below.
+                .padding(
+                    start = VoidDimens.screenPadding,
+                    end = VoidDimens.screenPadding - VoidDimens.iconButtonGlyphInset,
+                    top = VoidDimens.rowSpacing + VoidDimens.compactSpacing,
+                    bottom = VoidDimens.rowSpacing + VoidDimens.compactSpacing
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(VoidDimens.sectionSpacing)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
+            VoidSearchField(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                hint = stringResource(R.string.search),
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester),
-                placeholder = {
-                    Text(
-                        stringResource(R.string.search),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                singleLine = true,
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.outline,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                ),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                leadingIconDescription = stringResource(R.string.search),
+                clearDescription = stringResource(R.string.font_search_clear)
             )
             if (showPrivateSpaceControls) {
                 PrivateSpaceControls(
@@ -386,6 +399,8 @@ private fun ColumnScope.AppDrawerAppList(
     privateSpaceEnabled: Boolean,
     appDrawerTextSizeScale: Float,
     showBottomPrivateHeader: Boolean,
+    usage: Map<String, Long>,
+    ownUser: UserHandle,
     onAppClick: (AppModel) -> Unit,
     onTogglePrivateSpace: () -> Unit,
     onOpenPrivateSpaceSettings: () -> Unit,
@@ -416,8 +431,7 @@ private fun ColumnScope.AppDrawerAppList(
             .fillMaxWidth()
             .weight(1f)
             .nestedScroll(scrollConnection)
-            .padding(horizontal = VoidDimens.screenPadding),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
+            .padding(horizontal = VoidDimens.screenPadding)
     ) {
         if (showPrivateSpaceInSearch) {
             item(key = "private_search_result") {
@@ -433,11 +447,14 @@ private fun ColumnScope.AppDrawerAppList(
         groupedApps.forEach { (letter, apps) ->
             if (showAlphabetCategories) {
                 item(key = "header_$letter") {
+                    // A heading, so a screen reader can jump letter by letter through a long list.
                     Text(
                         text = letter,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f),
-                        modifier = Modifier.padding(top = 24.dp, bottom = 4.dp)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(top = VoidDimens.sectionSpacing + VoidDimens.rowSpacing, bottom = VoidDimens.compactSpacing)
+                            .semantics { heading() }
                     )
                 }
             }
@@ -450,6 +467,7 @@ private fun ColumnScope.AppDrawerAppList(
                 AppDrawerItem(
                     app = app,
                     textSizeScale = appDrawerTextSizeScale,
+                    usageLabel = usageLabelFor(app, usage, ownUser),
                     onClick = { onAppClick(app) }
                 )
             }
@@ -499,10 +517,21 @@ private fun ColumnScope.AppDrawerAppList(
     }
 }
 
+/**
+ * What to show next to [app]: today's usage when the library shows usage at all (it hands over a
+ * non-empty [usage]) and the app is a plain app of the current user. Pinned shortcuts are not apps
+ * and an app of another profile has usage this launcher cannot read, so both show nothing.
+ */
+internal fun usageLabelFor(app: AppModel, usage: Map<String, Long>, ownUser: UserHandle): String? {
+    if (usage.isEmpty() || app !is AppModel.App || app.user != ownUser) return null
+    return ScreenTimeMath.appLabel(usage[app.appPackage] ?: 0L)
+}
+
 @Composable
 private fun AppDrawerItem(
     app: AppModel,
     textSizeScale: Float,
+    usageLabel: String? = null,
     isPrivate: Boolean = false,
     privateIconColor: HomeColor = HomeColor.Default,
     onClick: () -> Unit
@@ -510,21 +539,40 @@ private fun AppDrawerItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // At least a touch target tall even at the smallest app-library text size.
+            .heightIn(min = VoidDimens.minTouchTarget)
             .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(vertical = VoidDimens.drawerRowPadding),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = app.appLabel,
-            style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = MaterialTheme.typography.bodyLarge.fontSize * textSizeScale
-            ),
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
+        // The usage sits right after the title; only the title gives way (it ends in an ellipsis) when the row is full.
+        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = app.appLabel,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = MaterialTheme.typography.bodyLarge.fontSize * textSizeScale
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (usageLabel != null) {
+                val spoken = stringResource(R.string.drawer_usage_today, usageLabel)
+                Text(
+                    text = usageLabel,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = MaterialTheme.typography.labelMedium.fontSize * textSizeScale
+                    ),
+                    // Small text: the full variant color, never a transparent one, keeps it at a readable contrast.
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(start = VoidDimens.rowSpacing)
+                        .semantics { contentDescription = spoken }
+                )
+            }
+        }
         if (isPrivate) {
             Icon(
                 imageVector = Icons.Outlined.Lock,
@@ -546,7 +594,7 @@ private fun AppDrawerPrivateSpaceSearchRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = VoidDimens.rowSpacing + VoidDimens.compactSpacing),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(

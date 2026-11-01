@@ -4,11 +4,14 @@
 
 | Setting | Pref key | Effect |
 |---------|----------|--------|
-| Show clock / date / screen time | `SHOW_*_WIDGET` | Toggle components |
+| Show clock / date | `SHOW_CLOCK_WIDGET`, `SHOW_DATE_WIDGET` | Toggle components |
+| Screen time: show on Home | `SHOW_SCREEN_TIME_WIDGET` | Today's total under the clock. Turning it on opens Usage Access when it is not granted. While it is off nothing is queried |
+| Screen time: show in app library | `SHOW_APP_SCREEN_TIME` (default on) | Today's usage next to each app of the app library, in the form `1h 5m`, `12m` or `<1m`; apps without usage today show nothing. Needs the Home switch on and usage access; the row is disabled while the Home switch is off. Pinned shortcuts and apps of another profile (Private Space, work) show nothing, because their usage is not in this launcher's figures |
+| Screen time: usage access | none (system) | Shows whether usage access is granted and opens the system screen; read again each time Settings resumes |
 | Show home apps | `SHOW_HOME_APPS` | Hide/show app list section |
 | Clock size | `CLOCK_SIZE_SCALE` | Time font only |
 | Date size | `DATE_SIZE_SCALE` | Date font only |
-| Screen time size | `SCREEN_TIME_SIZE_SCALE` | Screen-time font only |
+| Screen time size | `SCREEN_TIME_SIZE_SCALE` | Screen-time font only (in the Screen time section) |
 | Clock section weight | `CLOCK_SECTION_WEIGHT` | Vertical weight vs apps (clamped 22–48%) |
 | Section order | `HOME_SECTION_ORDER` | `clock_first` or `apps_first` |
 | App / clock alignment | gravity prefs | H/V gravity |

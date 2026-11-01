@@ -9,9 +9,11 @@ import android.os.BatteryManager
 import android.view.Gravity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import android.app.usage.UsageStatsManager
 import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppsCap
 import com.knownassurajit.app.launcher.voidlauncher.data.HomescreenPreferences
+import com.knownassurajit.app.launcher.voidlauncher.helper.ScreenTimeMath
+import com.knownassurajit.app.launcher.voidlauncher.helper.ScreenTimeResult
+import com.knownassurajit.app.launcher.voidlauncher.helper.ScreenTimeSource
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeTextColor
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
@@ -68,7 +70,8 @@ data class MainUiState(
     val homeAppsColor: String = HomeTextColor.Default.key,
     val clockFontWeight: Int = HomeStyle.DEFAULT_CLOCK_WEIGHT,
     val homeAppsFontWeight: Int = HomeStyle.DEFAULT_APP_WEIGHT,
-    val homeSidePaddingDp: Float = HomeStyle.DEFAULT_SIDE_PADDING_DP
+    val homeSidePaddingDp: Float = HomeStyle.DEFAULT_SIDE_PADDING_DP,
+    val showAppScreenTime: Boolean = true
 )
 
 /** Copies every Home setting from [hs]; the one mapping shared by the change listener and [MainUiViewModel.refreshFromPrefs]. */
@@ -107,7 +110,8 @@ internal fun MainUiState.withHomescreenPreferences(hs: HomescreenPreferences): M
     homeAppsColor = hs.homeAppsColor,
     clockFontWeight = hs.clockFontWeight,
     homeAppsFontWeight = hs.homeAppsFontWeight,
-    homeSidePaddingDp = hs.homeSidePaddingDp
+    homeSidePaddingDp = hs.homeSidePaddingDp,
+    showAppScreenTime = hs.showAppScreenTime
 )
 
 data class HomeApp(
@@ -138,6 +142,8 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
         )
     )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    private val screenTimeSource = ScreenTimeSource(appContext)
 
     private val timeFormat12 = SimpleDateFormat("h:mm a", Locale.getDefault())
     private val timeFormat24 = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -205,7 +211,11 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
         // Observe pref changes — fully reactive propagation
         viewModelScope.launch {
             var lastMaxApps = -1
+            var lastShowScreenTime = prefs.showScreenTimeWidget
             prefs.homescreenPreferences.collect { hsPrefs ->
+                // Switching the line on must not wait for the next minute tick.
+                if (hsPrefs.showScreenTime && !lastShowScreenTime) loadScreenTime()
+                lastShowScreenTime = hsPrefs.showScreenTime
                 val reloadApps = HomeAppsCap.shouldReloadHomeApps(lastMaxApps, hsPrefs.maxApps)
                 lastMaxApps = hsPrefs.maxApps
                 val apps = if (reloadApps) loadHomeApps(hsPrefs.maxApps) else _uiState.value.homeApps
@@ -256,47 +266,21 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.withHomescreenPreferences(hsPrefs).copy(homeApps = apps) }
     }
 
+    /**
+     * Reads today's total off the main thread. Nothing is queried while the feature is off, and the
+     * total is the sum of the per-app figures the app library shows (see [ScreenTimeSource]).
+     */
     private fun loadScreenTime() {
+        if (!prefs.showScreenTimeWidget) return
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val appOps = appContext.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
-                val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                    appOps.unsafeCheckOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), appContext.packageName)
-                } else {
-                    @Suppress("DEPRECATION")
-                    appOps.checkOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), appContext.packageName)
-                }
-                if (mode != android.app.AppOpsManager.MODE_ALLOWED) {
-                    _uiState.update { it.copy(screenTime = "Screen time: Permission required") }
-                    return@launch
-                }
-
-                val usageStatsManager = getApplication<android.app.Application>().getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-                val calendar = java.util.Calendar.getInstance()
-                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
-                calendar.set(java.util.Calendar.MINUTE, 0)
-                calendar.set(java.util.Calendar.SECOND, 0)
-                
-                val stats = usageStatsManager.queryUsageStats(
-                    UsageStatsManager.INTERVAL_DAILY,
-                    calendar.timeInMillis,
-                    System.currentTimeMillis()
-                )
-                
-                val totalMillis = stats
-                    .filter { it.packageName != appContext.packageName }
-                    .sumOf { it.totalTimeInForeground }
-                if (totalMillis > 0) {
-                    val hours = totalMillis / (1000 * 60 * 60)
-                    val minutes = (totalMillis / (1000 * 60)) % 60
-                    val text = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
-                    _uiState.update { it.copy(screenTime = "Screen time: $text") }
-                } else {
-                    _uiState.update { it.copy(screenTime = "Screen time: None") }
-                }
-            } catch (_: Exception) {
-                _uiState.update { it.copy(screenTime = "Screen time: Data unavailable") }
+            val value = when (val result = screenTimeSource.loadToday()) {
+                ScreenTimeResult.PermissionRequired -> appContext.getString(R.string.screen_time_permission_required)
+                ScreenTimeResult.Unavailable -> appContext.getString(R.string.screen_time_data_unavailable)
+                is ScreenTimeResult.Usage ->
+                    if (result.totalMillis > 0L) ScreenTimeMath.hoursMinutes(result.totalMillis) else appContext.getString(R.string.screen_time_none)
             }
+            val text = appContext.getString(R.string.screen_time_line, value)
+            _uiState.update { it.copy(screenTime = text) }
         }
     }
 

@@ -140,4 +140,16 @@ class WidgetLayoutHelperTest {
         assertTrue(tall >= 96)
         assertTrue(wide <= 220)
     }
+
+    @Test
+    fun cellDpFor_sharesTheWidthBetweenFourCellsAndThreeGaps() {
+        // 411 dp wide, 20 dp padding on each side, 8 dp gaps: (411 - 40 - 24) / 4 = 86.75.
+        assertEquals(86, WidgetLayoutHelper.cellDpFor(411, 20f))
+        assertEquals(74, WidgetLayoutHelper.cellDpFor(360, 20f))
+    }
+
+    @Test
+    fun cellDpFor_neverGoesUnderTheSmallestCell() {
+        assertEquals(WidgetLayoutHelper.MIN_HEIGHT_DP, WidgetLayoutHelper.cellDpFor(120, 20f))
+    }
 }

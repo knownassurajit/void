@@ -1,8 +1,12 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
+import android.util.Log
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -16,9 +20,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The edge the panel being composed entered from. Provided per destination by [NavPanel]. */
 val LocalPanelEdge = compositionLocalOf { PanelEdge.None }
@@ -52,39 +63,39 @@ object NavMotion {
     /** The panel opens: it slides in from its edge, or (no edge) scales up and fades in. */
     fun enter(edge: PanelEdge, motion: VoidMotionScheme): EnterTransition =
         if (edge == PanelEdge.None) {
-            scaleIn(motion.slowScaleSpec(), NavTravel.sharedAxisPanelScale) +
+            scaleIn(motion.panelScaleSpec(), NavTravel.sharedAxisPanelScale) +
                 fadeIn(motion.defaultEffectsSpec())
         } else {
-            slideIn(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.enterStart(edge, it) }
+            slideIn(motion.panelSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.enterStart(edge, it) }
         }
 
     /** The screen under an opening panel moves the way the panel moves and dims (no edge: it scales up and fades out). */
     fun exit(edge: PanelEdge, motion: VoidMotionScheme): ExitTransition =
         if (edge == PanelEdge.None) {
-            scaleOut(motion.slowScaleSpec(), NavTravel.sharedAxisCoveredScale) +
+            scaleOut(motion.panelScaleSpec(), NavTravel.sharedAxisCoveredScale) +
                 fadeOut(motion.fastEffectsSpec())
         } else {
-            slideOut(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.exitEnd(edge, it) } +
+            slideOut(motion.panelSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.exitEnd(edge, it) } +
                 fadeOut(motion.slowEffectsSpec(), VoidAlpha.coveredByPanel)
         }
 
     /** The screen under a closing panel returns: [exit] played backwards. */
     fun popEnter(edge: PanelEdge, motion: VoidMotionScheme): EnterTransition =
         if (edge == PanelEdge.None) {
-            scaleIn(motion.slowScaleSpec(), NavTravel.sharedAxisCoveredScale) +
+            scaleIn(motion.panelScaleSpec(), NavTravel.sharedAxisCoveredScale) +
                 fadeIn(motion.fastEffectsSpec())
         } else {
-            slideIn(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popEnterStart(edge, it) } +
+            slideIn(motion.panelSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popEnterStart(edge, it) } +
                 fadeIn(motion.slowEffectsSpec(), VoidAlpha.coveredByPanel)
         }
 
     /** The panel closes: [enter] played backwards. */
     fun popExit(edge: PanelEdge, motion: VoidMotionScheme): ExitTransition =
         if (edge == PanelEdge.None) {
-            scaleOut(motion.slowScaleSpec(), NavTravel.sharedAxisPanelScale) +
+            scaleOut(motion.panelScaleSpec(), NavTravel.sharedAxisPanelScale) +
                 fadeOut(motion.defaultEffectsSpec())
         } else {
-            slideOut(motion.slowSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popExitEnd(edge, it) }
+            slideOut(motion.panelSpatialSpec(IntOffset.VisibilityThreshold)) { NavTravel.popExitEnd(edge, it) }
         }
 
     /**
@@ -117,15 +128,54 @@ object NavMotion {
 }
 
 /**
+ * Whether the panel being composed has finished entering, as state so that only what reads it
+ * recomposes. It starts `false` and turns `true` once, when the slide-in ends, and stays `true`
+ * (an exit animation does not take it back, so nothing a screen built after it is torn down while the
+ * panel leaves). Outside a [NavPanel] it is always `true`.
+ *
+ * A screen uses it to keep work that blocks the main thread out of the transition: the slide is
+ * smooth only while every frame is cheap, and creating a hosted widget view or showing the keyboard
+ * costs tens of milliseconds, so such work waits for this flag instead of a fixed delay (a delay is
+ * wrong at the slow animation speed).
+ */
+val LocalPanelSettled = compositionLocalOf<State<Boolean>> { AlwaysSettled }
+
+private val AlwaysSettled: State<Boolean> = object : State<Boolean> {
+    override val value: Boolean = true
+}
+
+/**
  * Wraps the content of every destination except Home in an opaque black surface and tells it which
- * [edge] it entered from. No screen paints a background of its own, so without this surface the
- * screen under a sliding panel would show through it. Home stays transparent over the black window.
+ * [edge] it entered from and, through [LocalPanelSettled], when it has arrived. No screen paints a
+ * background of its own, so without this surface the screen under a sliding panel would show
+ * through it. Home stays transparent over the black window.
  */
 @Composable
-fun NavPanel(edge: PanelEdge, content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalPanelEdge provides edge) {
+fun AnimatedContentScope.NavPanel(edge: PanelEdge, content: @Composable () -> Unit) {
+    val settled = rememberPanelSettled(transition)
+    CompositionLocalProvider(LocalPanelEdge provides edge, LocalPanelSettled provides settled) {
         Box(modifier = Modifier.fillMaxSize().background(VoidBlack)) {
             content()
         }
     }
+}
+
+/**
+ * The longest a panel is waited for. The slide-in takes 0.8 s at the slowest speed, so this is far
+ * past any real transition; it only guarantees that what waits for [LocalPanelSettled] (widget
+ * views, the keyboard) is never held back for good by a transition that did not report its end.
+ */
+private const val PANEL_SETTLE_TIMEOUT_MS = 2_000L
+
+@Composable
+private fun rememberPanelSettled(transition: Transition<EnterExitState>): State<Boolean> {
+    val settled = remember { mutableStateOf(false) }
+    LaunchedEffect(transition) {
+        val arrived = withTimeoutOrNull(PANEL_SETTLE_TIMEOUT_MS) {
+            snapshotFlow { transition.currentState == EnterExitState.Visible }.first { it }
+        }
+        if (arrived == null) Log.w("NavPanel", "panel_settle_timeout ms=$PANEL_SETTLE_TIMEOUT_MS")
+        settled.value = true
+    }
+    return settled
 }
