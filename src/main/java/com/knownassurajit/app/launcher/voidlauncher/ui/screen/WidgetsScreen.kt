@@ -107,6 +107,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -1455,7 +1456,9 @@ private fun WidgetPickerPanel(
                         stringResource(R.string.widget_picker_title),
                         style = MaterialTheme.typography.titleLargeEmphasized,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(start = VoidDimens.screenPadding, end = VoidDimens.screenPadding, top = VoidDimens.sectionSpacing)
+                        modifier = Modifier
+                            .padding(start = VoidDimens.screenPadding, end = VoidDimens.screenPadding, top = VoidDimens.sectionSpacing)
+                            .semantics { heading() }
                     )
                     Text(
                         stringResource(R.string.widget_picker_hint),
@@ -1486,7 +1489,9 @@ private fun WidgetPickerPanel(
                                             text = appName,
                                             style = MaterialTheme.typography.labelLarge,
                                             color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(start = VoidDimens.screenPadding, bottom = VoidDimens.rowSpacing)
+                                            modifier = Modifier
+                                                .padding(start = VoidDimens.screenPadding, bottom = VoidDimens.rowSpacing)
+                                                .semantics { heading() }
                                         )
                                         LazyRow(
                                             horizontalArrangement = Arrangement.spacedBy(VoidDimens.sectionSpacing - VoidDimens.compactSpacing),

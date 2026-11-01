@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -66,7 +67,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppModel
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
@@ -82,12 +82,12 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import com.knownassurajit.app.launcher.voidlauncher.helper.AppCacheManager
 import com.knownassurajit.app.launcher.voidlauncher.helper.PrivateSpaceHelper
 import com.knownassurajit.app.launcher.voidlauncher.helper.ScreenTimeMath
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.LocalPanelSettled
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.VoidAlpha
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceControls
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.PrivateSpaceHeader
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.VoidSectionDivider
@@ -345,7 +345,7 @@ private fun AppDrawerSearchBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = VoidDimens.screenPadding, vertical = 12.dp),
+                .padding(horizontal = VoidDimens.screenPadding, vertical = VoidDimens.rowSpacing + VoidDimens.compactSpacing),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(VoidDimens.sectionSpacing)
         ) {
@@ -440,8 +440,7 @@ private fun ColumnScope.AppDrawerAppList(
             .fillMaxWidth()
             .weight(1f)
             .nestedScroll(scrollConnection)
-            .padding(horizontal = VoidDimens.screenPadding),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
+            .padding(horizontal = VoidDimens.screenPadding)
     ) {
         if (showPrivateSpaceInSearch) {
             item(key = "private_search_result") {
@@ -457,11 +456,14 @@ private fun ColumnScope.AppDrawerAppList(
         groupedApps.forEach { (letter, apps) ->
             if (showAlphabetCategories) {
                 item(key = "header_$letter") {
+                    // A heading, so a screen reader can jump letter by letter through a long list.
                     Text(
                         text = letter,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.60f),
-                        modifier = Modifier.padding(top = 24.dp, bottom = 4.dp)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(top = VoidDimens.sectionSpacing + VoidDimens.rowSpacing, bottom = VoidDimens.compactSpacing)
+                            .semantics { heading() }
                     )
                 }
             }
@@ -546,8 +548,10 @@ private fun AppDrawerItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // At least a touch target tall even at the smallest app-library text size.
+            .heightIn(min = VoidDimens.minTouchTarget)
             .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
+            .padding(vertical = VoidDimens.drawerRowPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // The usage sits right after the title; only the title gives way (it ends in an ellipsis) when the row is full.
@@ -557,7 +561,7 @@ private fun AppDrawerItem(
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = MaterialTheme.typography.bodyLarge.fontSize * textSizeScale
                 ),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f),
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false)
@@ -569,7 +573,8 @@ private fun AppDrawerItem(
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontSize = MaterialTheme.typography.labelMedium.fontSize * textSizeScale
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = VoidAlpha.muted),
+                    // Small text: the full variant color, never a transparent one, keeps it at a readable contrast.
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     modifier = Modifier
                         .padding(start = VoidDimens.rowSpacing)
@@ -598,7 +603,7 @@ private fun AppDrawerPrivateSpaceSearchRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = VoidDimens.rowSpacing + VoidDimens.compactSpacing),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(

@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -72,7 +73,8 @@ private const val MAX_CONNECTED_OPTIONS = 4
 private val SEGMENT_GAP = 2.dp
 
 /**
- * A category heading above a run of [SettingsSection]s ("Appearance", "Home screen", ...).
+ * A category heading above a run of [SettingsSection]s ("Appearance", "Home screen", ...). Announced as a
+ * heading, as is a section's own label, so a screen reader can move through Settings by heading.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -81,11 +83,13 @@ fun SettingsGroupHeader(title: String) {
         text = title,
         style = MaterialTheme.typography.titleLargeEmphasized,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(
-            start = VoidDimens.compactSpacing,
-            top = VoidDimens.sectionSpacing + VoidDimens.rowSpacing,
-            bottom = VoidDimens.compactSpacing
-        )
+        modifier = Modifier
+            .padding(
+                start = VoidDimens.compactSpacing,
+                top = VoidDimens.sectionSpacing + VoidDimens.rowSpacing,
+                bottom = VoidDimens.compactSpacing
+            )
+            .semantics { heading() }
     )
 }
 
@@ -107,10 +111,12 @@ fun SettingsSection(
                 text = title,
                 style = MaterialTheme.typography.labelLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(
-                    start = VoidDimens.sectionSpacing,
-                    bottom = if (description == null) VoidDimens.rowSpacing else VoidDimens.compactSpacing
-                )
+                modifier = Modifier
+                    .padding(
+                        start = VoidDimens.sectionSpacing,
+                        bottom = if (description == null) VoidDimens.rowSpacing else VoidDimens.compactSpacing
+                    )
+                    .semantics { heading() }
             )
         }
         if (description != null) {

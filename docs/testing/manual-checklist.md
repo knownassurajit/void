@@ -13,9 +13,14 @@
 - [ ] Screen time (Settings > Home screen > Screen time): the section holds Show on Home, Show in app library, Usage access and the size slider. With usage access not granted, switching Show on Home on opens the system screen; back in Settings the Usage access row says Allowed; the app library then shows today's usage after each app's name (`1h 5m`, `12m`, `<1m`; nothing for an app not used today), none for pinned shortcuts or Private Space apps; Show in app library off (or Show on Home off, which disables that row) removes the figures; the Home total equals the sum of the per-app figures; with Show on Home off no usage is queried (no `ScreenTimeSource` log lines)
 - [ ] App drawer with auto-keyboard on: the drawer slides in with no hitch and the keyboard opens when the panel has stopped, at Fast, Standard and Slow speed
 - [ ] Animation speed Slow and Fast: switches, buttons, list items, the picker, the widget glide and the edit bar also change speed, not only the panels
-- [ ] Home: long-press empty space opens app picker; chip X removes immediately
+- [ ] Home: long-press empty space opens app picker; tapping a chip removes the app immediately
 - [ ] Settings: swipe-down notifications toggle; grant notification listener if prompted
 - [ ] Swipe down opens in-app notification list when toggle is on; list matches shade after listener grant
+- [ ] Notifications and Summary without notification access: both panels say why they are empty and offer Grant notification access; allow it in system Settings, press Back: the panel fills in without being reopened
+- [ ] Notifications and Summary look alike: same title size and place as Notes and Widgets, cards line up with the title, an app with several notifications shows a count badge, and a card's tint only shows while it is being swiped away (either direction)
+- [ ] Notifications with TalkBack: each card offers Dismiss in its actions; an app with several notifications reads "Collapsed, double tap to show all" and then "Expanded"; the count badge is read as "3 notifications"; the panel titles, Settings group and section labels, app library letters, Notes' Completed label and the widget picker's title and app names are headings
+- [ ] Notes and Settings with the keyboard up: the last note, and the last Settings search result, can be scrolled above the keyboard; the Undo snackbar shows above it
+- [ ] Home app picker (long-press empty Home): each chosen app is a chip whose whole surface removes it; with TalkBack, an app already on Home reads "On Home" and is not offered as a button, and once Home is full no row is
 - [ ] Home: pin 6–10 apps; toggle clock/date in Settings and return — list count stays
 - [ ] Settings search filters groups; back swipe (down, on the header or a gap) leaves Settings
 - [ ] Assigned left/right swipe panels move the way you swipe: a swipe that moves right brings the left-assigned panel in from the left edge, a swipe that moves left brings the right-assigned panel in from the right edge; closing moves the finger back toward that edge (56 dp, or a quick flick) and the panel leaves the same way. A shorter, slower swipe does nothing and the panel stays

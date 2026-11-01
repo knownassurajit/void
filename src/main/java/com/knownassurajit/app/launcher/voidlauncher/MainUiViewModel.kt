@@ -273,12 +273,13 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
     private fun loadScreenTime() {
         if (!prefs.showScreenTimeWidget) return
         viewModelScope.launch(Dispatchers.IO) {
-            val text = when (val result = screenTimeSource.loadToday()) {
-                ScreenTimeResult.PermissionRequired -> "Screen time: Permission required"
-                ScreenTimeResult.Unavailable -> "Screen time: Data unavailable"
+            val value = when (val result = screenTimeSource.loadToday()) {
+                ScreenTimeResult.PermissionRequired -> appContext.getString(R.string.screen_time_permission_required)
+                ScreenTimeResult.Unavailable -> appContext.getString(R.string.screen_time_data_unavailable)
                 is ScreenTimeResult.Usage ->
-                    if (result.totalMillis > 0L) "Screen time: ${ScreenTimeMath.hoursMinutes(result.totalMillis)}" else "Screen time: None"
+                    if (result.totalMillis > 0L) ScreenTimeMath.hoursMinutes(result.totalMillis) else appContext.getString(R.string.screen_time_none)
             }
+            val text = appContext.getString(R.string.screen_time_line, value)
             _uiState.update { it.copy(screenTime = text) }
         }
     }

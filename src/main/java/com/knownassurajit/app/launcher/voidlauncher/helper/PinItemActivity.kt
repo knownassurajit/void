@@ -3,12 +3,13 @@ package com.knownassurajit.app.launcher.voidlauncher.helper
 import android.content.pm.LauncherApps
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import com.knownassurajit.app.launcher.voidlauncher.R
 
 class PinItemActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Set window to be transparent
         window.setBackgroundDrawable(null)
 
@@ -17,7 +18,7 @@ class PinItemActivity : AppCompatActivity() {
 
         when (pinItemRequest != null) {
             true -> handleRequestType(pinItemRequest)
-            false -> showToast("Invalid pin request")
+            false -> showToast(R.string.pin_invalid_request)
         }
 
         finish()
@@ -31,29 +32,20 @@ class PinItemActivity : AppCompatActivity() {
             LauncherApps.PinItemRequest.REQUEST_TYPE_APPWIDGET ->
                 handleWidgetRequest(pinItemRequest)
 
-            else -> showToast("Unknown action not supported")
+            else -> showToast(R.string.pin_unsupported)
         }
     }
 
     private fun handleShortcutRequest(pinItemRequest: LauncherApps.PinItemRequest) {
         val shortcutInfo = pinItemRequest.shortcutInfo
         if (shortcutInfo != null) {
-            val success = pinItemRequest.accept()
-            val message = when (success) {
-                true -> "Shortcut pinned successfully"
-                false -> "Failed to pin shortcut"
-            }
-            showToast(message)
+            showToast(if (pinItemRequest.accept()) R.string.pin_shortcut_added else R.string.pin_shortcut_failed)
         } else {
-            showToast("Invalid shortcut info")
+            showToast(R.string.pin_invalid_request)
         }
     }
 
     private fun handleWidgetRequest(pinItemRequest: LauncherApps.PinItemRequest) {
-        val success = pinItemRequest.accept()
-        showToast(
-            if (success) "Widget pin request accepted"
-            else "Failed to pin widget"
-        )
+        showToast(if (pinItemRequest.accept()) R.string.pin_widget_added else R.string.pin_widget_failed)
     }
 }
