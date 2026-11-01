@@ -6,8 +6,6 @@ import android.net.Uri
 import android.util.Log
 import android.view.Gravity
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
@@ -662,8 +660,8 @@ fun SettingsScreen(onBack: () -> Unit) {
             AnimatedVisibility(
                 visible = activePreviewTarget != null,
                 modifier = Modifier.fillMaxSize(),
-                enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
-                exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                enter = fadeIn(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec()),
+                exit = fadeOut(animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec())
             ) {
                 activePreviewTarget?.let { target ->
                     SettingsPreviewPane(target = target, state = previewState)

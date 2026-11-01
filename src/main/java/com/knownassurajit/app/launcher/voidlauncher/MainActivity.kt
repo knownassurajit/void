@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val navController = rememberNavController()
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            VoidAppTheme(appFont = uiState.appFont) {
+            VoidAppTheme(appFont = uiState.appFont, animationSpeed = uiState.animationSpeed) {
                 // Capture the physical status bar height — this returns the
                 // hardware inset even before the bar is programmatically hidden.
                 val density = LocalDensity.current
