@@ -2,8 +2,8 @@ package com.knownassurajit.app.launcher.voidlauncher.ui.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -14,7 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
- * The rounded single-line search field used by Settings and the font picker.
+ * The rounded single-line search field used by Settings, the app library, the widget picker and the
+ * font picker, so every search box has the same icon on the same side.
  *
  * @param leadingIconDescription spoken label of the search icon; null keeps the icon decorative.
  * @param clearDescription spoken label of the clear button; null shows no clear button.
@@ -33,11 +34,11 @@ fun VoidSearchField(
         onValueChange = onQueryChange,
         modifier = modifier.fillMaxWidth(),
         placeholder = { Text(hint) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = leadingIconDescription) },
+        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = leadingIconDescription) },
         trailingIcon = if (clearDescription != null && query.isNotEmpty()) {
             {
                 IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Close, contentDescription = clearDescription)
+                    Icon(Icons.Outlined.Close, contentDescription = clearDescription)
                 }
             }
         } else {

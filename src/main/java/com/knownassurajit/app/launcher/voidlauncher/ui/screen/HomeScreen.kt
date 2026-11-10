@@ -25,7 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,13 +37,13 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -78,6 +78,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.BuildConfig
 import com.knownassurajit.app.launcher.voidlauncher.HomeApp
@@ -195,21 +197,13 @@ private fun openScreenTimeDestination(context: android.content.Context) {
         val launchedFallback = resolvedIntent.action == Settings.ACTION_USAGE_ACCESS_SETTINGS ||
             resolvedIntent.action == Settings.ACTION_APPLICATION_DETAILS_SETTINGS
         if (launchedFallback) {
-            Toast.makeText(
-                context,
-                "Digital Wellbeing not found. Opening a settings fallback.",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(context, R.string.screen_time_fallback_opened, Toast.LENGTH_SHORT).show()
         }
         context.startActivity(resolvedIntent)
         return
     }
 
-    Toast.makeText(
-        context,
-        "No screen-time destination available on this device.",
-        Toast.LENGTH_SHORT
-    ).show()
+    Toast.makeText(context, R.string.screen_time_no_destination, Toast.LENGTH_SHORT).show()
 }
 
 // ── Main Home Screen ──
@@ -736,7 +730,8 @@ private fun ColumnScope.HomeAppsSection(
                 Text(
                     text = stringResource(R.string.home_reorder_release_hint),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
+                    // An instruction, so full variant color: at 40% small text fell under readable contrast.
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -797,6 +792,8 @@ private fun HomeAppPickerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val allApps = remember { mutableStateListOf<AppModel>() }
     var search by remember { mutableStateOf("") }
+    val addLabel = stringResource(R.string.home_apps_add_action)
+    val onHomeLabel = stringResource(R.string.home_apps_on_home)
 
     LaunchedEffect(Unit) {
         scope.launch {
@@ -860,7 +857,7 @@ private fun HomeAppPickerSheet(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                "${selectedApps.size} / $maxApps selected",
+                stringResource(R.string.home_apps_selected_count, selectedApps.size, maxApps),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = VoidDimens.compactSpacing, bottom = VoidDimens.rowSpacing)
@@ -872,41 +869,32 @@ private fun HomeAppPickerSheet(
                     verticalArrangement = Arrangement.spacedBy(VoidDimens.rowSpacing)
                 ) {
                     selectedApps.forEach { app ->
-                        Surface(
-                            shape = MaterialTheme.shapes.extraLarge,
-                            color = MaterialTheme.colorScheme.secondaryContainer
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(start = 12.dp)
-                            ) {
+                        // A whole chip is the remove target (at least a touch target tall), not a 32 dp icon on it.
+                        InputChip(
+                            selected = true,
+                            onClick = {
+                                val remaining = selectedApps.filterNot {
+                                    it.packageName == app.packageName &&
+                                        it.userString == app.userString
+                                }
+                                persistDense(remaining)
+                            },
+                            label = {
                                 Text(
                                     text = app.label,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.widthIn(max = 140.dp)
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                IconButton(
-                                    onClick = {
-                                        val remaining = selectedApps.filterNot {
-                                            it.packageName == app.packageName &&
-                                                it.userString == app.userString
-                                        }
-                                        persistDense(remaining)
-                                    },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.Close,
-                                        contentDescription = stringResource(R.string.remove),
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                }
-                            }
-                        }
+                            },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = stringResource(R.string.remove),
+                                    modifier = Modifier.size(InputChipDefaults.IconSize)
+                                )
+                            },
+                            shape = MaterialTheme.shapes.extraLarge
+                        )
                     }
                 }
             }
@@ -933,18 +921,20 @@ private fun HomeAppPickerSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 itemsIndexed(
                     items = filtered,
                     key = { index, app -> "lib_${app.id}_$index" }
                 ) { _, app ->
                     val isOnHome = selectedApps.any { it.packageName == app.appPackage }
+                    val canAdd = !isOnHome && selectedApps.size < maxApps && app is AppModel.App
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                if (!isOnHome && selectedApps.size < maxApps) {
+                            .heightIn(min = VoidDimens.minTouchTarget)
+                            // An app already on Home, or any app once Home is full, is not a target: TalkBack says so.
+                            .clickable(enabled = canAdd, onClickLabel = addLabel) {
+                                if (canAdd) {
                                     val a = app as? AppModel.App ?: return@clickable
                                     persistDense(
                                         selectedApps.toList() + HomeApp(
@@ -959,7 +949,8 @@ private fun HomeAppPickerSheet(
                                     )
                                 }
                             }
-                            .padding(vertical = 12.dp),
+                            .then(if (isOnHome) Modifier.semantics { stateDescription = onHomeLabel } else Modifier)
+                            .padding(vertical = VoidDimens.rowSpacing + VoidDimens.compactSpacing),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -979,9 +970,10 @@ private fun HomeAppPickerSheet(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         } else if (selectedApps.size < maxApps) {
+                            // The row already says "add" as its action; the icon is decoration.
                             Icon(
                                 Icons.Outlined.Add,
-                                contentDescription = stringResource(R.string.add),
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

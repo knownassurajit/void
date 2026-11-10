@@ -1,0 +1,9 @@
+# Baseline profile of VOID (release builds; ProfileInstaller applies it on first launch).
+#
+# Every method and class of the launcher's own code is listed as hot (H), startup (S) and post-startup
+# (P), so ART compiles them ahead of time instead of interpreting them the first time a screen opens:
+# the first open of Widgets, the drawer and Settings composes hundreds of lambdas that would otherwise
+# run interpreted, which shows as a stalled first frame of the transition. The libraries under it
+# (Compose, Material 3, Navigation, Lifecycle) ship their own profiles, which the build merges in.
+HSPLcom/knownassurajit/app/launcher/voidlauncher/**;->**(**)**
+Lcom/knownassurajit/app/launcher/voidlauncher/**;

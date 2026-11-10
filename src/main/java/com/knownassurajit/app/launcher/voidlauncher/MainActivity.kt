@@ -105,6 +105,9 @@ private object StatusBarPanelOpener {
 /** Physical status bar height, available to all screens regardless of bar visibility. */
 val LocalFixedStatusBarHeight = compositionLocalOf<Dp> { 24.dp }
 
+/** How long after launch the pinned widgets are built in the background: Home has drawn and settled by then. */
+private const val WIDGET_PREWARM_DELAY_MS = 1_500L
+
 class MainActivity : ComponentActivity() {
     private val appReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -135,10 +138,16 @@ class MainActivity : ComponentActivity() {
         androidx.core.content.ContextCompat.registerReceiver(this, appReceiver, pkgFilter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
 
         enableEdgeToEdge()
+        // Widgets are built once and kept while this activity lives (WidgetHostHolder). Build the pinned
+        // ones while Home is idle after launch, so the first open of Widgets shows them at once.
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(WIDGET_PREWARM_DELAY_MS)
+            com.knownassurajit.app.launcher.voidlauncher.helper.WidgetHostHolder.prewarm(this@MainActivity)
+        }
         setContent {
             val navController = rememberNavController()
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            VoidAppTheme(appFont = uiState.appFont) {
+            VoidAppTheme(appFont = uiState.appFont, animationSpeed = uiState.animationSpeed) {
                 // Capture the physical status bar height — this returns the
                 // hardware inset even before the bar is programmatically hidden.
                 val density = LocalDensity.current
@@ -278,7 +287,9 @@ class MainActivity : ComponentActivity() {
                                     mainViewModel.selectedApp(app, com.knownassurajit.app.launcher.voidlauncher.data.Constants.FLAG_LAUNCH_APP)
                                 },
                                 onOpenSettings = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
-                                privateSpacePlacement = uiState.privateSpacePlacement
+                                privateSpacePlacement = uiState.privateSpacePlacement,
+                                // Per-app usage is part of screen time: it follows the Home switch as well as its own.
+                                showAppScreenTime = uiState.showScreenTime && uiState.showAppScreenTime
                             )
                         }
                     }
@@ -322,6 +333,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // The kept widget views stay current while the launcher is visible.
+        com.knownassurajit.app.launcher.voidlauncher.helper.WidgetHostHolder.onActivityStarted(this)
+    }
+
+    override fun onStop() {
+        com.knownassurajit.app.launcher.voidlauncher.helper.WidgetHostHolder.onActivityStopped(this)
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
         viewModel.refreshFromPrefs()
@@ -329,6 +351,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // The kept widget views hold this activity: let them go with it.
+        com.knownassurajit.app.launcher.voidlauncher.helper.WidgetHostHolder.onActivityDestroyed(this)
         super.onDestroy()
         unregisterReceiver(appReceiver)
     }

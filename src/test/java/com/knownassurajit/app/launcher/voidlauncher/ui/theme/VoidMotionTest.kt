@@ -110,16 +110,22 @@ class VoidMotionTest {
     }
 
     @Test
-    fun scaleSpec_isTheSlowSpatialSpringWithAFinerThanDefaultThreshold() {
+    fun scaleSpec_isThePanelSpringWithAFinerThanDefaultThreshold() {
         listOf(fast, standard, slow).forEach { scheme ->
-            val spec = scheme.slowScaleSpec()
+            val spec = scheme.panelScaleSpec()
             assertEquals(VoidMotion.scaleVisibilityThreshold, spec.visibilityThreshold)
-            assertEquals(scheme.slowSpatialSpec<Float>().dampingRatio, spec.dampingRatio, 0f)
-            assertEquals(scheme.slowSpatialSpec<Float>().stiffness, spec.stiffness, 0f)
+            assertEquals(scheme.panelSpatialSpec<Float>().dampingRatio, spec.dampingRatio, 0f)
+            assertEquals(scheme.panelSpatialSpec<Float>().stiffness, spec.stiffness, 0f)
         }
         // Compose's own default for a Float spring is Spring.DefaultDisplacementThreshold (0.01).
         assertTrue(VoidMotion.scaleVisibilityThreshold < 0.01f)
         assertTrue(VoidMotion.scaleVisibilityThreshold > 0f)
+    }
+
+    @Test
+    fun thePanelSpring_isTheStandardSpatialDefault() {
+        assertEquals(0.9f to 700f, standard.panelSpatialSpec<Float>().pair())
+        assertEquals(700f / (0.6f * 0.6f), fast.panelSpatialSpec<Float>().stiffness, 0.01f)
     }
 
     @Test

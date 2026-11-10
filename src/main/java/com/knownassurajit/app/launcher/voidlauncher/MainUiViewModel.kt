@@ -1,19 +1,18 @@
 package com.knownassurajit.app.launcher.voidlauncher
 
 import android.app.Application
+import android.app.AppOpsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.view.Gravity
+import android.os.Process
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import android.app.usage.UsageStatsManager
 import com.knownassurajit.app.launcher.voidlauncher.data.HomeAppsCap
-import com.knownassurajit.app.launcher.voidlauncher.data.HomescreenPreferences
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeStyle
-import com.knownassurajit.app.launcher.voidlauncher.ui.theme.HomeTextColor
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
 import kotlinx.coroutines.Dispatchers
@@ -44,8 +43,8 @@ data class MainUiState(
     val showHomeApps: Boolean = true,
     val showStatusBar: Boolean = false,
     val homeAppsCount: Int = HomeAppsCap.DEFAULT,
-    val leftSwipeAction: String = SwipeAction.WIDGETS,
-    val rightSwipeAction: String = SwipeAction.NOTIFICATION_SUMMARY,
+    val leftSwipeAction: String = SwipeAction.NOTIFICATION_SUMMARY,
+    val rightSwipeAction: String = SwipeAction.WIDGETS,
     val clockSectionWeight: Float = 0.35f,
     val clockSizeScale: Float = 1.0f,
     val dateSizeScale: Float = 1.0f,
@@ -61,53 +60,7 @@ data class MainUiState(
     val showSeconds: Boolean = false,
     val animationSpeed: String = Prefs.AnimationSpeed.STANDARD,
     val contentSwipeToBack: Boolean = true,
-    val privateSpacePlacement: String = Prefs.PrivateSpacePlacement.BOTTOM,
-    val clockOpacity: Float = HomeStyle.MAX_OPACITY,
-    val homeAppsOpacity: Float = HomeStyle.MAX_OPACITY,
-    val clockColor: String = HomeTextColor.Default.key,
-    val homeAppsColor: String = HomeTextColor.Default.key,
-    val clockFontWeight: Int = HomeStyle.DEFAULT_CLOCK_WEIGHT,
-    val homeAppsFontWeight: Int = HomeStyle.DEFAULT_APP_WEIGHT,
-    val homeSidePaddingDp: Float = HomeStyle.DEFAULT_SIDE_PADDING_DP
-)
-
-/** Copies every Home setting from [hs]; the one mapping shared by the change listener and [MainUiViewModel.refreshFromPrefs]. */
-internal fun MainUiState.withHomescreenPreferences(hs: HomescreenPreferences): MainUiState = copy(
-    clockHorizontalAlignment = hs.clockHorizontalAlignment,
-    clockVerticalAlignment = hs.clockVerticalAlignment,
-    appHorizontalAlignment = hs.appHorizontalAlignment,
-    appVerticalAlignment = hs.appVerticalAlignment,
-    showClock = hs.showClock,
-    showDate = hs.showDate,
-    showScreenTime = hs.showScreenTime,
-    showHomeApps = hs.showHomeApps,
-    homeAppsCount = hs.maxApps,
-    showStatusBar = hs.showStatusBar,
-    leftSwipeAction = hs.leftSwipeAction,
-    rightSwipeAction = hs.rightSwipeAction,
-    clockSectionWeight = hs.clockSectionWeight,
-    clockSizeScale = hs.clockSizeScale,
-    dateSizeScale = hs.dateSizeScale,
-    screenTimeSizeScale = hs.screenTimeSizeScale,
-    homeSectionOrder = hs.homeSectionOrder,
-    homeTextSizeScale = hs.homeTextSizeScale,
-    appDrawerTextSizeScale = hs.appDrawerTextSizeScale,
-    appSpacingDp = hs.appSpacingDp,
-    enableGestures = hs.enableGestures,
-    enableSwipeDownNotifications = hs.enableSwipeDownNotifications,
-    appFont = hs.appFont,
-    use24HourClock = hs.use24HourClock,
-    showSeconds = hs.showSeconds,
-    animationSpeed = hs.animationSpeed,
-    contentSwipeToBack = hs.contentSwipeToBack,
-    privateSpacePlacement = hs.privateSpacePlacement,
-    clockOpacity = hs.clockOpacity,
-    homeAppsOpacity = hs.homeAppsOpacity,
-    clockColor = hs.clockColor,
-    homeAppsColor = hs.homeAppsColor,
-    clockFontWeight = hs.clockFontWeight,
-    homeAppsFontWeight = hs.homeAppsFontWeight,
-    homeSidePaddingDp = hs.homeSidePaddingDp
+    val privateSpacePlacement: String = Prefs.PrivateSpacePlacement.BOTTOM
 )
 
 data class HomeApp(
@@ -209,7 +162,39 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
                 val reloadApps = HomeAppsCap.shouldReloadHomeApps(lastMaxApps, hsPrefs.maxApps)
                 lastMaxApps = hsPrefs.maxApps
                 val apps = if (reloadApps) loadHomeApps(hsPrefs.maxApps) else _uiState.value.homeApps
-                _uiState.update { it.withHomescreenPreferences(hsPrefs).copy(homeApps = apps) }
+                _uiState.update {
+                    it.copy(
+                        clockHorizontalAlignment = hsPrefs.clockHorizontalAlignment,
+                        clockVerticalAlignment = hsPrefs.clockVerticalAlignment,
+                        appHorizontalAlignment = hsPrefs.appHorizontalAlignment,
+                        appVerticalAlignment = hsPrefs.appVerticalAlignment,
+                        showClock = hsPrefs.showClock,
+                        showDate = hsPrefs.showDate,
+                        showScreenTime = hsPrefs.showScreenTime,
+                        showHomeApps = hsPrefs.showHomeApps,
+                        homeAppsCount = hsPrefs.maxApps,
+                        homeApps = apps,
+                        showStatusBar = hsPrefs.showStatusBar,
+                        leftSwipeAction = hsPrefs.leftSwipeAction,
+                        rightSwipeAction = hsPrefs.rightSwipeAction,
+                        clockSectionWeight = hsPrefs.clockSectionWeight,
+                        clockSizeScale = hsPrefs.clockSizeScale,
+                        dateSizeScale = hsPrefs.dateSizeScale,
+                        screenTimeSizeScale = hsPrefs.screenTimeSizeScale,
+                        homeSectionOrder = hsPrefs.homeSectionOrder,
+                        homeTextSizeScale = hsPrefs.homeTextSizeScale,
+                        appDrawerTextSizeScale = hsPrefs.appDrawerTextSizeScale,
+                        appSpacingDp = hsPrefs.appSpacingDp,
+                        enableGestures = hsPrefs.enableGestures,
+                        enableSwipeDownNotifications = hsPrefs.enableSwipeDownNotifications,
+                        appFont = hsPrefs.appFont,
+                        use24HourClock = hsPrefs.use24HourClock,
+                        showSeconds = hsPrefs.showSeconds,
+                        animationSpeed = hsPrefs.animationSpeed,
+                        contentSwipeToBack = hsPrefs.contentSwipeToBack,
+                        privateSpacePlacement = hsPrefs.privateSpacePlacement
+                    )
+                }
                 // Re-format time immediately when format changes
                 val now = Date()
                 val formatter = when {
@@ -251,9 +236,40 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun refreshFromPrefs() {
-        val hsPrefs = prefs.currentHomescreenPreferences()
-        val apps = loadHomeApps(hsPrefs.maxApps.coerceIn(0, 10))
-        _uiState.update { it.withHomescreenPreferences(hsPrefs).copy(homeApps = apps) }
+        val count = prefs.maxHomeApps.coerceIn(0, 10)
+        val apps = loadHomeApps(count)
+        _uiState.update {
+            it.copy(
+                homeApps = apps,
+                homeAppsCount = count,
+                clockHorizontalAlignment = prefs.clockAlignment,
+                clockVerticalAlignment = prefs.clockVerticalAlignment,
+                appHorizontalAlignment = prefs.homeAlignment,
+                appVerticalAlignment = prefs.homeVerticalAlignment,
+                showClock = prefs.showClockWidget,
+                showDate = prefs.showDateWidget,
+                showScreenTime = prefs.showScreenTimeWidget,
+                showHomeApps = prefs.showHomeApps,
+                showStatusBar = prefs.showStatusBar,
+                leftSwipeAction = prefs.leftSwipeAction,
+                rightSwipeAction = prefs.rightSwipeAction,
+                clockSectionWeight = prefs.clockSectionWeight,
+                clockSizeScale = prefs.clockSizeScale,
+                dateSizeScale = prefs.dateSizeScale,
+                screenTimeSizeScale = prefs.screenTimeSizeScale,
+                homeSectionOrder = prefs.homeSectionOrder,
+                homeTextSizeScale = prefs.homeTextSizeScale,
+                appDrawerTextSizeScale = prefs.appDrawerTextSizeScale,
+                appSpacingDp = prefs.appSpacingDp,
+                enableGestures = prefs.enableGestures,
+                enableSwipeDownNotifications = prefs.enableSwipeDownNotifications,
+                appFont = prefs.appFont,
+                use24HourClock = prefs.use24HourClock,
+                animationSpeed = prefs.animationSpeed,
+                contentSwipeToBack = prefs.contentSwipeToBack,
+                privateSpacePlacement = prefs.privateSpacePlacement
+            )
+        }
     }
 
     private fun loadScreenTime() {
@@ -298,6 +314,19 @@ class MainUiViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.update { it.copy(screenTime = "Screen time: Data unavailable") }
             }
         }
+    }
+
+    private fun hasUsageStatsPermission(): Boolean {
+        val appOpsManager = appContext.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager
+            ?: return false
+        val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            appOpsManager.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), appContext.packageName)
+        } else {
+            @Suppress("DEPRECATION")
+            appOpsManager.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), appContext.packageName)
+        }
+
+        return mode == AppOpsManager.MODE_ALLOWED
     }
 
     override fun onCleared() {
