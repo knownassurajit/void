@@ -12,6 +12,33 @@ object VoidDimens {
     val fontStateIconSize = 24.dp
     val fontProgressStrokeWidth = 2.dp
 
+    /** The smallest touch target (Material and Android accessibility guidance). */
+    val minTouchTarget = 48.dp
+
+    /**
+     * How far an icon button draws its glyph inside its touch target: (48 dp target - 24 dp icon) / 2.
+     * A row of icon buttons takes this off its end padding so the glyph, not the invisible target,
+     * sits on the screen's content edge.
+     */
+    val iconButtonGlyphInset = 12.dp
+
+    /** The smallest height of a panel's title row, so a trailing button never makes titles jump between panels. */
+    val panelTitleMinHeight = minTouchTarget
+
+    /** Space above and below an app's name in the app library. */
+    val drawerRowPadding = 14.dp
+
+    /** Inner padding of a notification or summary card, and the gap between cards. */
+    val cardPadding = 16.dp
+    val cardGap = 8.dp
+
+    /** Elevation of a bar that floats over content (the widget edit bar), and its tonal lift. */
+    val floatingBarElevation = 8.dp
+    val floatingBarTonalElevation = 3.dp
+
+    /** Elevation of a header that slides in over content (the Widgets header). */
+    val overlayHeaderElevation = 6.dp
+
     /**
      * Drag distance along the dismiss direction that commits a swipe on release: the Material 3
      * `SwipeToDismissBox` positional threshold (`SwipeToDismissBoxDefaults.positionalThreshold`).

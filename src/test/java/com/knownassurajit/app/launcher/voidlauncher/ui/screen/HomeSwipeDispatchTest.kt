@@ -4,6 +4,8 @@ import com.knownassurajit.app.launcher.voidlauncher.MainUiState
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs.SwipeAction
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeFeatureFlags
 import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.SwipeTarget
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.dispatchSwipeTarget
+import com.knownassurajit.app.launcher.voidlauncher.ui.gesture.homeSwipeSettings
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.NavRouteKind
 import com.knownassurajit.app.launcher.voidlauncher.ui.theme.PanelEdge
 import org.junit.Assert.assertEquals

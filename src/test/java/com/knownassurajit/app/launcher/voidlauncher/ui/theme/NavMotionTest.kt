@@ -133,8 +133,8 @@ class NavMotionTest {
     fun everyEdgeAndSpeed_buildsTheExpectedPartsWithTheExpectedSprings() {
         speeds.forEach { speed ->
             val scheme = VoidMotionScheme(speed)
-            val slide = scheme.slowSpatialSpec(IntOffset.VisibilityThreshold).id()
-            val scale = scheme.slowScaleSpec().id()
+            val slide = scheme.panelSpatialSpec(IntOffset.VisibilityThreshold).id()
+            val scale = scheme.panelScaleSpec().id()
             PanelEdge.entries.forEach { edge ->
                 val label = "$speed $edge"
                 val enter = NavMotion.enter(edge, scheme)
@@ -168,13 +168,13 @@ class NavMotionTest {
 
     @Test
     fun springIdentity_tellsSpeedsAndFamiliesApart() {
-        val ids = speeds.map { VoidMotionScheme(it).slowSpatialSpec(IntOffset.VisibilityThreshold).id() }
+        val ids = speeds.map { VoidMotionScheme(it).panelSpatialSpec(IntOffset.VisibilityThreshold).id() }
         assertEquals(ids.size, ids.toSet().size)
         assertNotEquals(
-            motion.slowSpatialSpec(IntOffset.VisibilityThreshold).id(),
+            motion.panelSpatialSpec(IntOffset.VisibilityThreshold).id(),
             motion.slowEffectsSpec(IntOffset.VisibilityThreshold).id()
         )
-        assertNotEquals(motion.slowScaleSpec().id(), motion.slowSpatialSpec<Float>().id())
+        assertNotEquals(motion.panelScaleSpec().id(), motion.panelSpatialSpec<Float>().id())
     }
 
     @Test

@@ -119,6 +119,56 @@ object WidgetGrid {
         return null
     }
 
+    /**
+     * The cell [placement] reaches when it moves [columns] columns and [rows] rows, or `null` when that
+     * cell is off the grid or covers another widget. It is one deliberate step (a screen reader's
+     * "Move left"), not a drop: it never slides to a nearby free cell the way [nearestFreeCell] does.
+     */
+    fun moved(
+        others: List<Placement>,
+        placement: Placement,
+        columns: Int,
+        rows: Int,
+        gridColumns: Int = WidgetLayoutHelper.GRID_COLUMNS
+    ): Cell? {
+        val candidate = placement.copy(cell = Cell(placement.cell.column + columns, placement.cell.row + rows))
+        return candidate.cell.takeIf { fits(others, candidate, gridColumns) }
+    }
+
+    /**
+     * The sizes one step away from [placement]'s, each `null` when that step is not possible: the
+     * provider does not resize that way ([resizesHorizontally], [resizesVertically]), the size would
+     * leave the grid or go under one cell, or it would cover another widget. A widget keeps its
+     * top-left cell, so growing takes the cells to its right and below it.
+     */
+    fun resizeSteps(
+        others: List<Placement>,
+        placement: Placement,
+        resizesHorizontally: Boolean,
+        resizesVertically: Boolean,
+        columns: Int = WidgetLayoutHelper.GRID_COLUMNS
+    ): ResizeSteps {
+        fun step(deltaColumns: Int, deltaRows: Int): WidgetSpan? {
+            val span = WidgetSpan(placement.span.columns + deltaColumns, placement.span.rows + deltaRows)
+            if (span.columns !in 1..columns || span.rows !in 1..WidgetLayoutHelper.MAX_ROWS) return null
+            return span.takeIf { fits(others, placement.copy(span = it), columns) }
+        }
+        return ResizeSteps(
+            wider = if (resizesHorizontally) step(1, 0) else null,
+            narrower = if (resizesHorizontally) step(-1, 0) else null,
+            taller = if (resizesVertically) step(0, 1) else null,
+            shorter = if (resizesVertically) step(0, -1) else null
+        )
+    }
+
+    /** The next size each way; see [resizeSteps]. */
+    data class ResizeSteps(
+        val wider: WidgetSpan?,
+        val narrower: WidgetSpan?,
+        val taller: WidgetSpan?,
+        val shorter: WidgetSpan?
+    )
+
     /** The cell whose top-left corner is nearest to a top-left at ([xDp], [yDp]), keeping [span] inside the columns. */
     fun cellAt(
         xDp: Float,

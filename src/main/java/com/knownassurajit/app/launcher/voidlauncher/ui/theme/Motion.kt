@@ -1,15 +1,21 @@
 package com.knownassurajit.app.launcher.voidlauncher.ui.theme
 
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.IntOffset
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 
 /**
  * Material 3 **standard** spring tokens as (dampingRatio, stiffness) pairs, copied from material3
- * 1.4.0 `StandardMotionTokens`. `MotionScheme` is internal in every released material3 (1.3.2 on
- * our classpath has none), so the numbers live here instead.
+ * 1.4.0 `StandardMotionTokens`. The numbers live here because full-screen panels use the standard
+ * springs (an expressive overshoot would show the window edge), while `MaterialTheme.motionScheme`
+ * is the expressive scheme (see [SpeedScaledMotionScheme] for how it follows the speed setting).
  *
  * Standard, not Expressive: a damping ratio of 0.9 overshoots by about 0.15%, so a full-screen
  * panel never exposes the black window edge. Spatial springs move things (offset, scale, size);
@@ -29,6 +35,15 @@ object VoidMotion {
     const val effectsDefaultStiffness = 1600f
     const val effectsSlowDamping = 1.0f
     const val effectsSlowStiffness = 800f
+
+    /**
+     * The spring a full-screen panel moves on (slide, shared-axis scale), and Home with it: the
+     * spatial default token. It settles a 1080 px slide in about 0.3 s at standard speed. It was
+     * spatial slow (0.5 s), which read as sluggish for a launcher whose screens open many times a
+     * minute; damping 0.9 keeps the overshoot under 2 px, so the window edge never shows.
+     */
+    const val panelDamping = spatialDefaultDamping
+    const val panelStiffness = spatialDefaultStiffness
 
     /**
      * Where a spring on a scale (a `Float` between 0.8 and 1.1) stops. Compose's default of 0.01
@@ -92,8 +107,15 @@ class VoidMotionScheme(private val speedKey: String) {
         visibilityThreshold
     )
 
-    /** [slowSpatialSpec] for a scale: it stops at [VoidMotion.scaleVisibilityThreshold] instead of Compose's 0.01. */
-    fun slowScaleSpec(): SpringSpec<Float> = slowSpatialSpec(VoidMotion.scaleVisibilityThreshold)
+    /** The spring of a full-screen panel and of Home moving with it ([VoidMotion.panelStiffness]). */
+    fun <T> panelSpatialSpec(visibilityThreshold: T? = null): SpringSpec<T> = scaled(
+        VoidMotion.panelDamping,
+        VoidMotion.panelStiffness,
+        visibilityThreshold
+    )
+
+    /** [panelSpatialSpec] for a scale: it stops at [VoidMotion.scaleVisibilityThreshold] instead of Compose's 0.01. */
+    fun panelScaleSpec(): SpringSpec<Float> = panelSpatialSpec(VoidMotion.scaleVisibilityThreshold)
 
     fun <T> fastEffectsSpec(visibilityThreshold: T? = null): SpringSpec<T> = scaled(
         VoidMotion.effectsFastDamping,
@@ -120,3 +142,40 @@ class VoidMotionScheme(private val speedKey: String) {
 @Composable
 fun rememberVoidMotionScheme(speedKey: String): VoidMotionScheme =
     remember(speedKey) { VoidMotionScheme(speedKey) }
+
+/**
+ * The Material [MotionScheme] of the theme with the animation-speed preference applied: every
+ * spring it hands out ([delegate]'s springs) keeps its damping and has its stiffness scaled the way
+ * [VoidMotion.stiffnessFor] scales the panel springs.
+ *
+ * `MaterialTheme.motionScheme` drives the springs of Material components (buttons, switches, list
+ * items, sliders) and of our own `AnimatedVisibility` and offset animations. Before this wrapper only the
+ * panel transitions followed the preference, so "Fast" and "Slow" changed how the screens moved and
+ * left everything inside them at the default speed. A spec that is not a spring (a tween the scheme
+ * never returns today) is passed on unchanged.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+class SpeedScaledMotionScheme(
+    private val delegate: MotionScheme,
+    private val speedKey: String
+) : MotionScheme {
+    override fun <T> defaultSpatialSpec(): FiniteAnimationSpec<T> = scaled(delegate.defaultSpatialSpec())
+    override fun <T> fastSpatialSpec(): FiniteAnimationSpec<T> = scaled(delegate.fastSpatialSpec())
+    override fun <T> slowSpatialSpec(): FiniteAnimationSpec<T> = scaled(delegate.slowSpatialSpec())
+    override fun <T> defaultEffectsSpec(): FiniteAnimationSpec<T> = scaled(delegate.defaultEffectsSpec())
+    override fun <T> fastEffectsSpec(): FiniteAnimationSpec<T> = scaled(delegate.fastEffectsSpec())
+    override fun <T> slowEffectsSpec(): FiniteAnimationSpec<T> = scaled(delegate.slowEffectsSpec())
+
+    private fun <T> scaled(spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> {
+        if (spec !is SpringSpec<T> || VoidMotion.speedFactor(speedKey) == 1f) return spec
+        return spring(spec.dampingRatio, VoidMotion.stiffnessFor(speedKey, spec.stiffness), spec.visibilityThreshold)
+    }
+}
+
+/**
+ * [this] spring, stopping at one pixel instead of the 0.01 that Compose assumes for a number: an
+ * offset animation given a scheme spring (which has no threshold) keeps running for a quarter of
+ * a second after it has stopped moving.
+ */
+fun FiniteAnimationSpec<IntOffset>.stoppingAtOnePixel(): FiniteAnimationSpec<IntOffset> =
+    if (this is SpringSpec<IntOffset>) spring(dampingRatio, stiffness, IntOffset.VisibilityThreshold) else this

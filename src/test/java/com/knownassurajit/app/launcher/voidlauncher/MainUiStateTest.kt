@@ -4,6 +4,7 @@ import android.view.Gravity
 import com.knownassurajit.app.launcher.voidlauncher.data.HomescreenPreferences
 import com.knownassurajit.app.launcher.voidlauncher.data.Prefs
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,7 +45,8 @@ class MainUiStateTest {
         homeAppsColor = "muted",
         clockFontWeight = 500,
         homeAppsFontWeight = 700,
-        homeSidePaddingDp = 32f
+        homeSidePaddingDp = 32f,
+        showAppScreenTime = false
     )
 
     @Test
@@ -62,6 +64,13 @@ class MainUiStateTest {
         assertEquals(700, state.homeAppsFontWeight)
         assertEquals(32f, state.homeSidePaddingDp, 0f)
         assertEquals(Prefs.PrivateSpacePlacement.SEARCH_BAR, state.privateSpacePlacement)
+        assertFalse(state.showAppScreenTime)
+    }
+
+    @Test
+    fun appScreenTimeIsOnUntilTheUserSwitchesItOff() {
+        assertTrue(MainUiState().showAppScreenTime)
+        assertTrue(MainUiState().withHomescreenPreferences(prefs.copy(showAppScreenTime = true)).showAppScreenTime)
     }
 
     @Test

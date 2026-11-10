@@ -17,7 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Remove
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -72,7 +74,8 @@ private const val MAX_CONNECTED_OPTIONS = 4
 private val SEGMENT_GAP = 2.dp
 
 /**
- * A category heading above a run of [SettingsSection]s ("Appearance", "Home screen", ...).
+ * A category heading above a run of [SettingsSection]s ("Appearance", "Home screen", ...). Announced as a
+ * heading, as is a section's own label, so a screen reader can move through Settings by heading.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -81,11 +84,13 @@ fun SettingsGroupHeader(title: String) {
         text = title,
         style = MaterialTheme.typography.titleLargeEmphasized,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(
-            start = VoidDimens.compactSpacing,
-            top = VoidDimens.sectionSpacing + VoidDimens.rowSpacing,
-            bottom = VoidDimens.compactSpacing
-        )
+        modifier = Modifier
+            .padding(
+                start = VoidDimens.compactSpacing,
+                top = VoidDimens.sectionSpacing + VoidDimens.rowSpacing,
+                bottom = VoidDimens.compactSpacing
+            )
+            .semantics { heading() }
     )
 }
 
@@ -107,10 +112,12 @@ fun SettingsSection(
                 text = title,
                 style = MaterialTheme.typography.labelLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(
-                    start = VoidDimens.sectionSpacing,
-                    bottom = if (description == null) VoidDimens.rowSpacing else VoidDimens.compactSpacing
-                )
+                modifier = Modifier
+                    .padding(
+                        start = VoidDimens.sectionSpacing,
+                        bottom = if (description == null) VoidDimens.rowSpacing else VoidDimens.compactSpacing
+                    )
+                    .semantics { heading() }
             )
         }
         if (description != null) {
@@ -139,12 +146,27 @@ fun SettingsSection(
 @Composable
 private fun segmentShapes() = LocalSegmentPosition.current.let { ListItemDefaults.segmentedShapes(it.index, it.count) }
 
+/**
+ * Where a row's leading icon and trailing control sit. A row that is only text (title and subtitle)
+ * centers them on that block however many lines the subtitle wraps to, so icons and switches stay
+ * on one line down a group instead of jumping between rows (the list item's own default moves them
+ * to the title line once a row is three lines tall). A row with a control under its title (slider,
+ * choice buttons) keeps them on the title line at any height or font scale: the icon belongs to
+ * the title, not to the middle of the control.
+ */
+private val TextRowAlignment = Alignment.CenterVertically
+private val ControlRowAlignment = Alignment.Top
+
 @Composable
 private fun Subtitle(text: String) {
     if (text.isNotEmpty()) Text(text, maxLines = 3, overflow = TextOverflow.Ellipsis)
 }
 
-/** Opens something (a screen, a picker, system settings). */
+/**
+ * Opens something. A chevron says the row goes deeper inside VOID (a picker, a dialog); an
+ * [external] row leaves VOID for a page of Android's own settings and says so with an open-in-new
+ * icon.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingActionItem(
@@ -152,20 +174,29 @@ fun SettingActionItem(
     subtitle: String,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
+    external: Boolean = false,
     trailing: (@Composable () -> Unit)? = {
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        if (external) {
+            Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
+        } else {
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null)
+        }
     }
 ) {
     SegmentedListItem(
         onClick = onClick,
         shapes = segmentShapes(),
+        verticalAlignment = TextRowAlignment,
         leadingContent = icon,
         supportingContent = if (subtitle.isEmpty()) null else { { Subtitle(subtitle) } },
         trailingContent = trailing
     ) { Text(title) }
 }
 
-/** A switch row: the whole row toggles; the thumb shows a check while on. */
+/**
+ * A switch row: the whole row toggles; the thumb shows a check while on. A row that is not
+ * [enabled] is dimmed and ignores touches (a setting that depends on another one that is off).
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingToggleItem(
@@ -173,18 +204,22 @@ fun SettingToggleItem(
     subtitle: String,
     icon: @Composable () -> Unit,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
 ) {
     SegmentedListItem(
         checked = checked,
         onCheckedChange = onCheckedChange,
         shapes = segmentShapes(),
+        enabled = enabled,
+        verticalAlignment = TextRowAlignment,
         leadingContent = icon,
         supportingContent = if (subtitle.isEmpty()) null else { { Subtitle(subtitle) } },
         trailingContent = {
             Switch(
                 checked = checked,
                 onCheckedChange = null,
+                enabled = enabled,
                 thumbContent = if (checked) {
                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
                 } else {
@@ -220,6 +255,7 @@ fun SettingSliderItem(
 
     SegmentedListItem(
         shapes = segmentShapes(),
+        verticalAlignment = ControlRowAlignment,
         leadingContent = icon,
         trailingContent = {
             Text(shownValue, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -255,6 +291,7 @@ fun <T> SettingChoiceItem(
 ) {
     SegmentedListItem(
         shapes = segmentShapes(),
+        verticalAlignment = ControlRowAlignment,
         leadingContent = icon,
         supportingContent = {
             Column {
@@ -317,6 +354,7 @@ fun SettingCounterItem(
 ) {
     SegmentedListItem(
         shapes = segmentShapes(),
+        verticalAlignment = TextRowAlignment,
         leadingContent = icon,
         supportingContent = if (subtitle.isEmpty()) null else { { Subtitle(subtitle) } },
         trailingContent = {

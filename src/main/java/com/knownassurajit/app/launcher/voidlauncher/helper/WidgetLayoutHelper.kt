@@ -44,6 +44,28 @@ object WidgetLayoutHelper {
         return WidgetSpan(columns = columns, rows = rows)
     }
 
+    /**
+     * The side of one square cell of the Widgets grid on a screen [screenWidthDp] wide: the width minus
+     * the side padding, shared by [GRID_COLUMNS] cells and the gaps between them, never under
+     * [MIN_HEIGHT_DP]. The screen and the pre-built widget views use the same number.
+     */
+    fun cellDpFor(screenWidthDp: Int, sidePaddingDp: Float, spacingDp: Int = GRID_SPACING_DP, columns: Int = GRID_COLUMNS): Int =
+        ((screenWidthDp - sidePaddingDp * 2 - spacingDp * (columns - 1)) / columns)
+            .toInt()
+            .coerceAtLeast(MIN_HEIGHT_DP)
+
+    /** [defaultSpan] from a provider's metadata; the target cells only exist on Android 12 and later. */
+    fun defaultSpanFor(info: android.appwidget.AppWidgetProviderInfo, cellDp: Int): WidgetSpan {
+        val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        return defaultSpan(
+            minWidthDp = info.minWidth,
+            minHeightDp = info.minHeight,
+            targetCellWidth = if (modern) info.targetCellWidth else 0,
+            targetCellHeight = if (modern) info.targetCellHeight else 0,
+            cellDp = cellDp
+        )
+    }
+
     fun clampSpan(
         span: WidgetSpan,
         gridColumns: Int = GRID_COLUMNS
