@@ -1,14 +1,14 @@
 # Privacy Policy for VOID
 
 **Effective Date:** August 13, 2026  
-**Last Updated:** October 7, 2026
+**Last Updated:** November 15, 2026
 
 ## 1. Overview
-VOID ("the Application") is a minimalist Android launcher with on-device AI notification summaries, developed by Surajit Das ("we", "us", or "our"). We believe privacy is a fundamental right. VOID is open-source (GPLv3) and designed around zero data collection.
+VOID ("the Application") is a minimalist Android launcher with local notification summaries, developed by Surajit Das ("we", "us", or "our"). We believe privacy is a fundamental right. VOID is open-source (GPLv3) and designed around zero data collection.
 
-## 2. Notification Data & On-Device AI Summarization
-- **Notification Access:** If granted permission, VOID Launcher accesses incoming system notifications solely to display them on your home screen and generate AI summaries.
-- **Strict On-Device Processing:** AI summarization is performed **100% locally on your device** using Android AICore / Gemini Nano (or local text parsing fallbacks).
+## 2. Notification Data & Local Summarization
+- **Notification Access:** If granted permission, VOID Launcher accesses incoming system notifications solely to display them on your home screen and generate concise local summaries.
+- **Strict On-Device Processing:** Summaries are created from notification text by deterministic local parsing. No AI model or cloud service is used.
 - **No Cloud Uploads:** Notification titles, text, and contact names are **never** transmitted off your device or sent to any server.
 
 ## 3. Device Permissions & Purpose

@@ -3,7 +3,7 @@
 | Folder | Contents |
 |--------|----------|
 | [architecture/](architecture/) | Flavor decision, data flow, process boundaries, motion |
-| [features/](features/) | Private Space, widgets, AI summary, notes, fonts |
+| [features/](features/) | Private Space, widgets, notification summaries, notes, fonts |
 | [settings/](settings/) | Categories and hierarchy, homescreen layout customization, permissions, icon placement rules |
 | [testing/](testing/) | Unit, e2e, manual checklist |
 | [bugs/](bugs/) | Root-cause notes for fixed defects (`home-apps-cap`, reorder, drawer crash, Google Sans placeholder assets) |

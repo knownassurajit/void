@@ -28,7 +28,7 @@
 - `LaunchAnimationTest` — edge to launch animation (left swipe action from the left, right from the right, up from the bottom, no edge keeps the default), the custom animation only on Android 11 and earlier (API 31+ ignores it for a launch in a new task), the resource pairs, and the eight `res/anim` files against `NavTravel` and `VoidAlpha`: 300 ms on the emphasized-decelerate curve, the app travels its whole extent from its edge without a fade, Home leaves the same way by the parallax and dims to 68%, the window default stays the fade
 - `PredictiveBackMathTest` — edge sign (left `+1`, right `-1`, none `0`), the `W / 20 - 8 dp` shift cap and its floor at 0, the sideways-only `shiftOffset`, scales 0.9 and 1.1, duration per animation speed, the 35% fade split, the easing control points (0.1, 0.1, 0, 1) and two of its values
 - `HomeReorderHelper` — multi-slot cascade and `moveItem`
-- `AiSummarizer` — tier mapping
+- `LocalNotificationSummarizer` — deterministic formatting, truncation, and empty input
 - `FeatureAvailability` — private space API gate (robolectric/light)
 - `PrivateSpaceUi` — settings action visibility, add-entry heuristic, `outcomeFor` (an unlock request that returns false is never `UNLOCKED`)
 - `BundledFontFilesTest` — every `res/font` `.ttf`/`.otf`/`.ttc` has a valid sfnt header (would have caught the Google Sans HTML placeholders); the default Google Sans asset exists, exposes only the pinned-down `wght` axis covering the weights `GoogleSansFamily` declares, and keeps its `tnum` (tabular figures) feature; every bundled catalog family has its files and the Geist asset is byte-identical to upstream (sha256 pin)

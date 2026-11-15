@@ -8,7 +8,7 @@ VOID Launcher is a minimalist Android launcher focused on reducing distractions 
 - **App Drawer**: Searchable list of all installed apps with alphabetical grouping.
 - **Notes**: Built-in simple note-taking with reminders and calendar integration.
 - **Widgets**: Dedicated screen hosting live system widgets via native `AppWidgetHost`.
-- **Notification Summary**: On-device AI-powered summarization of notifications using ML Kit GenAI (Gemini Nano).
+- **Notification Summary**: Deterministic on-device summaries from notification text; no AI service or network call.
 - **Private Space Integration**: Support for Android 15+'s Private Space feature.
 - **Customization**: Fonts, text scaling, clock size, section weights/order, and layout alignments.
 
@@ -17,7 +17,7 @@ VOID Launcher is a minimalist Android launcher focused on reducing distractions 
 - **UI Framework**: Jetpack Compose (BOM 2025.05.01)
 - **Navigation**: Type-safe Jetpack Navigation Compose
 - **Architecture**: MVVM with StateFlow and LiveData (legacy interop)
-- **AI**: Google ML Kit GenAI (Prompt & Summarization APIs)
+- **Summaries**: Local text parsing via `LocalNotificationSummarizer`
 - **Persistence**: SharedPreferences (wrapped in `Prefs` class) and JSON file caching for apps.
 
 ## Build Variant
@@ -31,7 +31,7 @@ See `docs/architecture/flavor-decision.md`.
 - `AppRoutes.kt`: Type-safe route definitions.
 - `MainUiViewModel.kt`: UI state management for the home screen.
 - `Prefs.kt`: Centralized preference management.
-- `AiSummarizer.kt`: Tiered AI engine for notification summaries.
+- `LocalNotificationSummarizer.kt`: Deterministic formatting for notification summaries.
 
 ## Known Issues & Ongoing Work
 - Resolving crashes during screen transitions.

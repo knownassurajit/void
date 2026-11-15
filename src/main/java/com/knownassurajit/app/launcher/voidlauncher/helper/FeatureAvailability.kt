@@ -48,15 +48,6 @@ object FeatureAvailability {
         }
     }
 
-    fun isAiCoreLikelyAvailable(context: Context): Boolean {
-        return try {
-            context.packageManager.getPackageInfo("com.google.android.aicore", 0)
-            true
-        } catch (_: Exception) {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
-        }
-    }
-
     /**
      * Downloadable fonts need the Google Play services font provider. Without it (no Play services, a stripped
      * ROM) the Google Fonts families are hidden and the bundled ones keep working. Signature checks happen when a

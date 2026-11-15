@@ -3,7 +3,7 @@
 Checklist-style notes with optional reminders (`NotesScreen`, `NoteRepository`, WorkManager reminder worker).
 
 - Swipe dismiss / priority ordering
-- No AI summarization on notes (AI is for notifications only)
+- Notification summaries apply only to notification text; notes remain plain text
 - Reachable via configurable swipe actions from home
 
 ## Options and deletion

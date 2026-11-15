@@ -12,9 +12,6 @@ navigationevent = "1.2.0"
 serializationJson = "1.12.0"
 googleFonts = "1.10.6"
 profileinstaller = "1.4.1"
-mlkitSummarization = "1.0.0-beta1"
-mlkitPrompt = "1.0.0-beta5"
-coroutinesPlayServices = "1.11.0"
 
 [libraries]
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -42,11 +39,6 @@ navigationevent = { module = "androidx.navigationevent:navigationevent", version
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serializationJson" }
 profileinstaller = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
 
-# Integrated-flavor only (ML Kit GenAI)
-mlkit-genai-summarization = { module = "com.google.mlkit:genai-summarization", version.ref = "mlkitSummarization" }
-mlkit-genai-prompt = { module = "com.google.mlkit:genai-prompt", version.ref = "mlkitPrompt" }
-kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
-
 # Test
 junit = "junit:junit:4.13.2"
 androidx-junit = "androidx.test.ext:junit:1.2.1"
@@ -56,6 +48,5 @@ compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlinStdlib" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinStdlib" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinStdlib" }

@@ -10,7 +10,7 @@ The former `integrated` / `disintegrated` product flavors were removed. All feat
 
 - The project is intended for GitHub / sideload distribution, not Play Store policy packaging.
 - Dual flavors duplicated APIs, broke CI after removal, and confused contributors.
-- Capability differences are better expressed as **runtime gates** (API level, permissions, AICore presence) than compile-time stubs.
+- Capability differences are better expressed as **runtime gates** (API level and permissions) than compile-time stubs.
 
 ## Runtime gates
 
@@ -21,7 +21,7 @@ The former `integrated` / `disintegrated` product flavors were removed. All feat
 | Widgets | AppWidgetHost / AppWidgetManager |
 | Private Space | API 35+ and profile detection |
 | Notifications UI | Always available; listener optional |
-| AI summary | Soft AICore / API readiness; tier fallbacks remain |
+| Notification summary | Deterministic local text parsing; no external model or service |
 
 `FeatureUnavailableScreen` messaging describes missing capability/permission — not a Play SKU.
 

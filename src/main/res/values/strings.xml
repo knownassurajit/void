@@ -87,7 +87,7 @@
     <string name="permissions">Permissions</string>
     <string name="permissions_intro">Runtime grants used by launcher features. Install-time items are listed for reference.</string>
     <string name="perm_notification_listener">Notification listener</string>
-    <string name="perm_notification_listener_body">In-app notification list and AI summary</string>
+    <string name="perm_notification_listener_body">In-app notification list and local summaries</string>
     <string name="perm_usage_access">Usage access</string>
     <string name="perm_usage_access_body">Home screen time</string>
     <string name="perm_accessibility">Accessibility</string>
@@ -169,7 +169,7 @@
     <string name="notification_summary">Notification Summary</string>
     <string name="widgets">Widgets</string>
     <string name="private_space">Private Space</string>
-    <string name="ai_summary_unavailable">AI summary unavailable on this device</string>
+    <string name="notification_summary_notice">Summaries are generated locally from notification text.</string>
     <string name="no_widgets">No widgets available</string>
     <string name="summarizing">Summarizing…</string>
     <string name="no_summary">No notifications to summarize</string>

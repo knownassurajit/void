@@ -8,19 +8,6 @@
 -dontwarn com.google.errorprone.annotations.Immutable
 -dontwarn com.google.errorprone.annotations.RestrictedApi
 
-# ── Integrated-flavor: ML Kit GenAI ───────────────────────────────────────────
-# ML Kit on-device feature delivery loads classes via reflection at runtime.
-# These keep rules are no-ops for the disintegrated build because the classes
-# are not on the classpath; R8 just ignores keeps for absent classes.
--keep class com.google.mlkit.genai.** { *; }
--dontwarn com.google.mlkit.genai.**
--keep class com.google.android.gms.internal.mlkit_genai_summarization.** { *; }
--keep class com.google.android.gms.internal.mlkit_genai_prompt.** { *; }
-
-# Guava ListenableFuture used by the ML Kit GenAI futures adapter.
--keep interface com.google.common.util.concurrent.ListenableFuture { *; }
--keep class com.google.common.util.concurrent.** { *; }
-
 # ── Kotlinx Serialization (@Serializable Compose navigation routes) ───────────
 # Type-safe Navigation-Compose routes are @Serializable data objects/classes.
 # R8 must keep the generated $serializer companion fields or NavType lookup fails at runtime.

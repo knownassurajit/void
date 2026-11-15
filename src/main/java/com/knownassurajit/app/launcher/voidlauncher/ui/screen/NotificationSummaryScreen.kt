@@ -31,8 +31,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.knownassurajit.app.launcher.voidlauncher.LocalFixedStatusBarHeight
 import com.knownassurajit.app.launcher.voidlauncher.R
 import com.knownassurajit.app.launcher.voidlauncher.data.AppNotificationSummary
-import com.knownassurajit.app.launcher.voidlauncher.helper.AiSummarizer
 import com.knownassurajit.app.launcher.voidlauncher.helper.FeatureAvailability
+import com.knownassurajit.app.launcher.voidlauncher.helper.LocalNotificationSummarizer
 import com.knownassurajit.app.launcher.voidlauncher.helper.NotificationService
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.DismissibleCard
 import com.knownassurajit.app.launcher.voidlauncher.ui.components.NotificationAccessPrompt
@@ -58,21 +58,14 @@ class NotificationSummaryViewModel(application: Application) : AndroidViewModel(
         private const val SUMMARY_DEBOUNCE_MS = 250L
     }
 
-    private val summarizer = AiSummarizer(application.applicationContext)
+    private val summarizer = LocalNotificationSummarizer()
     private val summaryJobs = mutableMapOf<String, Job>()
     private var generation = 0L
 
     private val _summaries = MutableStateFlow<List<AppNotificationSummary>>(emptyList())
     val summaries: StateFlow<List<AppNotificationSummary>> = _summaries.asStateFlow()
 
-    private val _isAiAvailable = MutableStateFlow<Boolean?>(null)
-    val isAiAvailable: StateFlow<Boolean?> = _isAiAvailable.asStateFlow()
-
     init {
-        viewModelScope.launch {
-            _isAiAvailable.value = summarizer.isAvailable()
-        }
-
         viewModelScope.launch {
             NotificationService.notificationsState.collect { groups ->
                 generation += 1
@@ -96,20 +89,19 @@ class NotificationSummaryViewModel(application: Application) : AndroidViewModel(
 
                 _summaries.value = summaryList
 
-                // Generate AI summaries in background
                 summaryList.forEach { summary ->
                     summaryJobs[summary.packageName]?.cancel()
                     summaryJobs[summary.packageName] = launch {
                         val texts = extractNotificationTexts(summary.notifications)
 
-                        val aiResult = summarizer.summarize(summary.appLabel, texts)
+                        val localSummary = summarizer.summarize(texts)
                         if (currentGeneration != generation) return@launch
 
                         val fallbackSummary = texts.joinToString(". ")
                         _summaries.value = _summaries.value.map { current ->
                             if (current.packageName == summary.packageName) {
                                 current.copy(
-                                    aiSummary = aiResult ?: fallbackSummary,
+                                    summary = localSummary ?: fallbackSummary,
                                     isLoading = false
                                 )
                             } else {
@@ -204,7 +196,6 @@ fun NotificationSummaryScreen(
 
     val hasAccess = rememberNotificationAccess()
     val summaries by viewModel.summaries.collectAsState()
-    val aiAvailable by viewModel.isAiAvailable.collectAsState()
     val totalCount = remember(summaries) { summaries.sumOf { it.notifications.size } }
 
     Column(
@@ -220,9 +211,9 @@ fun NotificationSummaryScreen(
         ) {
             if (hasAccess && totalCount > 0) TotalCountPill(totalCount)
         }
-        if (hasAccess && aiAvailable == false) {
+        if (hasAccess) {
             Text(
-                text = stringResource(R.string.ai_summary_unavailable),
+                text = stringResource(R.string.notification_summary_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(
@@ -308,7 +299,7 @@ private fun SummaryCard(summary: AppNotificationSummary) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            val bullets = remember(summary.aiSummary) { SummaryBullets.parse(summary.aiSummary) }
+            val bullets = remember(summary.summary) { SummaryBullets.parse(summary.summary) }
             when (bullets.size) {
                 0 -> SummaryText(stringResource(R.string.summary_empty), muted = true)
                 1 -> SummaryText(bullets.first())

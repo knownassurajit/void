@@ -28,8 +28,8 @@
 ## ✨ Core Features
 
 - **Text-Only Home Screen**: Pin up to 10 of your most essential apps as clean text labels. No icons, no distractions.
-- **Smart Notification Grouping**: A dedicated screen that groups system notifications by app with smart summaries, categorized by conversation. Each app is a card: tap its header to show all of its notifications, swipe it either way (or use TalkBack's Dismiss action) to clear them. Without notification access the panel says why it is empty and links to the system page, and fills in as soon as you come back.
-- **On-Device AI Summarization**: Uses Gemini Nano (via ML Kit) to summarize your notifications locally, ensuring privacy and speed.
+- **Smart Notification Grouping**: A dedicated screen that groups system notifications by app with concise local summaries, categorized by conversation. Each app is a card: tap its header to show all of its notifications, swipe it either way (or use TalkBack's Dismiss action) to clear them. Without notification access the panel says why it is empty and links to the system page, and fills in as soon as you come back.
+- **Offline Notification Summaries**: Summaries are generated locally from notification text; no AI model, cloud service, or GenAI SDK is required.
 - **Integrated Quick Notes**: Fast, text-based checklist with stars, reminders and undoable swipe-to-delete; long-press a note for edit, reminder, copy, share and delete.
 - **Widget Grid**: A full-screen 4-column grid with no top bar: drag down or tap the strip at the top to bring in the header (title, Add widget), hold a widget in the picker and drag it onto the grid, and tap and hold a pinned widget to move it, change its width and height with labelled buttons, or remove it. Widgets are kept live and built ahead of time, so they are on screen as soon as Widgets opens. See [`docs/features/widgets.md`](docs/features/widgets.md).
 - **Granular Home Styling**: Per-block (clock, home apps) size, weight, any color (spectrum picker, hex codes, theme colors) and opacity, plus spacing, side margins and the clock/apps split, with a live preview in Settings.
@@ -68,7 +68,7 @@ VOID Launcher leverages the latest Android development stack for maximum perform
 - **UI Framework**: [Jetpack Compose](https://developer.android.com/compose) with [Material 3](https://m3.material.io/).
 - **Programming Language**: 100% Kotlin.
 - **State Management**: Clean Architecture with Fragments/Single-Activity and shared `MainViewModel` using Kotlin Coroutines and Flow.
-- **Intelligence**: Integrated with **ML Kit GenAI** for on-device notification processing.
+- **Notification Processing**: Deterministic summaries run entirely on-device without an AI service or network request.
 - **Background Tasks**: Powered by `WorkManager` for reliable, low-impact operations like wallpaper updates.
 - **Persistence**: Hybrid approach using `SharedPreferences` and JSON for lightweight, fast data access.
 
@@ -149,7 +149,7 @@ Required secrets for `stable-release`: `SIGNING_KEY`, `ALIAS`, `KEY_STORE_PASSWO
 
 VOID is designed with privacy as a first-class citizen:
 - **No Ads. No Tracking.**
-- **Local AI**: All summarization happens on-device using Gemini Nano. Your data never leaves your phone.
+- **Local Summaries**: Notification summaries are generated on-device from notification text. Your notification data never leaves your phone.
 - **Open Source**: The code is fully transparent and open for audit.
 
 ---

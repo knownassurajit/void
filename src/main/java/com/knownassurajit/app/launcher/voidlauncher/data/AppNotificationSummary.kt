@@ -7,7 +7,7 @@ data class AppNotificationSummary(
     val packageName: String,
     val appLabel: String,
     val notifications: List<StatusBarNotification>,
-    val aiSummary: String? = null,
+    val summary: String? = null,
     val latestTimestamp: Long,
     val isLoading: Boolean = true
 )

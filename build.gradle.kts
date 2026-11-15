@@ -1,13 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.knownassurajit.app.launcher.voidlauncher"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.knownassurajit.app.launcher.voidlauncher"
@@ -94,11 +93,6 @@ dependencies {
 
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.profileinstaller)
-
-    // ML Kit GenAI — included in the single-variant OSS build.
-    implementation(libs.mlkit.genai.summarization)
-    implementation(libs.mlkit.genai.prompt)
-    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

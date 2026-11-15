@@ -114,7 +114,7 @@ Runtime gates live in `FeatureAvailability`:
 - Widgets → AppWidgetHost availability
 - Private Space → API 35+ / profile presence
 - Notification listener → optional permission for live panels
-- AICore → soft capability for richer summarization tiers
+- Notification summaries → deterministic local text parsing; do not add an AI service dependency
 
 Degrade gracefully when a capability or permission is missing. Do not reintroduce Play stub flavors unless a Play SKU is explicitly planned.
 
